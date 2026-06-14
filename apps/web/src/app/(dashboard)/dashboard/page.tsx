@@ -1,9 +1,7 @@
-import { auth } from "@/server/auth";
-import { getWorkspacesByUser } from "@/modules/workspace/queries";
+import { listMyWorkspaces } from "@/modules/workspace/workspace.service";
 
 export default async function DashboardPage() {
-  const session = await auth();
-  const workspaces = await getWorkspacesByUser(session!.user.id);
+  const workspaces = await listMyWorkspaces();
 
   return (
     <div className="p-6">

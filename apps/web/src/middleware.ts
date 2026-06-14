@@ -1,21 +1,24 @@
-import { auth } from "@/server/auth";
+import NextAuth from "next-auth";
+import { authConfig } from "@/server/auth/config";
+
+// Edge-safe: build a minimal auth instance from the DB-free config.
+const { auth } = NextAuth(authConfig);
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
   const isAuthPage = req.nextUrl.pathname.startsWith("/login");
-  const isApiRoute = req.nextUrl.pathname.startsWith("/api");
 
-  if (isApiRoute) return;
-
-  if (!isLoggedIn && !isAuthPage) {
-    return Response.redirect(new URL("/login", req.url));
+  if (isAuthPage) {
+    if (isLoggedIn) return Response.redirect(new URL("/dashboard", req.url));
+    return;
   }
 
-  if (isLoggedIn && isAuthPage) {
-    return Response.redirect(new URL("/dashboard", req.url));
+  if (!isLoggedIn) {
+    return Response.redirect(new URL("/login", req.url));
   }
 });
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Exclude API routes (incl. /api/auth) and static assets from the gate.
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };

@@ -1,21 +1,29 @@
 import { notFound } from "next/navigation";
-import { auth } from "@/server/auth";
-import { getProjectById } from "@/modules/project/queries";
-import { getTasksByProject } from "@/modules/task/queries";
+import { getWorkspace } from "@/modules/workspace/workspace.service";
+import { getProject } from "@/modules/project/project.service";
+import { listBoard } from "@/modules/task/task.service";
 import { TaskBoard } from "@/modules/task/components/task-board";
+import { NotFoundError } from "@/server/lib/errors";
+import type { Task, TaskStatus } from "@vieroc/types";
 
 interface Props {
   params: Promise<{ slug: string; projectId: string }>;
 }
 
 export default async function ProjectPage({ params }: Props) {
-  const { projectId } = await params;
-  const session = await auth();
+  const { slug, projectId } = await params;
 
-  const project = await getProjectById(projectId, session!.user.id);
-  if (!project) notFound();
+  let workspace;
+  let project;
+  try {
+    workspace = await getWorkspace(slug);
+    project = await getProject(workspace.id, projectId);
+  } catch (err) {
+    if (err instanceof NotFoundError) notFound();
+    throw err;
+  }
 
-  const { tasks, statuses } = await getTasksByProject(projectId);
+  const { tasks, statuses } = await listBoard(workspace.id, projectId);
 
   return (
     <div className="flex flex-col h-full">
@@ -26,7 +34,11 @@ export default async function ProjectPage({ params }: Props) {
         )}
       </div>
       <div className="flex-1 overflow-hidden">
-        <TaskBoard tasks={tasks} statuses={statuses} projectId={projectId} />
+        <TaskBoard
+          tasks={tasks as unknown as Task[]}
+          statuses={statuses as unknown as TaskStatus[]}
+          projectId={projectId}
+        />
       </div>
     </div>
   );

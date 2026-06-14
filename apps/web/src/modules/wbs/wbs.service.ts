@@ -1,0 +1,92 @@
+import "server-only";
+import { db } from "@vieroc/db";
+import { requireActor } from "@/server/lib/context";
+import { NotFoundError } from "@/server/lib/errors";
+import { createWbsNodeSchema, updateWbsNodeSchema } from "./wbs.schema";
+import { assertCanManageWbs } from "./wbs.policy";
+import * as repo from "./wbs.repo";
+import * as events from "./wbs.events";
+
+/** Read: WBS nodes for a project (ordered by position). Requires workspace membership. */
+export async function listWbsNodes(workspaceId: string, projectId: string) {
+  await requireActor(workspaceId, projectId);
+  return repo.listByProject(projectId);
+}
+
+export async function createWbsNode(p: {
+  workspaceId: string;
+  projectId: string;
+  input: unknown;
+}) {
+  const data = createWbsNodeSchema.parse(p.input);
+  const ctx = await requireActor(p.workspaceId, p.projectId);
+  assertCanManageWbs(ctx);
+
+  return db.transaction(async (tx) => {
+    const node = await repo.create(
+      {
+        projectId: p.projectId,
+        parentId: data.parentId ?? null,
+        title: data.title,
+        description: data.description ?? null,
+        nodeType: data.nodeType,
+        linkedTaskId: data.linkedTaskId ?? null,
+        position: data.position,
+      },
+      tx
+    );
+
+    await events.wbsNodeCreated(tx, ctx, node);
+
+    return node;
+  });
+}
+
+export async function updateWbsNode(p: {
+  workspaceId: string;
+  projectId: string;
+  nodeId: string;
+  input: unknown;
+}) {
+  const data = updateWbsNodeSchema.parse(p.input);
+  const ctx = await requireActor(p.workspaceId, p.projectId);
+  assertCanManageWbs(ctx);
+
+  const existing = await repo.findById(p.nodeId);
+  if (!existing) throw new NotFoundError("WBS node");
+
+  const values: Partial<repo.WbsNodeInsert> = {};
+  if (data.parentId !== undefined) values.parentId = data.parentId ?? null;
+  if (data.title !== undefined) values.title = data.title;
+  if (data.description !== undefined) values.description = data.description ?? null;
+  if (data.nodeType !== undefined) values.nodeType = data.nodeType;
+  if (data.linkedTaskId !== undefined) values.linkedTaskId = data.linkedTaskId ?? null;
+  if (data.position !== undefined) values.position = data.position;
+
+  return db.transaction(async (tx) => {
+    const updated = await repo.update(p.nodeId, values, tx);
+    if (!updated) throw new NotFoundError("WBS node");
+
+    await events.wbsNodeUpdated(tx, ctx, existing, updated);
+
+    return updated;
+  });
+}
+
+export async function deleteWbsNode(p: {
+  workspaceId: string;
+  projectId: string;
+  nodeId: string;
+}) {
+  const ctx = await requireActor(p.workspaceId, p.projectId);
+  assertCanManageWbs(ctx);
+
+  const existing = await repo.findById(p.nodeId);
+  if (!existing) throw new NotFoundError("WBS node");
+
+  return db.transaction(async (tx) => {
+    await events.wbsNodeDeleted(tx, ctx, existing);
+    await repo.remove(p.nodeId, tx);
+    return { id: p.nodeId };
+  });
+}

@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
-import { auth } from "@/server/auth";
-import { getWorkspaceBySlug } from "@/modules/workspace/queries";
-import { getProjectsByWorkspace } from "@/modules/project/queries";
+import { getWorkspace } from "@/modules/workspace/workspace.service";
+import { listProjects } from "@/modules/project/project.service";
 import { ProjectCard } from "@/modules/project/components/project-card";
+import { NotFoundError } from "@/server/lib/errors";
+import type { Project } from "@vieroc/types";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -10,12 +11,16 @@ interface Props {
 
 export default async function WorkspacePage({ params }: Props) {
   const { slug } = await params;
-  const session = await auth();
 
-  const workspace = await getWorkspaceBySlug(slug, session!.user.id);
-  if (!workspace) notFound();
+  let workspace;
+  try {
+    workspace = await getWorkspace(slug);
+  } catch (err) {
+    if (err instanceof NotFoundError) notFound();
+    throw err;
+  }
 
-  const projects = await getProjectsByWorkspace(workspace.id);
+  const projects = await listProjects(workspace.id);
 
   return (
     <div className="p-6">
@@ -25,7 +30,11 @@ export default async function WorkspacePage({ params }: Props) {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {projects.map((project) => (
-          <ProjectCard key={project.id} project={project} workspaceSlug={slug} />
+          <ProjectCard
+            key={project.id}
+            project={project as unknown as Project}
+            workspaceSlug={slug}
+          />
         ))}
       </div>
     </div>

@@ -1,29 +1,43 @@
 import NextAuth from "next-auth";
-import GitHub from "next-auth/providers/github";
-import Google from "next-auth/providers/google";
-import { DrizzleAdapter } from "@auth/drizzle-adapter";
-import { db } from "@vieroc/db";
+import { db, users } from "@vieroc/db";
+import { authConfig } from "./config";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: DrizzleAdapter(db),
-  providers: [
-    GitHub({
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-    }),
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-  ],
+  ...authConfig,
   callbacks: {
-    session({ session, user }) {
-      session.user.id = user.id;
+    ...authConfig.callbacks,
+    /**
+     * On initial sign-in, upsert the OAuth profile into our own `users` table
+     * (mapping name → full_name, picture → avatar_url) and stamp our internal
+     * user id onto the JWT. We do not use a database session adapter, so this
+     * keeps the design's `users` schema as the source of truth without needing
+     * Auth.js's accounts/sessions tables.
+     */
+    async jwt({ token, profile, account }) {
+      if (account && profile?.email) {
+        const email = profile.email;
+        const fullName = (profile.name as string | undefined) ?? email;
+        const avatarUrl =
+          (profile.picture as string | undefined) ??
+          (profile.avatar_url as string | undefined) ??
+          null;
+
+        const [row] = await db
+          .insert(users)
+          .values({ email, fullName, avatarUrl })
+          .onConflictDoUpdate({
+            target: users.email,
+            set: { fullName, avatarUrl, updatedAt: new Date() },
+          })
+          .returning({ id: users.id });
+
+        if (row) token.userId = row.id;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (token.userId) session.user.id = token.userId as string;
       return session;
     },
-  },
-  pages: {
-    signIn: "/login",
-    error: "/login",
   },
 });
