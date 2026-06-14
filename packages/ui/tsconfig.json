@@ -1,0 +1,8 @@
+{
+  "extends": "@vieroc/config/typescript/nextjs",
+  "compilerOptions": {
+    "outDir": "dist"
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}

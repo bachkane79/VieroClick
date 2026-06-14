@@ -1,0 +1,11 @@
+{
+  "name": "@vieroc/config",
+  "version": "0.0.1",
+  "private": true,
+  "exports": {
+    "./eslint": "./eslint/index.js",
+    "./prettier": "./prettier/index.js",
+    "./typescript/base": "./typescript/base.json",
+    "./typescript/nextjs": "./typescript/nextjs.json"
+  }
+}
