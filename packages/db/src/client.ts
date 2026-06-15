@@ -7,7 +7,7 @@ import * as schema from "./schema/index";
 // Using the Pool/WebSocket driver (not neon-http) because interactive
 // transactions — required by the service-layer mutation flow — are only
 // supported over WebSockets.
-neonConfig.webSocketConstructor = ws;
+neonConfig.webSocketConstructor = globalThis.WebSocket ?? ws;
 
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is required");

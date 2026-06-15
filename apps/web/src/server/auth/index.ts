@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import { db, users } from "@vieroc/db";
 import { authConfig } from "./config";
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+const authResult = NextAuth({
   ...authConfig,
   callbacks: {
     ...authConfig.callbacks,
@@ -13,8 +13,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
      * keeps the design's `users` schema as the source of truth without needing
      * Auth.js's accounts/sessions tables.
      */
-    async jwt({ token, profile, account }) {
-      if (account && profile?.email) {
+    async jwt({ token, profile, account, user }) {
+      if (account && account.provider === "credentials" && user?.email) {
+        const email = user.email;
+        const fullName = user.name ?? email;
+        const avatarUrl = null;
+
+        const [row] = await db
+          .insert(users)
+          .values({ email, fullName, avatarUrl })
+          .onConflictDoUpdate({
+            target: users.email,
+            set: { fullName, updatedAt: new Date() },
+          })
+          .returning({ id: users.id });
+
+        if (row) token.userId = row.id;
+      } else if (account && profile?.email) {
         const email = profile.email;
         const fullName = (profile.name as string | undefined) ?? email;
         const avatarUrl =
@@ -41,3 +56,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
 });
+
+export const handlers = authResult.handlers;
+export const auth = authResult.auth;
+export const signIn = authResult.signIn as (...args: any[]) => Promise<any>;
+export const signOut = authResult.signOut as (...args: any[]) => Promise<any>;

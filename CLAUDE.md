@@ -122,6 +122,7 @@ The event write and any notifications are committed atomically with the mutation
 ### Web → Python boundary
 
 Next.js calls the Python service only for AI jobs (planning, assignment, report generation, Q&A). The call pattern is:
+
 1. Web POSTs to `agent-api /api/jobs/` with `{ job_type, project_id, input }` and the `X-Api-Secret` header.
 2. Agent API enqueues a Celery task and returns `{ job_id, status: "queued" }`.
 3. Web polls `GET /api/jobs/{job_id}` for results.

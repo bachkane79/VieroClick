@@ -33,3 +33,59 @@ export function workspaceUpdated(
     after,
   });
 }
+
+export function workspaceMemberAdded(
+  exec: Executor,
+  ctx: ActorContext,
+  after: Record<string, unknown>
+) {
+  return recordEvent(exec, {
+    ...actorFields(ctx),
+    entityType: "workspace_member",
+    entityId: (after.memberId as string) || ctx.workspaceId,
+    eventType: "workspace.member_added",
+    after,
+  });
+}
+
+export function workspaceMemberRoleUpdated(
+  exec: Executor,
+  ctx: ActorContext,
+  after: Record<string, unknown>
+) {
+  return recordEvent(exec, {
+    ...actorFields(ctx),
+    entityType: "workspace_member",
+    entityId: (after.memberId as string) || ctx.workspaceId,
+    eventType: "workspace.member_role_updated",
+    after,
+  });
+}
+
+export function workspaceMemberRemoved(
+  exec: Executor,
+  ctx: ActorContext,
+  after: Record<string, unknown>
+) {
+  return recordEvent(exec, {
+    ...actorFields(ctx),
+    entityType: "workspace_member",
+    entityId: (after.memberId as string) || ctx.workspaceId,
+    eventType: "workspace.member_removed",
+    after,
+  });
+}
+
+export function workspaceMemberUpdated(
+  exec: Executor,
+  ctx: ActorContext,
+  after: Record<string, unknown>
+) {
+  return recordEvent(exec, {
+    ...actorFields(ctx),
+    entityType: "workspace_member",
+    entityId: (after.memberId as string) || ctx.workspaceMemberId,
+    eventType: "workspace.member_updated",
+    after,
+  });
+}

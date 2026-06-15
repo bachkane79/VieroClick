@@ -1,4 +1,5 @@
-# Next.js + AI Monorepo Design System  
+# Next.js + AI Monorepo Design System
+
 ## Autonomous Agent Project Manager System
 
 > Scope: thiết kế hệ thống monorepo cho sản phẩm quản lý dự án có lớp AI Agent.  
@@ -989,13 +990,13 @@ If due date changed, write plan deviation event.
 ### Minimum task service
 
 ```ts
-createTask(input)
-updateTask(taskId, patch)
-assignTask(taskId, memberId)
-changeTaskStatus(taskId, statusId)
-createSubtask(parentTaskId, input)
-addTaskDependency(blockerTaskId, blockedTaskId)
-removeTaskDependency(dependencyId)
+createTask(input);
+updateTask(taskId, patch);
+assignTask(taskId, memberId);
+changeTaskStatus(taskId, statusId);
+createSubtask(parentTaskId, input);
+addTaskDependency(blockerTaskId, blockedTaskId);
+removeTaskDependency(dependencyId);
 ```
 
 ---
@@ -1257,7 +1258,7 @@ if task status not done and due_date < today:
 Tạo service:
 
 ```ts
-detectPlanDeviations(projectId)
+detectPlanDeviations(projectId);
 ```
 
 Returns:

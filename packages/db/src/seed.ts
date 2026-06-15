@@ -1,4 +1,7 @@
-import "dotenv/config";
+import * as dotenv from "dotenv";
+import * as path from "path";
+dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
+
 import { db, users, workspaces, workspaceMembers, projects, taskStatuses } from "./index";
 
 async function seed() {
@@ -39,7 +42,13 @@ async function seed() {
 
   await db.insert(taskStatuses).values([
     { projectId: project!.id, name: "Todo", type: "todo", position: 0, isDefault: true },
-    { projectId: project!.id, name: "In Progress", type: "in_progress", position: 1, isDefault: false },
+    {
+      projectId: project!.id,
+      name: "In Progress",
+      type: "in_progress",
+      position: 1,
+      isDefault: false,
+    },
     { projectId: project!.id, name: "In Review", type: "in_review", position: 2, isDefault: false },
     { projectId: project!.id, name: "Done", type: "done", position: 3, isDefault: false },
   ]);

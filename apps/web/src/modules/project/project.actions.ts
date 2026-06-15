@@ -24,3 +24,10 @@ export async function updateProjectAction(args: {
     return project;
   });
 }
+
+export async function detectPlanDeviationsAction(args: { workspaceId: string; projectId: string }) {
+  return runAction(async () => {
+    return service.detectPlanDeviations(args.workspaceId, args.projectId);
+  });
+}
+

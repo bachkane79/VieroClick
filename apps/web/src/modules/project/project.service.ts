@@ -87,3 +87,139 @@ export async function updateProject(workspaceId: string, projectId: string, inpu
     return updated;
   });
 }
+
+import { and, eq } from "drizzle-orm";
+import { tasks, taskStatuses, taskDependencies } from "@vieroc/db";
+
+export async function detectPlanDeviations(workspaceId: string, projectId: string) {
+  await requireActor(workspaceId, projectId);
+
+  // 1. Fetch all tasks with status type
+  const allTasks = await db
+    .select({
+      id: tasks.id,
+      title: tasks.title,
+      dueDate: tasks.dueDate,
+      startDate: tasks.startDate,
+      isMilestone: tasks.isMilestone,
+      priority: tasks.priority,
+      statusType: taskStatuses.type,
+      statusName: taskStatuses.name,
+    })
+    .from(tasks)
+    .innerJoin(taskStatuses, eq(taskStatuses.id, tasks.statusId))
+    .where(eq(tasks.projectId, projectId));
+
+  // 2. Fetch all dependencies
+  const dependencies = await db
+    .select({
+      blockerTaskId: taskDependencies.blockerTaskId,
+      blockedTaskId: taskDependencies.blockedTaskId,
+    })
+    .from(taskDependencies)
+    .where(eq(taskDependencies.projectId, projectId));
+
+  const todayStr = new Date().toISOString().split("T")[0];
+  const today = todayStr ? new Date(todayStr) : new Date();
+
+  const deviations: Array<{
+    type: "dependency_conflict" | "milestone_at_risk" | "task_delayed";
+    taskId: string;
+    severity: "low" | "medium" | "high" | "urgent";
+    reason: string;
+  }> = [];
+
+  // Overdue tasks
+  const overdueTasks = allTasks.filter((t) => {
+    if (t.statusType === "done" || t.statusType === "cancelled") return false;
+    if (!t.dueDate) return false;
+    const due = new Date(t.dueDate);
+    return due < today;
+  });
+
+  // Build graph of blockers
+  // Graph: blockerId -> list of blockedIds
+  const blockerMap = new Map<string, string[]>();
+  for (const dep of dependencies) {
+    const list = blockerMap.get(dep.blockerTaskId) ?? [];
+    list.push(dep.blockedTaskId);
+    blockerMap.set(dep.blockerTaskId, list);
+  }
+
+  // Helper to check if task A directly or transitively blocks task B
+  const blocksTask = (startId: string, targetId: string): boolean => {
+    const visited = new Set<string>();
+    const queue = [startId];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      if (current === targetId) return true;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      const neighbors = blockerMap.get(current) ?? [];
+      queue.push(...neighbors);
+    }
+    return false;
+  };
+
+  // Find milestones
+  const milestoneTasks = allTasks.filter((t) => t.isMilestone);
+
+  // Check milestone risk and delayed tasks
+  for (const ot of overdueTasks) {
+    let blocksMilestone = false;
+    let blockedMilestoneTitle = "";
+
+    for (const mt of milestoneTasks) {
+      if (blocksTask(ot.id, mt.id)) {
+        blocksMilestone = true;
+        blockedMilestoneTitle = mt.title;
+        break;
+      }
+    }
+
+    if (blocksMilestone) {
+      deviations.push({
+        type: "milestone_at_risk",
+        taskId: ot.id,
+        severity: "high",
+        reason: `Overdue task "${ot.title}" blocks milestone "${blockedMilestoneTitle}"`,
+      });
+    } else {
+      let severity: "low" | "medium" | "high" | "urgent" = "medium";
+      if (ot.priority === "low") severity = "low";
+      if (ot.priority === "high") severity = "high";
+      if (ot.priority === "urgent") severity = "urgent";
+
+      deviations.push({
+        type: "task_delayed",
+        taskId: ot.id,
+        severity,
+        reason: `Task "${ot.title}" is overdue (due ${ot.dueDate})`,
+      });
+    }
+  }
+
+  // Check dependency conflicts
+  // A conflict is when blocker.dueDate > blocked.startDate
+  for (const dep of dependencies) {
+    const blocker = allTasks.find((t) => t.id === dep.blockerTaskId);
+    const blocked = allTasks.find((t) => t.id === dep.blockedTaskId);
+
+    if (blocker && blocked && blocker.dueDate && blocked.startDate) {
+      const blockerDue = new Date(blocker.dueDate);
+      const blockedStart = new Date(blocked.startDate);
+
+      if (blockerDue > blockedStart) {
+        deviations.push({
+          type: "dependency_conflict",
+          taskId: blocked.id,
+          severity: "medium",
+          reason: `Blocker task "${blocker.title}" due date (${blocker.dueDate}) is after blocked task "${blocked.title}" start date (${blocked.startDate})`,
+        });
+      }
+    }
+  }
+
+  return deviations;
+}
+
