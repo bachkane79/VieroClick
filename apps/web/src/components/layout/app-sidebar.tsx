@@ -7,7 +7,15 @@ import { signOut } from "next-auth/react";
 import type { User } from "next-auth";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { CreateWorkspaceDialog } from "@/modules/workspace/components/create-workspace-dialog";
-import { ChevronDown, Plus, LayoutDashboard, Settings, UserCircle, Briefcase } from "lucide-react";
+import {
+  Briefcase,
+  ChevronDown,
+  LayoutDashboard,
+  ListTodo,
+  Plus,
+  Settings,
+  UserCircle,
+} from "lucide-react";
 
 interface Props {
   user: User;
@@ -102,15 +110,28 @@ export function AppSidebar({ user, workspaces }: Props) {
             </div>
             
             <Link
-              href={`/workspace/${activeWorkspace.slug}`}
+              href={`/workspace/${activeWorkspace.slug}/projects`}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                pathname === `/workspace/${activeWorkspace.slug}`
+                pathname === `/workspace/${activeWorkspace.slug}` ||
+                pathname.startsWith(`/workspace/${activeWorkspace.slug}/projects`)
                   ? "bg-primary text-primary-foreground shadow-md font-semibold"
                   : "hover:bg-muted text-muted-foreground hover:text-foreground"
               }`}
             >
               <Briefcase className="w-4 h-4 shrink-0" />
-              <span>Projects Board</span>
+              <span>Projects</span>
+            </Link>
+
+            <Link
+              href={`/workspace/${activeWorkspace.slug}/my-tasks`}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                pathname === `/workspace/${activeWorkspace.slug}/my-tasks`
+                  ? "bg-primary text-primary-foreground shadow-md font-semibold"
+                  : "hover:bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <ListTodo className="w-4 h-4 shrink-0" />
+              <span>My Tasks</span>
             </Link>
 
             <Link

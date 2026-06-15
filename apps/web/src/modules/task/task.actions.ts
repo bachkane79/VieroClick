@@ -12,6 +12,9 @@ interface BaseArgs {
 
 function revalidateBoard(slug: string, projectId: string) {
   revalidatePath(`/workspace/${slug}/project/${projectId}`);
+  revalidatePath(`/workspace/${slug}/projects/${projectId}/tasks`);
+  revalidatePath(`/workspace/${slug}/projects/${projectId}/board`);
+  revalidatePath(`/workspace/${slug}/my-tasks`);
 }
 
 export async function createTaskAction(args: BaseArgs & { data: unknown }) {
@@ -58,6 +61,85 @@ export async function deleteTaskAction(args: BaseArgs & { taskId: string }) {
       workspaceId: args.workspaceId,
       projectId: args.projectId,
       taskId: args.taskId,
+    });
+    revalidateBoard(args.slug, args.projectId);
+    return result;
+  });
+}
+
+export async function assignTaskAction(args: BaseArgs & { taskId: string; memberId: string | null }) {
+  return runAction(async () => {
+    const task = await service.assignTask({
+      workspaceId: args.workspaceId,
+      projectId: args.projectId,
+      taskId: args.taskId,
+      memberId: args.memberId,
+    });
+    revalidateBoard(args.slug, args.projectId);
+    return task;
+  });
+}
+
+export async function changeTaskStatusAction(
+  args: BaseArgs & {
+    taskId: string;
+    statusId: string;
+    blockerReason?: string;
+    allowBlockedOverride?: boolean;
+  }
+) {
+  return runAction(async () => {
+    const task = await service.changeTaskStatus({
+      workspaceId: args.workspaceId,
+      projectId: args.projectId,
+      taskId: args.taskId,
+      statusId: args.statusId,
+      blockerReason: args.blockerReason,
+      allowBlockedOverride: args.allowBlockedOverride,
+    });
+    revalidateBoard(args.slug, args.projectId);
+    return task;
+  });
+}
+
+export async function createSubtaskAction(
+  args: BaseArgs & { parentTaskId: string; data: unknown }
+) {
+  return runAction(async () => {
+    const task = await service.createSubtask({
+      workspaceId: args.workspaceId,
+      projectId: args.projectId,
+      parentTaskId: args.parentTaskId,
+      input: args.data,
+    });
+    revalidateBoard(args.slug, args.projectId);
+    return task;
+  });
+}
+
+export async function addTaskDependencyFromTaskAction(
+  args: BaseArgs & { blockerTaskId: string; blockedTaskId: string }
+) {
+  return runAction(async () => {
+    const dependency = await service.addTaskDependency({
+      workspaceId: args.workspaceId,
+      projectId: args.projectId,
+      blockerTaskId: args.blockerTaskId,
+      blockedTaskId: args.blockedTaskId,
+    });
+    revalidateBoard(args.slug, args.projectId);
+    return dependency;
+  });
+}
+
+export async function removeTaskDependencyFromTaskAction(
+  args: BaseArgs & { dependencyId: string }
+) {
+  return runAction(async () => {
+    const result = await service.removeTaskDependency({
+      workspaceId: args.workspaceId,
+      projectId: args.projectId,
+      dependencyId: args.dependencyId,
     });
     revalidateBoard(args.slug, args.projectId);
     return result;

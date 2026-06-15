@@ -72,6 +72,7 @@ export interface Project {
   workspaceId: string;
   name: string;
   description: string | null;
+  scope: string | null;
   status: ProjectStatus;
   leadMemberId: string | null;
   startDate: string | null;
@@ -83,6 +84,13 @@ export interface Project {
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface AcceptanceCriterion {
+  id?: string;
+  text: string;
+  required: boolean;
+  checked: boolean;
 }
 
 export interface ProjectMember {
@@ -116,7 +124,7 @@ export interface Task {
   dueDate: string | null;
   estimateHours: number | null;
   actualHours: number | null;
-  acceptanceCriteria: string[];
+  acceptanceCriteria: AcceptanceCriterion[];
   labels: string[];
   position: number;
   isMilestone: boolean;
@@ -124,6 +132,15 @@ export interface Task {
   completedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface TaskDependency {
+  id: string;
+  projectId: string;
+  blockerTaskId: string;
+  blockedTaskId: string;
+  dependencyType: string;
+  createdAt: Date;
 }
 
 export interface TaskComment {

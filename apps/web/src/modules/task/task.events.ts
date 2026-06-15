@@ -8,6 +8,7 @@ interface TaskLike {
   statusId: string;
   priority: string;
   assigneeMemberId: string | null;
+  dueDate?: string | null;
 }
 
 export function taskCreated(exec: Executor, ctx: ActorContext, task: TaskLike) {
@@ -64,5 +65,22 @@ export function taskDeleted(exec: Executor, ctx: ActorContext, task: TaskLike) {
     entityId: task.id,
     eventType: "task.deleted",
     before: { title: task.title },
+  });
+}
+
+export function taskPlanDeviation(
+  exec: Executor,
+  ctx: ActorContext,
+  before: TaskLike,
+  after: TaskLike
+) {
+  return recordEvent(exec, {
+    ...actorFields(ctx),
+    entityType: "task",
+    entityId: after.id,
+    eventType: "plan.deviation",
+    before: { dueDate: before.dueDate ?? null },
+    after: { dueDate: after.dueDate ?? null },
+    metadata: { reason: "task_due_date_changed" },
   });
 }

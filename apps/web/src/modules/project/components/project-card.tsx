@@ -17,7 +17,7 @@ const STATUS_COLORS: Record<string, string> = {
 export function ProjectCard({ project, workspaceSlug }: Props) {
   return (
     <Link
-      href={`/workspace/${workspaceSlug}/project/${project.id}`}
+      href={`/workspace/${workspaceSlug}/projects/${project.id}/overview`}
       className="block rounded-lg border bg-card p-4 hover:border-primary transition-colors"
     >
       <div className="flex items-start justify-between gap-2">

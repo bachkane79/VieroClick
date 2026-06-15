@@ -8,6 +8,7 @@ export async function createProjectAction(args: { workspaceId: string; slug: str
   return runAction(async () => {
     const project = await service.createProject(args.workspaceId, args.data);
     revalidatePath(`/workspace/${args.slug}`);
+    revalidatePath(`/workspace/${args.slug}/projects`);
     return project;
   });
 }
@@ -21,6 +22,7 @@ export async function updateProjectAction(args: {
   return runAction(async () => {
     const project = await service.updateProject(args.workspaceId, args.projectId, args.data);
     revalidatePath(`/workspace/${args.slug}/project/${args.projectId}`);
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}/overview`);
     return project;
   });
 }

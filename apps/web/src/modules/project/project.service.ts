@@ -1,7 +1,9 @@
 import "server-only";
-import { db } from "@vieroc/db";
+import { eq } from "drizzle-orm";
+import { db, tasks, taskStatuses, taskDependencies } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
-import { NotFoundError } from "@/server/lib/errors";
+import { NotFoundError, ValidationError } from "@/server/lib/errors";
+import { enqueueNotifications } from "@/server/lib/notifications";
 import { createProjectSchema, updateProjectSchema } from "./project.schema";
 import { assertCanCreateProject, assertCanManageProject } from "./project.policy";
 import * as repo from "./project.repo";
@@ -24,12 +26,30 @@ export async function createProject(workspaceId: string, input: unknown) {
   const ctx = await requireActor(workspaceId);
   assertCanCreateProject(ctx);
 
+  const leadMemberId = data.leadMemberId ?? ctx.workspaceMemberId;
+  const memberRoles = new Map<string, "project_lead" | "member">();
+  memberRoles.set(ctx.workspaceMemberId, "project_lead");
+  memberRoles.set(leadMemberId, "project_lead");
+  for (const memberId of data.memberIds) {
+    if (!memberRoles.has(memberId)) memberRoles.set(memberId, "member");
+  }
+
+  const workspaceMemberIds = new Set(
+    (await repo.listWorkspaceMemberIds(workspaceId)).map((member) => member.id)
+  );
+  for (const memberId of memberRoles.keys()) {
+    if (!workspaceMemberIds.has(memberId)) {
+      throw new ValidationError("Project members must belong to this workspace");
+    }
+  }
+
   return db.transaction(async (tx) => {
     const project = await repo.create(
       {
         workspaceId,
         name: data.name,
         description: data.description ?? null,
+        scope: data.scope ?? null,
         status: data.status,
         leadMemberId: data.leadMemberId ?? ctx.workspaceMemberId,
         startDate: data.startDate ?? null,
@@ -43,18 +63,38 @@ export async function createProject(workspaceId: string, input: unknown) {
       tx
     );
 
-    // creator becomes project_lead; seed the default board columns
-    await repo.addMember(
-      {
-        projectId: project.id,
-        workspaceMemberId: ctx.workspaceMemberId,
-        role: "project_lead",
-        allocationPercent: 100,
-      },
-      tx
-    );
+    for (const [workspaceMemberId, role] of memberRoles) {
+      await repo.addMember(
+        {
+          projectId: project.id,
+          workspaceMemberId,
+          role,
+          allocationPercent: 100,
+        },
+        tx
+      );
+    }
+
     await repo.seedDefaultStatuses(project.id, tx);
     await events.projectCreated(tx, ctx, project);
+
+    const notificationRecipients = [...memberRoles.keys()].filter(
+      (memberId) => memberId !== ctx.workspaceMemberId
+    );
+    if (notificationRecipients.length > 0) {
+      await enqueueNotifications(
+        tx,
+        notificationRecipients.map((memberId) => ({
+          workspaceId: ctx.workspaceId,
+          recipientMemberId: memberId,
+          projectId: project.id,
+          type: "project.member_added",
+          title: `You were added to ${project.name}`,
+          entityType: "project",
+          entityId: project.id,
+        }))
+      );
+    }
 
     return project;
   });
@@ -71,6 +111,7 @@ export async function updateProject(workspaceId: string, projectId: string, inpu
   const patch: Partial<repo.ProjectInsert> = {};
   if (data.name !== undefined) patch.name = data.name;
   if (data.description !== undefined) patch.description = data.description ?? null;
+  if (data.scope !== undefined) patch.scope = data.scope ?? null;
   if (data.status !== undefined) patch.status = data.status;
   if (data.leadMemberId !== undefined) patch.leadMemberId = data.leadMemberId ?? null;
   if (data.startDate !== undefined) patch.startDate = data.startDate ?? null;
@@ -87,9 +128,6 @@ export async function updateProject(workspaceId: string, projectId: string, inpu
     return updated;
   });
 }
-
-import { and, eq } from "drizzle-orm";
-import { tasks, taskStatuses, taskDependencies } from "@vieroc/db";
 
 export async function detectPlanDeviations(workspaceId: string, projectId: string) {
   await requireActor(workspaceId, projectId);

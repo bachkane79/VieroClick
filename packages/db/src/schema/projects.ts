@@ -26,6 +26,7 @@ export const projects = pgTable("projects", {
     .references(() => workspaces.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
+  scope: text("scope"),
   status: projectStatusEnum("status").notNull().default("draft"),
   leadMemberId: uuid("lead_member_id").references(() => workspaceMembers.id),
   startDate: date("start_date"),

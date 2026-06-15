@@ -20,6 +20,7 @@ export const projectStatusSchema = z.enum(["draft", "active", "paused", "complet
 export const createProjectSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().optional(),
+  scope: z.string().optional(),
   status: projectStatusSchema.default("draft"),
   leadMemberId: z.string().uuid().optional(),
   startDate: z.string().date().optional(),
@@ -27,6 +28,7 @@ export const createProjectSchema = z.object({
   goals: z.array(z.string()).default([]),
   constraints: z.array(z.string()).default([]),
   expectedDeliverables: z.array(z.string()).default([]),
+  memberIds: z.array(z.string().uuid()).default([]),
   initialContext: z.string().optional(),
 });
 
@@ -36,20 +38,43 @@ export const updateProjectSchema = createProjectSchema.partial();
 
 export const taskPrioritySchema = z.enum(["low", "medium", "high", "urgent"]);
 
+export const acceptanceCriterionSchema = z.object({
+  id: z.string().optional(),
+  text: z.string().min(1).max(500),
+  required: z.boolean().default(true),
+  checked: z.boolean().default(false),
+});
+
+export const taskAcceptanceCriteriaSchema = z
+  .array(
+    z.union([
+      acceptanceCriterionSchema,
+      z.string().min(1).max(500).transform((text) => ({
+        text,
+        required: true,
+        checked: false,
+      })),
+    ])
+  )
+  .default([]);
+
 export const createTaskSchema = z.object({
   title: z.string().min(1).max(500),
   description: z.string().optional(),
   statusId: z.string().uuid(),
   priority: taskPrioritySchema.default("medium"),
-  assigneeMemberId: z.string().uuid().optional(),
-  reporterMemberId: z.string().uuid().optional(),
-  parentTaskId: z.string().uuid().optional(),
+  assigneeMemberId: z.string().uuid().nullable().optional(),
+  reporterMemberId: z.string().uuid().nullable().optional(),
+  parentTaskId: z.string().uuid().nullable().optional(),
   startDate: z.string().date().optional(),
   dueDate: z.string().date().optional(),
   estimateHours: z.number().min(0).optional(),
-  acceptanceCriteria: z.array(z.string()).default([]),
+  acceptanceCriteria: taskAcceptanceCriteriaSchema,
   labels: z.array(z.string()).default([]),
+  position: z.number().int().min(0).default(0),
   isMilestone: z.boolean().default(false),
+  blockerReason: z.string().optional(),
+  allowBlockedOverride: z.boolean().default(false),
 });
 
 export const updateTaskSchema = createTaskSchema.partial();
@@ -57,6 +82,8 @@ export const updateTaskSchema = createTaskSchema.partial();
 export const moveTaskSchema = z.object({
   statusId: z.string().uuid(),
   position: z.number().int().min(0),
+  blockerReason: z.string().optional(),
+  allowBlockedOverride: z.boolean().default(false),
 });
 
 // ─── Task Status ──────────────────────────────────────────────────────────────
@@ -175,6 +202,7 @@ export const paginationSchema = z.object({
 export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>;
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
+export type AcceptanceCriterionInput = z.infer<typeof acceptanceCriterionSchema>;
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type CreateDailyUpdateInput = z.infer<typeof createDailyUpdateSchema>;

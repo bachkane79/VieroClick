@@ -1,6 +1,13 @@
 import "server-only";
 import { eq } from "drizzle-orm";
-import { db, projects, projectMembers, taskStatuses, type Executor } from "@vieroc/db";
+import {
+  db,
+  projects,
+  projectMembers,
+  taskStatuses,
+  workspaceMembers,
+  type Executor,
+} from "@vieroc/db";
 
 export type ProjectInsert = typeof projects.$inferInsert;
 export type ProjectRow = typeof projects.$inferSelect;
@@ -10,7 +17,9 @@ const DEFAULT_STATUSES = [
   { name: "Todo", type: "todo", position: 0, isDefault: true },
   { name: "In Progress", type: "in_progress", position: 1, isDefault: false },
   { name: "In Review", type: "in_review", position: 2, isDefault: false },
-  { name: "Done", type: "done", position: 3, isDefault: false },
+  { name: "Blocked", type: "blocked", position: 3, isDefault: false },
+  { name: "Done", type: "done", position: 4, isDefault: false },
+  { name: "Cancelled", type: "cancelled", position: 5, isDefault: false },
 ] as const;
 
 export async function findById(id: string, exec: Executor = db): Promise<ProjectRow | null> {
@@ -20,6 +29,13 @@ export async function findById(id: string, exec: Executor = db): Promise<Project
 
 export async function listByWorkspace(workspaceId: string, exec: Executor = db): Promise<ProjectRow[]> {
   return exec.select().from(projects).where(eq(projects.workspaceId, workspaceId));
+}
+
+export async function listWorkspaceMemberIds(workspaceId: string, exec: Executor = db) {
+  return exec
+    .select({ id: workspaceMembers.id })
+    .from(workspaceMembers)
+    .where(eq(workspaceMembers.workspaceId, workspaceId));
 }
 
 export async function create(values: ProjectInsert, exec: Executor = db): Promise<ProjectRow> {

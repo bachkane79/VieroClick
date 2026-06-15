@@ -16,6 +16,13 @@ import { users } from "./users";
 import { workspaceMembers } from "./workspaces";
 import { projects } from "./projects";
 
+export interface AcceptanceCriterion {
+  id?: string;
+  text: string;
+  required: boolean;
+  checked: boolean;
+}
+
 export const taskStatusTypeEnum = pgEnum("task_status_type", [
   "todo",
   "in_progress",
@@ -62,7 +69,10 @@ export const tasks = pgTable("tasks", {
   dueDate: date("due_date"),
   estimateHours: numeric("estimate_hours", { precision: 6, scale: 2 }),
   actualHours: numeric("actual_hours", { precision: 6, scale: 2 }),
-  acceptanceCriteria: jsonb("acceptance_criteria").$type<string[]>().notNull().default([]),
+  acceptanceCriteria: jsonb("acceptance_criteria")
+    .$type<AcceptanceCriterion[]>()
+    .notNull()
+    .default([]),
   labels: jsonb("labels").$type<string[]>().notNull().default([]),
   position: integer("position").notNull().default(0),
   isMilestone: boolean("is_milestone").notNull().default(false),
