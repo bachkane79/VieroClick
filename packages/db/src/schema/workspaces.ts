@@ -1,13 +1,4 @@
-import {
-  pgTable,
-  pgEnum,
-  text,
-  uuid,
-  numeric,
-  integer,
-  jsonb,
-  unique,
-} from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, text, uuid, numeric, integer, jsonb, unique } from "drizzle-orm/pg-core";
 import { timestamptz } from "./_helpers";
 import { users } from "./users";
 

@@ -1,7 +1,8 @@
-# Next.js + AI Monorepo Design System  
+# Next.js + AI Monorepo Design System
+
 ## Autonomous Agent Project Manager System
 
-> Scope: thiết kế hệ thống monorepo cho sản phẩm quản lý dự án có lớp AI Agent.  
+> Scope: thiết kế hệ thống monorepo cho sản phẩm quản lý dự án có lớp AI Agent.
 
 ## Build đúng lõi
 

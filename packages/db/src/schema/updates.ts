@@ -80,7 +80,10 @@ export const leaderReports = pgTable(
     blockerSummary: text("blocker_summary"),
     recommendedActions: jsonb("recommended_actions").$type<string[]>().notNull().default([]),
     memberDemands: jsonb("member_demands").$type<Record<string, unknown>[]>().notNull().default([]),
-    planDeviations: jsonb("plan_deviations").$type<Record<string, unknown>[]>().notNull().default([]),
+    planDeviations: jsonb("plan_deviations")
+      .$type<Record<string, unknown>[]>()
+      .notNull()
+      .default([]),
     generatedByAgent: boolean("generated_by_agent").notNull().default(false),
     approvedByMemberId: uuid("approved_by_member_id").references(() => workspaceMembers.id),
     approvedAt: timestamptz("approved_at"),

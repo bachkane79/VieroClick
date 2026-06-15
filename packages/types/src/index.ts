@@ -2,11 +2,23 @@
 export type WorkspaceRole = "owner" | "admin" | "leader" | "member" | "viewer";
 export type ProjectRole = "project_lead" | "tech_lead" | "member" | "reviewer" | "stakeholder";
 export type ProjectStatus = "draft" | "active" | "paused" | "completed" | "archived";
-export type TaskStatusType = "todo" | "in_progress" | "in_review" | "blocked" | "done" | "cancelled";
+export type TaskStatusType =
+  | "todo"
+  | "in_progress"
+  | "in_review"
+  | "blocked"
+  | "done"
+  | "cancelled";
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 export type BlockerStatus = "open" | "in_review" | "resolved" | "ignored";
 export type AgentJobStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
-export type ProjectDocType = "requirement" | "technical_note" | "decision" | "meeting_note" | "scope" | "other";
+export type ProjectDocType =
+  | "requirement"
+  | "technical_note"
+  | "decision"
+  | "meeting_note"
+  | "scope"
+  | "other";
 
 // Core entities
 export interface User {

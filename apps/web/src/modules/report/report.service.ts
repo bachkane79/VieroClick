@@ -7,6 +7,9 @@ import { assertCanManageReports } from "./report.policy";
 import * as repo from "./report.repo";
 import * as events from "./report.events";
 
+import * as projectMemberRepo from "../project-member/project-member.repo";
+import { enqueueNotifications } from "@/server/lib/notifications";
+
 /** Read: all leader reports for a project. Requires workspace membership. */
 export async function listReports(workspaceId: string, projectId: string) {
   await requireActor(workspaceId, projectId);
@@ -40,6 +43,25 @@ export async function createReport(p: {
 
     await events.reportCreated(tx, ctx, report);
 
+    // Notify project members
+    const pms = await projectMemberRepo.listByProject(p.projectId, tx);
+    const notifyItems = pms
+      .filter((pm) => pm.workspaceMemberId !== ctx.workspaceMemberId)
+      .map((pm) => ({
+        workspaceId: ctx.workspaceId,
+        recipientMemberId: pm.workspaceMemberId,
+        projectId: p.projectId,
+        type: "report.ready",
+        title: `Project report ready for date ${report.reportDate}`,
+        body: report.progressSummary.slice(0, 140),
+        entityType: "report",
+        entityId: report.id,
+      }));
+
+    if (notifyItems.length > 0) {
+      await enqueueNotifications(tx, notifyItems);
+    }
+
     return report;
   });
 }
@@ -64,6 +86,25 @@ export async function approveReport(p: {
     if (!updated) throw new NotFoundError("Report");
 
     await events.reportApproved(tx, ctx, updated);
+
+    // Notify project members
+    const pms = await projectMemberRepo.listByProject(p.projectId, tx);
+    const notifyItems = pms
+      .filter((pm) => pm.workspaceMemberId !== ctx.workspaceMemberId)
+      .map((pm) => ({
+        workspaceId: ctx.workspaceId,
+        recipientMemberId: pm.workspaceMemberId,
+        projectId: p.projectId,
+        type: "report.approved",
+        title: `Project report approved by leader`,
+        body: updated.progressSummary.slice(0, 140),
+        entityType: "report",
+        entityId: updated.id,
+      }));
+
+    if (notifyItems.length > 0) {
+      await enqueueNotifications(tx, notifyItems);
+    }
 
     return updated;
   });

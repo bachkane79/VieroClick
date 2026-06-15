@@ -7,6 +7,9 @@ import { assertCanLogDecision } from "./decision-log.policy";
 import * as repo from "./decision-log.repo";
 import * as events from "./decision-log.events";
 
+import * as projectMemberRepo from "../project-member/project-member.repo";
+import { enqueueNotifications } from "@/server/lib/notifications";
+
 /** Read: decision logs for a project. Requires workspace membership. */
 export async function listDecisions(workspaceId: string, projectId: string) {
   await requireActor(workspaceId, projectId);
@@ -32,6 +35,25 @@ export async function logDecision(p: { workspaceId: string; projectId: string; i
     );
 
     await events.decisionCreated(tx, ctx, decision);
+
+    // Notify other project members
+    const pms = await projectMemberRepo.listByProject(p.projectId, tx);
+    const notifyItems = pms
+      .filter((pm) => pm.workspaceMemberId !== ctx.workspaceMemberId)
+      .map((pm) => ({
+        workspaceId: ctx.workspaceId,
+        recipientMemberId: pm.workspaceMemberId,
+        projectId: p.projectId,
+        type: "decision.created",
+        title: `New decision logged: ${decision.title}`,
+        body: decision.decision.slice(0, 140),
+        entityType: "decision",
+        entityId: decision.id,
+      }));
+
+    if (notifyItems.length > 0) {
+      await enqueueNotifications(tx, notifyItems);
+    }
 
     return decision;
   });
