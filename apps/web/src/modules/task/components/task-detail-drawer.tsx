@@ -13,6 +13,12 @@ import {
   removeTaskDependencyFromTaskAction,
   updateTaskAction,
 } from "../task.actions";
+import {
+  addCommentAction,
+  deleteCommentAction,
+  listCommentsAction,
+} from "@/modules/comment/comment.actions";
+
 import type {
   AcceptanceCriterionView,
   MemberOptionView,
@@ -83,6 +89,10 @@ export function TaskDetailDrawer({
   const [allowBlockedOverride, setAllowBlockedOverride] = useState(false);
   const [dependencyCandidate, setDependencyCandidate] = useState("");
 
+  const [comments, setComments] = useState<any[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [newCommentBody, setNewCommentBody] = useState("");
+
   useEffect(() => {
     if (!open) return;
     setTitle(task?.title ?? "");
@@ -101,6 +111,69 @@ export function TaskDetailDrawer({
     setAllowBlockedOverride(false);
     setDependencyCandidate("");
   }, [initialStatusId, open, statuses, task]);
+
+  useEffect(() => {
+    if (!open || !task) {
+      setComments([]);
+      return;
+    }
+    async function loadComments() {
+      setLoadingComments(true);
+      const res = await listCommentsAction({
+        workspaceId,
+        projectId,
+        taskId: task!.id,
+      });
+      setLoadingComments(false);
+      if (res.ok) {
+        setComments(res.data);
+      }
+    }
+    loadComments();
+  }, [open, task, workspaceId, projectId]);
+
+  async function submitComment() {
+    if (!task || !newCommentBody.trim()) return;
+    const body = newCommentBody.trim();
+    setNewCommentBody("");
+    const result = await addCommentAction({
+      workspaceId,
+      projectId,
+      slug: workspaceSlug,
+      taskId: task.id,
+      data: { body },
+    });
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    const res = await listCommentsAction({
+      workspaceId,
+      projectId,
+      taskId: task.id,
+    });
+    if (res.ok) {
+      setComments(res.data);
+    }
+    toast.success("Comment posted");
+  }
+
+  async function deleteComment(commentId: string) {
+    if (!task) return;
+    const result = await deleteCommentAction({
+      workspaceId,
+      projectId,
+      slug: workspaceSlug,
+      commentId,
+    });
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    setComments((current) => current.filter((c) => c.id !== commentId));
+    toast.success("Comment deleted");
+  }
+
 
   const selectedStatus = statuses.find((status) => status.id === statusId);
   const taskById = useMemo(() => new Map(tasks.map((item) => [item.id, item])), [tasks]);
@@ -530,6 +603,68 @@ export function TaskDetailDrawer({
                 />
                 Override blocker dependency
               </label>
+
+              {task && (
+                <section className="grid gap-3 border-t pt-5">
+                  <h3 className="text-sm font-semibold">Comments</h3>
+                  <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                    {loadingComments ? (
+                      <p className="text-xs text-muted-foreground">Loading comments...</p>
+                    ) : comments.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">No comments yet. Start the conversation!</p>
+                    ) : (
+                      comments.map((comment) => {
+                        const author = members.find((m) => m.id === comment.authorMemberId);
+                        const authorName = author?.fullName ?? "Unknown Member";
+                        return (
+                          <div
+                            key={comment.id}
+                            className="rounded-lg bg-neutral-50 dark:bg-neutral-900 border p-3 text-sm flex items-start justify-between gap-3 group"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-bold text-xs">{authorName}</span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {new Date(comment.createdAt).toLocaleString()}
+                                </span>
+                              </div>
+                              <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                {comment.body}
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                              onClick={() => deleteComment(comment.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                            </Button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                  <div className="flex gap-2 items-end mt-2">
+                    <Textarea
+                      placeholder="Add a comment... Use @name to mention"
+                      value={newCommentBody}
+                      onChange={(e) => setNewCommentBody(e.target.value)}
+                      className="min-h-16 flex-1 text-xs"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={!newCommentBody.trim()}
+                      onClick={submitComment}
+                    >
+                      Post
+                    </Button>
+                  </div>
+                </section>
+              )}
+
             </div>
 
             <div className="flex items-center justify-between gap-3 border-t px-5 py-4">

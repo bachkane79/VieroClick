@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { db, tasks, taskStatuses, taskDependencies } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
@@ -9,17 +10,22 @@ import { assertCanCreateProject, assertCanManageProject } from "./project.policy
 import * as repo from "./project.repo";
 import * as events from "./project.events";
 
-export async function listProjects(workspaceId: string) {
+// cache() de-duplicates identical calls within a single server render tree.
+// e.g. layout.tsx + page.tsx both calling getProject() → only 1 DB query.
+export const listProjects = cache(async function listProjects(workspaceId: string) {
   await requireActor(workspaceId);
   return repo.listByWorkspace(workspaceId);
-}
+});
 
-export async function getProject(workspaceId: string, projectId: string) {
+export const getProject = cache(async function getProject(
+  workspaceId: string,
+  projectId: string
+) {
   await requireActor(workspaceId, projectId);
   const project = await repo.findById(projectId);
   if (!project) throw new NotFoundError("Project");
   return project;
-}
+});
 
 export async function createProject(workspaceId: string, input: unknown) {
   const data = createProjectSchema.parse(input);
@@ -132,30 +138,30 @@ export async function updateProject(workspaceId: string, projectId: string, inpu
 export async function detectPlanDeviations(workspaceId: string, projectId: string) {
   await requireActor(workspaceId, projectId);
 
-  // 1. Fetch all tasks with status type
-  const allTasks = await db
-    .select({
-      id: tasks.id,
-      title: tasks.title,
-      dueDate: tasks.dueDate,
-      startDate: tasks.startDate,
-      isMilestone: tasks.isMilestone,
-      priority: tasks.priority,
-      statusType: taskStatuses.type,
-      statusName: taskStatuses.name,
-    })
-    .from(tasks)
-    .innerJoin(taskStatuses, eq(taskStatuses.id, tasks.statusId))
-    .where(eq(tasks.projectId, projectId));
-
-  // 2. Fetch all dependencies
-  const dependencies = await db
-    .select({
-      blockerTaskId: taskDependencies.blockerTaskId,
-      blockedTaskId: taskDependencies.blockedTaskId,
-    })
-    .from(taskDependencies)
-    .where(eq(taskDependencies.projectId, projectId));
+  // Fetch tasks + dependencies in parallel (saves ~1 round-trip vs sequential)
+  const [allTasks, dependencies] = await Promise.all([
+    db
+      .select({
+        id: tasks.id,
+        title: tasks.title,
+        dueDate: tasks.dueDate,
+        startDate: tasks.startDate,
+        isMilestone: tasks.isMilestone,
+        priority: tasks.priority,
+        statusType: taskStatuses.type,
+        statusName: taskStatuses.name,
+      })
+      .from(tasks)
+      .innerJoin(taskStatuses, eq(taskStatuses.id, tasks.statusId))
+      .where(eq(tasks.projectId, projectId)),
+    db
+      .select({
+        blockerTaskId: taskDependencies.blockerTaskId,
+        blockedTaskId: taskDependencies.blockedTaskId,
+      })
+      .from(taskDependencies)
+      .where(eq(taskDependencies.projectId, projectId)),
+  ]);
 
   const todayStr = new Date().toISOString().split("T")[0];
   const today = todayStr ? new Date(todayStr) : new Date();

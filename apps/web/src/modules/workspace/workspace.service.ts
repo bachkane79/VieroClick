@@ -14,10 +14,10 @@ export async function listMyWorkspaces() {
 
 /** Resolve a workspace by slug, ensuring the current user is a member. */
 export async function getWorkspace(slug: string) {
-  await getUserId();
-  const ws = await repo.findBySlug(slug);
+  const userId = await getUserId();
+  // Single joined query: find workspace + verify membership in one round trip.
+  const ws = await repo.findBySlugForUser(slug, userId);
   if (!ws) throw new NotFoundError("Workspace");
-  await requireActor(ws.id); // membership check
   return ws;
 }
 

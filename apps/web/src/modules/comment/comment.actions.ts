@@ -34,3 +34,10 @@ export async function deleteCommentAction(args: BaseArgs & { commentId: string }
     return result;
   });
 }
+
+export async function listCommentsAction(args: { workspaceId: string; projectId: string; taskId: string }) {
+  return runAction(async () => {
+    return service.listComments(args.workspaceId, args.projectId, args.taskId);
+  });
+}
+
