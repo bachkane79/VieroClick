@@ -49,11 +49,15 @@ export const taskAcceptanceCriteriaSchema = z
   .array(
     z.union([
       acceptanceCriterionSchema,
-      z.string().min(1).max(500).transform((text) => ({
-        text,
-        required: true,
-        checked: false,
-      })),
+      z
+        .string()
+        .min(1)
+        .max(500)
+        .transform((text) => ({
+          text,
+          required: true,
+          checked: false,
+        })),
     ])
   )
   .default([]);
@@ -106,9 +110,21 @@ export const createTaskStatusSchema = z.object({
 
 // ─── Task Comment ─────────────────────────────────────────────────────────────
 
+export const linkedEntitySchema = z.object({
+  type: z.enum(["task", "doc", "comment"]),
+  id: z.string().uuid(),
+  label: z.string().max(160).optional(),
+});
+
+export const commentMetadataSchema = z
+  .object({
+    links: z.array(linkedEntitySchema).max(20).default([]),
+  })
+  .passthrough();
+
 export const createCommentSchema = z.object({
   body: z.string().min(1),
-  metadata: z.record(z.unknown()).default({}),
+  metadata: commentMetadataSchema.default({ links: [] }),
 });
 
 // ─── Daily Update ─────────────────────────────────────────────────────────────

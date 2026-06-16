@@ -6,8 +6,12 @@ import { getWorkspace, listWorkspaceMembers } from "@/modules/workspace/workspac
 import { getProject } from "@/modules/project/project.service";
 import { listMembers as listProjectMembers } from "@/modules/project-member/project-member.service";
 import { listBoard } from "@/modules/task/task.service";
+import { listProjectComments } from "@/modules/comment/comment.service";
+import { listProjectAttachments } from "@/modules/file/file.service";
 import { TaskBoard } from "@/modules/task/components/task-board";
 import { toDependencyView, toStatusView, toTaskView } from "@/modules/task/task.view";
+import { toCommentView } from "@/modules/comment/comment.view";
+import { toTaskAttachmentView } from "@/modules/file/file.view";
 import { NotFoundError } from "@/server/lib/errors";
 
 interface Props {
@@ -27,10 +31,18 @@ export default async function ProjectBoardPage({ params }: Props) {
     throw err;
   }
 
-  const [{ tasks, statuses, dependencies }, workspaceMembers, projectMembers] = await Promise.all([
+  const [
+    { tasks, statuses, dependencies },
+    workspaceMembers,
+    projectMembers,
+    comments,
+    attachments,
+  ] = await Promise.all([
     listBoard(workspace.id, projectId),
     listWorkspaceMembers(workspace.id),
     listProjectMembers(workspace.id, projectId),
+    listProjectComments(workspace.id, projectId),
+    listProjectAttachments(workspace.id, projectId),
   ]);
 
   const projectMemberIds = new Set(projectMembers.map((member) => member.workspaceMemberId));
@@ -64,6 +76,8 @@ export default async function ProjectBoardPage({ params }: Props) {
             email: member.email,
           }))}
           dependencies={dependencies.map(toDependencyView)}
+          comments={comments.map(toCommentView)}
+          attachments={attachments.map(toTaskAttachmentView)}
         />
       </div>
     </div>

@@ -1,6 +1,6 @@
 import "server-only";
-import { asc, eq } from "drizzle-orm";
-import { db, taskComments, type Executor } from "@vieroc/db";
+import { and, asc, eq } from "drizzle-orm";
+import { db, projectDocs, taskComments, tasks, type Executor } from "@vieroc/db";
 
 export type CommentInsert = typeof taskComments.$inferInsert;
 export type CommentRow = typeof taskComments.$inferSelect;
@@ -16,6 +16,58 @@ export async function listByTask(taskId: string, exec: Executor = db): Promise<C
     .from(taskComments)
     .where(eq(taskComments.taskId, taskId))
     .orderBy(asc(taskComments.createdAt));
+}
+
+export async function listByProject(projectId: string, exec: Executor = db): Promise<CommentRow[]> {
+  return exec
+    .select({
+      id: taskComments.id,
+      taskId: taskComments.taskId,
+      authorMemberId: taskComments.authorMemberId,
+      body: taskComments.body,
+      metadata: taskComments.metadata,
+      createdAt: taskComments.createdAt,
+      updatedAt: taskComments.updatedAt,
+    })
+    .from(taskComments)
+    .innerJoin(tasks, eq(tasks.id, taskComments.taskId))
+    .where(eq(tasks.projectId, projectId))
+    .orderBy(asc(taskComments.createdAt));
+}
+
+export async function findByIdInProject(
+  id: string,
+  projectId: string,
+  exec: Executor = db
+): Promise<CommentRow | null> {
+  const [row] = await exec
+    .select({
+      id: taskComments.id,
+      taskId: taskComments.taskId,
+      authorMemberId: taskComments.authorMemberId,
+      body: taskComments.body,
+      metadata: taskComments.metadata,
+      createdAt: taskComments.createdAt,
+      updatedAt: taskComments.updatedAt,
+    })
+    .from(taskComments)
+    .innerJoin(tasks, eq(tasks.id, taskComments.taskId))
+    .where(and(eq(taskComments.id, id), eq(tasks.projectId, projectId)))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function linkedDocExists(
+  docId: string,
+  projectId: string,
+  exec: Executor = db
+): Promise<boolean> {
+  const [row] = await exec
+    .select({ id: projectDocs.id })
+    .from(projectDocs)
+    .where(and(eq(projectDocs.id, docId), eq(projectDocs.projectId, projectId)))
+    .limit(1);
+  return Boolean(row);
 }
 
 export async function create(values: CommentInsert, exec: Executor = db): Promise<CommentRow> {

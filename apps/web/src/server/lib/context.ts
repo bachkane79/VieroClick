@@ -1,6 +1,6 @@
 import "server-only";
 import { and, eq } from "drizzle-orm";
-import { db, workspaceMembers, projectMembers } from "@vieroc/db";
+import { db, workspaceMembers, projectMembers, projects } from "@vieroc/db";
 import type { WorkspaceRole, ProjectRole } from "@vieroc/types";
 import { auth } from "@/server/auth";
 import { UnauthorizedError, ForbiddenError } from "./errors";
@@ -34,15 +34,21 @@ export async function requireActor(workspaceId: string, projectId?: string): Pro
   const [member] = await db
     .select({ id: workspaceMembers.id, role: workspaceMembers.role })
     .from(workspaceMembers)
-    .where(
-      and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId))
-    )
+    .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)))
     .limit(1);
 
   if (!member) throw new ForbiddenError("Not a member of this workspace");
 
   let projectRole: ProjectRole | null = null;
   if (projectId) {
+    const [project] = await db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(and(eq(projects.id, projectId), eq(projects.workspaceId, workspaceId)))
+      .limit(1);
+
+    if (!project) throw new ForbiddenError("Project does not belong to this workspace");
+
     const [pm] = await db
       .select({ role: projectMembers.role })
       .from(projectMembers)
@@ -54,6 +60,12 @@ export async function requireActor(workspaceId: string, projectId?: string): Pro
       )
       .limit(1);
     projectRole = pm?.role ?? null;
+
+    const workspaceCanSeeAllProjects =
+      member.role === "owner" || member.role === "admin" || member.role === "leader";
+    if (!projectRole && !workspaceCanSeeAllProjects) {
+      throw new ForbiddenError("Not a member of this project");
+    }
   }
 
   return {

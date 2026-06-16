@@ -4,12 +4,9 @@ import { useMemo, useState } from "react";
 import { Button } from "@vieroc/ui";
 import { Plus } from "lucide-react";
 import { TaskDetailDrawer } from "./task-detail-drawer";
-import type {
-  MemberOptionView,
-  TaskDependencyView,
-  TaskStatusView,
-  TaskView,
-} from "../task.view";
+import type { MemberOptionView, TaskDependencyView, TaskStatusView, TaskView } from "../task.view";
+import type { CommentView } from "@/modules/comment/comment.view";
+import type { TaskAttachmentView } from "@/modules/file/file.view";
 
 interface Props {
   workspaceId: string;
@@ -19,6 +16,8 @@ interface Props {
   statuses: TaskStatusView[];
   members: MemberOptionView[];
   dependencies: TaskDependencyView[];
+  comments: CommentView[];
+  attachments: TaskAttachmentView[];
 }
 
 export function TaskList({
@@ -29,11 +28,16 @@ export function TaskList({
   statuses,
   members,
   dependencies,
+  comments,
+  attachments,
 }: Props) {
   const [filter, setFilter] = useState<"all" | "blocked">("all");
   const [open, setOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TaskView | null>(null);
-  const statusById = useMemo(() => new Map(statuses.map((status) => [status.id, status])), [statuses]);
+  const statusById = useMemo(
+    () => new Map(statuses.map((status) => [status.id, status])),
+    [statuses]
+  );
   const memberNameById = useMemo(() => new Map(members.map((m) => [m.id, m.fullName])), [members]);
 
   const filteredTasks =
@@ -97,7 +101,10 @@ export function TaskList({
                     {task.labels.length > 0 && (
                       <span className="mt-1 flex flex-wrap gap-1">
                         {task.labels.slice(0, 4).map((label) => (
-                          <span key={label} className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                          <span
+                            key={label}
+                            className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
+                          >
                             {label}
                           </span>
                         ))}
@@ -107,7 +114,7 @@ export function TaskList({
                   <span className="truncate text-muted-foreground">{status?.name ?? "Status"}</span>
                   <span className="truncate text-muted-foreground">
                     {task.assigneeMemberId
-                      ? memberNameById.get(task.assigneeMemberId) ?? "Assigned"
+                      ? (memberNameById.get(task.assigneeMemberId) ?? "Assigned")
                       : "Unassigned"}
                   </span>
                   <span className="text-muted-foreground">{task.dueDate ?? "Not set"}</span>
@@ -135,6 +142,9 @@ export function TaskList({
         statuses={statuses}
         members={members}
         dependencies={dependencies}
+        comments={comments}
+        attachments={attachments}
+        onSelectTask={setSelectedTask}
       />
     </>
   );

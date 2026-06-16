@@ -17,7 +17,7 @@ export async function listProjects(workspaceId: string) {
 export async function getProject(workspaceId: string, projectId: string) {
   await requireActor(workspaceId, projectId);
   const project = await repo.findById(projectId);
-  if (!project) throw new NotFoundError("Project");
+  if (!project || project.workspaceId !== workspaceId) throw new NotFoundError("Project");
   return project;
 }
 
@@ -118,7 +118,8 @@ export async function updateProject(workspaceId: string, projectId: string, inpu
   if (data.targetEndDate !== undefined) patch.targetEndDate = data.targetEndDate ?? null;
   if (data.goals !== undefined) patch.goals = data.goals;
   if (data.constraints !== undefined) patch.constraints = data.constraints;
-  if (data.expectedDeliverables !== undefined) patch.expectedDeliverables = data.expectedDeliverables;
+  if (data.expectedDeliverables !== undefined)
+    patch.expectedDeliverables = data.expectedDeliverables;
   if (data.initialContext !== undefined) patch.initialContext = data.initialContext ?? null;
 
   return db.transaction(async (tx) => {
@@ -260,4 +261,3 @@ export async function detectPlanDeviations(workspaceId: string, projectId: strin
 
   return deviations;
 }
-

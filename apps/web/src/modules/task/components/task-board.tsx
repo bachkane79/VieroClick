@@ -4,12 +4,9 @@ import { useMemo, useState } from "react";
 import { Button } from "@vieroc/ui";
 import { Plus } from "lucide-react";
 import { TaskDetailDrawer } from "./task-detail-drawer";
-import type {
-  MemberOptionView,
-  TaskDependencyView,
-  TaskStatusView,
-  TaskView,
-} from "../task.view";
+import type { MemberOptionView, TaskDependencyView, TaskStatusView, TaskView } from "../task.view";
+import type { CommentView } from "@/modules/comment/comment.view";
+import type { TaskAttachmentView } from "@/modules/file/file.view";
 
 interface Props {
   workspaceId: string;
@@ -19,6 +16,8 @@ interface Props {
   statuses: TaskStatusView[];
   members: MemberOptionView[];
   dependencies: TaskDependencyView[];
+  comments: CommentView[];
+  attachments: TaskAttachmentView[];
 }
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -36,6 +35,8 @@ export function TaskBoard({
   statuses,
   members,
   dependencies,
+  comments,
+  attachments,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TaskView | null>(null);
@@ -45,10 +46,7 @@ export function TaskBoard({
   const tasksByStatus = useMemo(
     () =>
       Object.fromEntries(
-        statuses.map((status) => [
-          status.id,
-          tasks.filter((task) => task.statusId === status.id),
-        ])
+        statuses.map((status) => [status.id, tasks.filter((task) => task.statusId === status.id)])
       ),
     [statuses, tasks]
   );
@@ -149,6 +147,9 @@ export function TaskBoard({
         statuses={statuses}
         members={members}
         dependencies={dependencies}
+        comments={comments}
+        attachments={attachments}
+        onSelectTask={setSelectedTask}
       />
     </>
   );

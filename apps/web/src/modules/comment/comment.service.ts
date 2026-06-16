@@ -1,19 +1,65 @@
 import "server-only";
+
 import { db } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
-import { NotFoundError } from "@/server/lib/errors";
+import { NotFoundError, ValidationError } from "@/server/lib/errors";
 import { enqueueNotifications } from "@/server/lib/notifications";
 import * as taskRepo from "../task/task.repo";
+import * as workspaceRepo from "../workspace/workspace.repo";
 import { createCommentSchema } from "./comment.schema";
 import { assertCanComment, assertCanModifyComment } from "./comment.policy";
-import * as repo from "./comment.repo";
 import * as events from "./comment.events";
+import * as repo from "./comment.repo";
 
-import * as workspaceRepo from "../workspace/workspace.repo";
+type CommentLink = {
+  type: "task" | "doc" | "comment";
+  id: string;
+  label?: string;
+};
+
+async function getTaskInProject(taskId: string, projectId: string) {
+  const task = await taskRepo.findById(taskId);
+  if (!task || task.projectId !== projectId) throw new NotFoundError("Task");
+  return task;
+}
+
+async function assertLinksBelongToProject(links: CommentLink[], projectId: string) {
+  for (const link of links) {
+    if (link.type === "task") {
+      const task = await taskRepo.findById(link.id);
+      if (!task || task.projectId !== projectId) {
+        throw new ValidationError("Linked task must belong to this project");
+      }
+    }
+
+    if (link.type === "comment") {
+      const comment = await repo.findByIdInProject(link.id, projectId);
+      if (!comment) throw new ValidationError("Linked comment must belong to this project");
+    }
+
+    if (link.type === "doc") {
+      const exists = await repo.linkedDocExists(link.id, projectId);
+      if (!exists) throw new ValidationError("Linked doc must belong to this project");
+    }
+  }
+}
+
+function mentionTokens(body: string) {
+  const matches = body.matchAll(
+    /@([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[a-zA-Z0-9._-]+)/g
+  );
+  return [...matches].map((match) => match[1]!.toLowerCase());
+}
 
 export async function listComments(workspaceId: string, projectId: string, taskId: string) {
   await requireActor(workspaceId, projectId);
+  await getTaskInProject(taskId, projectId);
   return repo.listByTask(taskId);
+}
+
+export async function listProjectComments(workspaceId: string, projectId: string) {
+  await requireActor(workspaceId, projectId);
+  return repo.listByProject(projectId);
 }
 
 export async function addComment(p: {
@@ -26,16 +72,19 @@ export async function addComment(p: {
   const ctx = await requireActor(p.workspaceId, p.projectId);
   assertCanComment(ctx);
 
-  const task = await taskRepo.findById(p.taskId);
-  if (!task) throw new NotFoundError("Task");
+  const task = await getTaskInProject(p.taskId, p.projectId);
+  await assertLinksBelongToProject(data.metadata.links, p.projectId);
 
   return db.transaction(async (tx) => {
     const comment = await repo.create(
       {
         taskId: p.taskId,
         authorMemberId: ctx.workspaceMemberId,
-        body: data.body,
-        metadata: data.metadata,
+        body: data.body.trim(),
+        metadata: {
+          ...data.metadata,
+          links: data.metadata.links,
+        },
       },
       tx
     );
@@ -43,22 +92,24 @@ export async function addComment(p: {
     await events.commentAdded(tx, ctx, p.taskId, comment.id);
 
     const allMembers = await workspaceRepo.listMembers(ctx.workspaceId, tx);
-    const authorMember = allMembers.find(m => m.id === ctx.workspaceMemberId);
+    const authorMember = allMembers.find((member) => member.id === ctx.workspaceMemberId);
     const authorName = authorMember ? authorMember.fullName : "A workspace member";
-
-    // 1. Process Mentions
-    const mentionMatches = data.body.match(/@([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[a-zA-Z0-9._-]+)/g) || [];
-    const mentionedNamesOrEmails = mentionMatches.map(m => m.slice(1).toLowerCase());
+    const mentionedNamesOrEmails = mentionTokens(data.body);
     const notifiedMemberIds = new Set<string>();
 
     if (mentionedNamesOrEmails.length > 0) {
       const mentionNotifications = [];
       for (const member of allMembers) {
         if (member.id === ctx.workspaceMemberId) continue;
-        const matchesName = mentionedNamesOrEmails.includes(member.fullName.toLowerCase()) || 
-                            mentionedNamesOrEmails.includes(member.email.toLowerCase()) ||
-                            mentionedNamesOrEmails.includes(member.email.split("@")[0]?.toLowerCase() || "");
-        
+
+        const fullNameKey = member.fullName.toLowerCase().replace(/\s+/g, ".");
+        const emailKey = member.email.toLowerCase();
+        const localEmailKey = member.email.split("@")[0]?.toLowerCase() ?? "";
+        const matchesName =
+          mentionedNamesOrEmails.includes(fullNameKey) ||
+          mentionedNamesOrEmails.includes(emailKey) ||
+          mentionedNamesOrEmails.includes(localEmailKey);
+
         if (matchesName && !notifiedMemberIds.has(member.id)) {
           notifiedMemberIds.add(member.id);
           mentionNotifications.push({
@@ -74,13 +125,14 @@ export async function addComment(p: {
         }
       }
 
-      if (mentionNotifications.length > 0) {
-        await enqueueNotifications(tx, mentionNotifications);
-      }
+      await enqueueNotifications(tx, mentionNotifications);
     }
 
-    // 2. Process Assignee Notification (if not already notified via mention)
-    if (task.assigneeMemberId && task.assigneeMemberId !== ctx.workspaceMemberId && !notifiedMemberIds.has(task.assigneeMemberId)) {
+    if (
+      task.assigneeMemberId &&
+      task.assigneeMemberId !== ctx.workspaceMemberId &&
+      !notifiedMemberIds.has(task.assigneeMemberId)
+    ) {
       await enqueueNotifications(tx, [
         {
           workspaceId: ctx.workspaceId,
@@ -105,7 +157,7 @@ export async function deleteComment(p: {
   commentId: string;
 }) {
   const ctx = await requireActor(p.workspaceId, p.projectId);
-  const existing = await repo.findById(p.commentId);
+  const existing = await repo.findByIdInProject(p.commentId, p.projectId);
   if (!existing) throw new NotFoundError("Comment");
   assertCanModifyComment(ctx, existing.authorMemberId);
 
