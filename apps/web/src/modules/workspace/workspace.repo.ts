@@ -1,5 +1,5 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, workspaces, workspaceMembers, memberProfiles, users, type Executor } from "@vieroc/db";
 
 export type WorkspaceInsert = typeof workspaces.$inferInsert;
@@ -15,6 +15,31 @@ export async function findById(id: string, exec: Executor = db): Promise<Workspa
 export async function findBySlug(slug: string, exec: Executor = db): Promise<WorkspaceRow | null> {
   const [row] = await exec.select().from(workspaces).where(eq(workspaces.slug, slug)).limit(1);
   return row ?? null;
+}
+
+/**
+ * Find a workspace by slug AND verify the user is a member — all in one query.
+ * Returns null if the workspace doesn't exist OR the user isn't a member.
+ */
+export async function findBySlugForUser(
+  slug: string,
+  userId: string,
+  exec: Executor = db
+): Promise<WorkspaceRow | null> {
+  const [row] = await exec
+    .select({
+      id: workspaces.id,
+      name: workspaces.name,
+      slug: workspaces.slug,
+      ownerId: workspaces.ownerId,
+      createdAt: workspaces.createdAt,
+      updatedAt: workspaces.updatedAt,
+    })
+    .from(workspaces)
+    .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
+    .where(and(eq(workspaces.slug, slug), eq(workspaceMembers.userId, userId)))
+    .limit(1);
+  return (row as WorkspaceRow | undefined) ?? null;
 }
 
 export async function listForUser(userId: string, exec: Executor = db) {

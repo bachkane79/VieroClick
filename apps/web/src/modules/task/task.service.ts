@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { db, type Executor } from "@vieroc/db";
 import { requireActor, type ActorContext } from "@/server/lib/context";
 import { isProjectManager } from "@/server/lib/permissions";
@@ -128,8 +129,9 @@ async function createBlockerForTask(
   return blocker;
 }
 
-/** Read: board view (tasks + statuses + dependencies). Requires workspace membership. */
-export async function listBoard(workspaceId: string, projectId: string) {
+/** Read: board view (tasks + statuses + dependencies). Requires workspace membership.
+ *  Wrapped with React cache() so identical calls within a single render are de-duplicated. */
+export const listBoard = cache(async function listBoard(workspaceId: string, projectId: string) {
   await requireActor(workspaceId, projectId);
   const [tasks, statuses, dependencies] = await Promise.all([
     repo.listByProject(projectId),
@@ -137,7 +139,7 @@ export async function listBoard(workspaceId: string, projectId: string) {
     repo.listDependenciesByProject(projectId),
   ]);
   return { tasks, statuses, dependencies };
-}
+});
 
 export async function listMyTasks(workspaceId: string) {
   const ctx = await requireActor(workspaceId);
