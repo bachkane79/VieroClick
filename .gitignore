@@ -40,3 +40,4 @@ yarn-debug.log*
 # misc
 coverage/
 .nyc_output/
+.local-storage/

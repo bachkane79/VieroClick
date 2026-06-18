@@ -10,6 +10,12 @@ interface BaseArgs {
   slug: string;
 }
 
+function revalidateProject(slug: string, projectId: string) {
+  revalidatePath(`/workspace/${slug}/project/${projectId}`);
+  revalidatePath(`/workspace/${slug}/projects/${projectId}/tasks`);
+  revalidatePath(`/workspace/${slug}/projects/${projectId}/board`);
+}
+
 export async function addCommentAction(args: BaseArgs & { taskId: string; data: unknown }) {
   return runAction(async () => {
     const comment = await service.addComment({
@@ -18,7 +24,7 @@ export async function addCommentAction(args: BaseArgs & { taskId: string; data: 
       taskId: args.taskId,
       input: args.data,
     });
-    revalidatePath(`/workspace/${args.slug}/project/${args.projectId}`);
+    revalidateProject(args.slug, args.projectId);
     return comment;
   });
 }
@@ -30,7 +36,7 @@ export async function deleteCommentAction(args: BaseArgs & { commentId: string }
       projectId: args.projectId,
       commentId: args.commentId,
     });
-    revalidatePath(`/workspace/${args.slug}/project/${args.projectId}`);
+    revalidateProject(args.slug, args.projectId);
     return result;
   });
 }
