@@ -1,7 +1,9 @@
 import "server-only";
+import { cache } from "react";
 import { db } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
 import { NotFoundError } from "@/server/lib/errors";
+import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
 import { createReportSchema } from "./report.schema";
 import { assertCanManageReports } from "./report.policy";
 import * as repo from "./report.repo";
@@ -11,10 +13,10 @@ import * as projectMemberRepo from "../project-member/project-member.repo";
 import { enqueueNotifications } from "@/server/lib/notifications";
 
 /** Read: all leader reports for a project. Requires workspace membership. */
-export async function listReports(workspaceId: string, projectId: string) {
+export const listReports = cache(async function listReports(workspaceId: string, projectId: string) {
   await requireActor(workspaceId, projectId);
-  return repo.listByProject(projectId);
-}
+  return getOrSetCache(`reports:${projectId}`, () => repo.listByProject(projectId));
+});
 
 export async function createReport(p: {
   workspaceId: string;
@@ -62,6 +64,8 @@ export async function createReport(p: {
       await enqueueNotifications(tx, notifyItems);
     }
 
+    invalidateCache(`reports:${p.projectId}`);
+
     return report;
   });
 }
@@ -105,6 +109,8 @@ export async function approveReport(p: {
     if (notifyItems.length > 0) {
       await enqueueNotifications(tx, notifyItems);
     }
+
+    invalidateCache(`reports:${p.projectId}`);
 
     return updated;
   });

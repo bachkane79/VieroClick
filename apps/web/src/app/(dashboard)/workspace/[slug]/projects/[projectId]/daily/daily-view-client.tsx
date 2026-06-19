@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Textarea } from "@vieroc/ui";
 import { toast } from "sonner";
@@ -56,12 +56,18 @@ export function DailyViewClient({
   const [supportNeeded, setSupportNeeded] = useState("");
   const [concerns, setConcerns] = useState("");
 
+  const [updates, setUpdates] = useState<UpdateRow[]>(initialUpdates);
+
+  useEffect(() => {
+    setUpdates(initialUpdates);
+  }, [initialUpdates]);
+
   const memberNameMap = new Map(members.map((m) => [m.id, m.fullName]));
 
   // Calculate missing updates for today
   const todayStr = new Date().toISOString().split("T")[0];
   const submittedTodayMemberIds = new Set(
-    initialUpdates
+    updates
       .filter((u) => u.workDate === todayStr)
       .map((u) => u.memberId)
   );
@@ -71,35 +77,63 @@ export function DailyViewClient({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    const wDate = workDate;
+    const compText = completedText.trim();
+    const progText = inProgressText.trim();
+    const blockText = blockersText.trim();
+    const confLvl = confidenceLevel;
+    const suppText = supportNeeded.trim();
+    const concText = concerns.trim();
+
+    setCompletedText("");
+    setInProgressText("");
+    setBlockersText("");
+    setSupportNeeded("");
+    setConcerns("");
+
+    // Optimistic update
+    const tempId = `temp-${Date.now()}`;
+    const newUpdate: UpdateRow = {
+      id: tempId,
+      projectId,
+      memberId: "me",
+      workDate: wDate,
+      completedText: compText || null,
+      inProgressText: progText || null,
+      blockersText: blockText || null,
+      confidenceLevel: confLvl || null,
+      supportNeeded: suppText || null,
+      concerns: concText || null,
+      submittedAt: new Date(),
+    };
+    setUpdates((current) => [newUpdate, ...current]);
+    toast.success("Daily update submitted");
+
     setSubmitting(true);
     const res = await submitDailyUpdateAction({
       workspaceId,
       projectId,
       slug: workspaceSlug,
       data: {
-        workDate,
-        completedText: completedText.trim() || undefined,
-        inProgressText: inProgressText.trim() || undefined,
-        blockersText: blockersText.trim() || undefined,
-        confidenceLevel,
-        supportNeeded: supportNeeded.trim() || undefined,
-        concerns: concerns.trim() || undefined,
+        workDate: wDate,
+        completedText: compText || undefined,
+        inProgressText: progText || undefined,
+        blockersText: blockText || undefined,
+        confidenceLevel: confLvl,
+        supportNeeded: suppText || undefined,
+        concerns: concText || undefined,
       },
     });
     setSubmitting(false);
 
     if (!res.ok) {
       toast.error(res.error);
-      return;
+      // rollback
+      setUpdates((current) => current.filter((u) => u.id !== tempId));
+    } else {
+      router.refresh();
     }
-
-    toast.success("Daily update submitted");
-    setCompletedText("");
-    setInProgressText("");
-    setBlockersText("");
-    setSupportNeeded("");
-    setConcerns("");
-    router.refresh();
   }
 
   const getConfidenceColor = (level: number | null) => {
@@ -209,7 +243,7 @@ export function DailyViewClient({
             Daily Updates History Feed
           </h3>
 
-          {initialUpdates.length === 0 ? (
+          {updates.length === 0 ? (
             <div className="p-12 text-center text-muted-foreground">
               <MessageSquare className="w-8 h-8 mx-auto mb-3 opacity-40 text-primary" />
               <p className="text-sm font-semibold">No daily updates posted yet</p>
@@ -217,8 +251,8 @@ export function DailyViewClient({
             </div>
           ) : (
             <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
-              {initialUpdates.map((u) => {
-                const authorName = memberNameMap.get(u.memberId) ?? "Workspace member";
+              {updates.map((u) => {
+                const authorName = u.memberId === "me" ? "You" : (memberNameMap.get(u.memberId) ?? "Workspace member");
                 return (
                   <div
                     key={u.id}

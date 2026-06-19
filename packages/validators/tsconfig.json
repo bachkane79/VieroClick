@@ -1,5 +1,5 @@
 {
-  "extends": "@vieroc/config/typescript/base",
+  "extends": "../config/typescript/base.json",
   "compilerOptions": {
     "outDir": "dist"
   },

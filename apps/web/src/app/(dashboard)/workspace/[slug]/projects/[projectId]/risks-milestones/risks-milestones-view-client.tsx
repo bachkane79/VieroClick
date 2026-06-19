@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Textarea } from "@vieroc/ui";
 import { toast } from "sonner";
 import { Calendar, AlertTriangle, Plus, Trash2, ShieldAlert, Flag } from "lucide-react";
 import { createMilestoneAction, deleteMilestoneAction } from "@/modules/milestone/milestone.actions";
 import { createRiskAction, deleteRiskAction } from "@/modules/risk/risk.actions";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 interface MilestoneRow {
   id: string;
@@ -58,6 +59,8 @@ export function RisksMilestonesViewClient({
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<"milestones" | "risks">("milestones");
+  const [deleteMilestoneCandidateId, setDeleteMilestoneCandidateId] = useState<string | null>(null);
+  const [deleteRiskCandidateId, setDeleteRiskCandidateId] = useState<string | null>(null);
 
   // Form toggles
   const [showAddMilestone, setShowAddMilestone] = useState(false);
@@ -79,9 +82,43 @@ export function RisksMilestonesViewClient({
 
   const memberNameMap = new Map(members.map((m) => [m.id, m.fullName]));
 
+  const [milestones, setMilestones] = useState<MilestoneRow[]>(initialMilestones);
+  const [risks, setRisks] = useState<RiskRow[]>(initialRisks);
+
+  useEffect(() => {
+    setMilestones(initialMilestones);
+  }, [initialMilestones]);
+
+  useEffect(() => {
+    setRisks(initialRisks);
+  }, [initialRisks]);
+
   async function handleAddMilestone(e: React.FormEvent) {
     e.preventDefault();
     if (!mTitle.trim()) return;
+
+    const titleVal = mTitle.trim();
+    const descVal = mDescription.trim() || null;
+    const targetVal = mTargetDate || null;
+
+    setShowAddMilestone(false);
+    setMTitle("");
+    setMDescription("");
+    setMTargetDate("");
+
+    // Optimistic add
+    const tempId = `temp-${Date.now()}`;
+    const newMilestone: MilestoneRow = {
+      id: tempId,
+      projectId,
+      title: titleVal,
+      description: descVal,
+      targetDate: targetVal,
+      status: "pending",
+      createdAt: new Date(),
+    };
+    setMilestones((current) => [...current, newMilestone]);
+    toast.success("Milestone created");
 
     setSubmitting(true);
     const res = await createMilestoneAction({
@@ -89,28 +126,30 @@ export function RisksMilestonesViewClient({
       projectId,
       slug: workspaceSlug,
       data: {
-        title: mTitle.trim(),
-        description: mDescription.trim() || undefined,
-        targetDate: mTargetDate || undefined,
+        title: titleVal,
+        description: descVal || undefined,
+        targetDate: targetVal || undefined,
       },
     });
     setSubmitting(false);
 
     if (!res.ok) {
       toast.error(res.error);
-      return;
+      // rollback
+      setMilestones((current) => current.filter((m) => m.id !== tempId));
+    } else {
+      router.refresh();
     }
-
-    toast.success("Milestone created");
-    setShowAddMilestone(false);
-    setMTitle("");
-    setMDescription("");
-    setMTargetDate("");
-    router.refresh();
   }
 
-  async function handleDeleteMilestone(milestoneId: string) {
-    if (!confirm("Delete this milestone?")) return;
+  function handleDeleteMilestone(milestoneId: string) {
+    setDeleteMilestoneCandidateId(milestoneId);
+  }
+
+  async function executeDeleteMilestone(milestoneId: string) {
+    const previousMilestones = [...milestones];
+    setMilestones((current) => current.filter((m) => m.id !== milestoneId));
+    toast.success("Milestone deleted");
 
     setSubmitting(true);
     const res = await deleteMilestoneAction({
@@ -123,16 +162,49 @@ export function RisksMilestonesViewClient({
 
     if (!res.ok) {
       toast.error(res.error);
-      return;
+      // rollback
+      setMilestones(previousMilestones);
+    } else {
+      router.refresh();
     }
-
-    toast.success("Milestone deleted");
-    router.refresh();
   }
 
   async function handleAddRisk(e: React.FormEvent) {
     e.preventDefault();
     if (!rTitle.trim()) return;
+
+    const titleVal = rTitle.trim();
+    const descVal = rDescription.trim() || null;
+    const probVal = rProbability;
+    const impVal = rImpact;
+    const ownerVal = rOwnerMemberId || null;
+    const mitVal = rMitigation.trim() || null;
+    const escVal = rEscalation.trim() || null;
+
+    setShowAddRisk(false);
+    setRTitle("");
+    setRDescription("");
+    setROwnerMemberId("");
+    setRMitigation("");
+    setREscalation("");
+
+    // Optimistic add
+    const tempId = `temp-${Date.now()}`;
+    const newRisk: RiskRow = {
+      id: tempId,
+      projectId,
+      title: titleVal,
+      description: descVal,
+      probability: probVal,
+      impact: impVal,
+      ownerMemberId: ownerVal,
+      mitigation: mitVal,
+      escalationPath: escVal,
+      status: "open",
+      createdAt: new Date(),
+    };
+    setRisks((current) => [...current, newRisk]);
+    toast.success("Risk reported");
 
     setSubmitting(true);
     const res = await createRiskAction({
@@ -140,34 +212,34 @@ export function RisksMilestonesViewClient({
       projectId,
       slug: workspaceSlug,
       data: {
-        title: rTitle.trim(),
-        description: rDescription.trim() || undefined,
-        probability: rProbability,
-        impact: rImpact,
-        ownerMemberId: rOwnerMemberId || undefined,
-        mitigation: rMitigation.trim() || undefined,
-        escalationPath: rEscalation.trim() || undefined,
+        title: titleVal,
+        description: descVal || undefined,
+        probability: probVal,
+        impact: impVal,
+        ownerMemberId: ownerVal || undefined,
+        mitigation: mitVal || undefined,
+        escalationPath: escVal || undefined,
       },
     });
     setSubmitting(false);
 
     if (!res.ok) {
       toast.error(res.error);
-      return;
+      // rollback
+      setRisks((current) => current.filter((r) => r.id !== tempId));
+    } else {
+      router.refresh();
     }
-
-    toast.success("Risk reported");
-    setShowAddRisk(false);
-    setRTitle("");
-    setRDescription("");
-    setROwnerMemberId("");
-    setRMitigation("");
-    setREscalation("");
-    router.refresh();
   }
 
-  async function handleDeleteRisk(riskId: string) {
-    if (!confirm("Delete this risk?")) return;
+  function handleDeleteRisk(riskId: string) {
+    setDeleteRiskCandidateId(riskId);
+  }
+
+  async function executeDeleteRisk(riskId: string) {
+    const previousRisks = [...risks];
+    setRisks((current) => current.filter((r) => r.id !== riskId));
+    toast.success("Risk deleted");
 
     setSubmitting(true);
     const res = await deleteRiskAction({
@@ -180,11 +252,11 @@ export function RisksMilestonesViewClient({
 
     if (!res.ok) {
       toast.error(res.error);
-      return;
+      // rollback
+      setRisks(previousRisks);
+    } else {
+      router.refresh();
     }
-
-    toast.success("Risk deleted");
-    router.refresh();
   }
 
   const getRiskScoreClass = (prob: number | null, imp: number | null) => {
@@ -238,7 +310,7 @@ export function RisksMilestonesViewClient({
                 )}
               </div>
 
-              {initialMilestones.length === 0 ? (
+              {milestones.length === 0 ? (
                 <div className="p-12 text-center text-muted-foreground border border-dashed rounded-xl">
                   <Calendar className="w-8 h-8 mx-auto mb-3 opacity-40 text-primary" />
                   <p className="text-sm font-semibold">No milestones set</p>
@@ -246,7 +318,7 @@ export function RisksMilestonesViewClient({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {initialMilestones.map((m) => (
+                  {milestones.map((m) => (
                     <div
                       key={m.id}
                       className="p-4 border border-neutral-200/40 dark:border-neutral-800/40 rounded-xl bg-card flex items-start justify-between gap-3 shadow-sm"
@@ -349,7 +421,7 @@ export function RisksMilestonesViewClient({
                 )}
               </div>
 
-              {initialRisks.length === 0 ? (
+              {risks.length === 0 ? (
                 <div className="p-12 text-center text-muted-foreground border border-dashed rounded-xl">
                   <ShieldAlert className="w-8 h-8 mx-auto mb-3 opacity-40 text-primary" />
                   <p className="text-sm font-semibold">No risks identified</p>
@@ -357,7 +429,7 @@ export function RisksMilestonesViewClient({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {initialRisks.map((r) => {
+                  {risks.map((r) => {
                     const ownerName = memberNameMap.get(r.ownerMemberId ?? "") ?? "Unassigned";
                     const score = (r.probability ?? 1) * (r.impact ?? 1);
 
@@ -541,6 +613,40 @@ export function RisksMilestonesViewClient({
           </div>
         </div>
       )}
+
+      <ConfirmationDialog
+        isOpen={deleteMilestoneCandidateId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteMilestoneCandidateId(null);
+        }}
+        title="Delete Milestone"
+        description="Are you sure you want to delete this milestone? This action cannot be undone."
+        variant="destructive"
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          if (deleteMilestoneCandidateId) {
+            await executeDeleteMilestone(deleteMilestoneCandidateId);
+            setDeleteMilestoneCandidateId(null);
+          }
+        }}
+      />
+
+      <ConfirmationDialog
+        isOpen={deleteRiskCandidateId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteRiskCandidateId(null);
+        }}
+        title="Delete Risk"
+        description="Are you sure you want to delete this risk? This action cannot be undone."
+        variant="destructive"
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          if (deleteRiskCandidateId) {
+            await executeDeleteRisk(deleteRiskCandidateId);
+            setDeleteRiskCandidateId(null);
+          }
+        }}
+      />
     </div>
   );
 }

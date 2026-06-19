@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Textarea } from "@vieroc/ui";
 import { toast } from "sonner";
@@ -65,12 +65,50 @@ export function BlockersViewClient({
   const memberNameMap = new Map(members.map((m) => [m.id, m.fullName]));
   const taskTitleMap = new Map(tasks.map((t) => [t.id, t.title]));
 
-  const openBlockers = initialBlockers.filter((b) => b.status !== "resolved");
-  const resolvedBlockers = initialBlockers.filter((b) => b.status === "resolved");
+  const [blockers, setBlockers] = useState<BlockerRow[]>(initialBlockers);
+
+  useEffect(() => {
+    setBlockers(initialBlockers);
+  }, [initialBlockers]);
+
+  const openBlockers = blockers.filter((b) => b.status !== "resolved");
+  const resolvedBlockers = blockers.filter((b) => b.status === "resolved");
 
   async function handleReport(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
+
+    const titleVal = title.trim();
+    const descVal = description.trim() || null;
+    const taskVal = taskId || null;
+    const sevVal = severity;
+    const ownerVal = ownerMemberId || null;
+
+    setIsAdding(false);
+    setTitle("");
+    setDescription("");
+    setTaskId("");
+    setOwnerMemberId("");
+
+    // Optimistic add
+    const tempId = `temp-${Date.now()}`;
+    const newBlocker: BlockerRow = {
+      id: tempId,
+      projectId,
+      taskId: taskVal,
+      reportedByMemberId: "me",
+      title: titleVal,
+      description: descVal,
+      status: "open",
+      severity: sevVal,
+      ownerMemberId: ownerVal,
+      resolvedByMemberId: null,
+      resolvedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    setBlockers((current) => [newBlocker, ...current]);
+    toast.success("Blocker reported");
 
     setSubmitting(true);
     const res = await reportBlockerAction({
@@ -78,30 +116,40 @@ export function BlockersViewClient({
       projectId,
       slug: workspaceSlug,
       data: {
-        title: title.trim(),
-        description: description.trim() || undefined,
-        taskId: taskId || undefined,
-        severity,
-        ownerMemberId: ownerMemberId || undefined,
+        title: titleVal,
+        description: descVal || undefined,
+        taskId: taskVal || undefined,
+        severity: sevVal,
+        ownerMemberId: ownerVal || undefined,
       },
     });
     setSubmitting(false);
 
     if (!res.ok) {
       toast.error(res.error);
-      return;
+      // rollback
+      setBlockers((current) => current.filter((b) => b.id !== tempId));
+    } else {
+      router.refresh();
     }
-
-    toast.success("Blocker reported");
-    setIsAdding(false);
-    setTitle("");
-    setDescription("");
-    setTaskId("");
-    setOwnerMemberId("");
-    router.refresh();
   }
 
   async function handleResolve(blockerId: string) {
+    const previousBlockers = [...blockers];
+    setBlockers((current) =>
+      current.map((b) =>
+        b.id === blockerId
+          ? {
+              ...b,
+              status: "resolved",
+              resolvedByMemberId: "me",
+              resolvedAt: new Date(),
+            }
+          : b
+      )
+    );
+    toast.success("Blocker resolved");
+
     setSubmitting(true);
     const res = await updateBlockerAction({
       workspaceId,
@@ -116,14 +164,20 @@ export function BlockersViewClient({
 
     if (!res.ok) {
       toast.error(res.error);
-      return;
+      // rollback
+      setBlockers(previousBlockers);
+    } else {
+      router.refresh();
     }
-
-    toast.success("Blocker resolved");
-    router.refresh();
   }
 
   async function handleReassign(blockerId: string, newOwnerId: string) {
+    const previousBlockers = [...blockers];
+    setBlockers((current) =>
+      current.map((b) => (b.id === blockerId ? { ...b, ownerMemberId: newOwnerId || null } : b))
+    );
+    toast.success("Blocker owner updated");
+
     setSubmitting(true);
     const res = await updateBlockerAction({
       workspaceId,
@@ -138,11 +192,11 @@ export function BlockersViewClient({
 
     if (!res.ok) {
       toast.error(res.error);
-      return;
+      // rollback
+      setBlockers(previousBlockers);
+    } else {
+      router.refresh();
     }
-
-    toast.success("Blocker owner updated");
-    router.refresh();
   }
 
   const getSeverityColor = (sev: string) => {

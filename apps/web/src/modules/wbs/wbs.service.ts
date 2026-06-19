@@ -1,17 +1,19 @@
 import "server-only";
+import { cache } from "react";
 import { db } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
 import { NotFoundError } from "@/server/lib/errors";
+import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
 import { createWbsNodeSchema, updateWbsNodeSchema } from "./wbs.schema";
 import { assertCanManageWbs } from "./wbs.policy";
 import * as repo from "./wbs.repo";
 import * as events from "./wbs.events";
 
 /** Read: WBS nodes for a project (ordered by position). Requires workspace membership. */
-export async function listWbsNodes(workspaceId: string, projectId: string) {
+export const listWbsNodes = cache(async function listWbsNodes(workspaceId: string, projectId: string) {
   await requireActor(workspaceId, projectId);
-  return repo.listByProject(projectId);
-}
+  return getOrSetCache(`wbs:${projectId}`, () => repo.listByProject(projectId));
+});
 
 export async function createWbsNode(p: {
   workspaceId: string;
@@ -37,6 +39,7 @@ export async function createWbsNode(p: {
     );
 
     await events.wbsNodeCreated(tx, ctx, node);
+    invalidateCache(`wbs:${p.projectId}`);
 
     return node;
   });
@@ -68,6 +71,7 @@ export async function updateWbsNode(p: {
     if (!updated) throw new NotFoundError("WBS node");
 
     await events.wbsNodeUpdated(tx, ctx, existing, updated);
+    invalidateCache(`wbs:${p.projectId}`);
 
     return updated;
   });
@@ -87,6 +91,7 @@ export async function deleteWbsNode(p: {
   return db.transaction(async (tx) => {
     await events.wbsNodeDeleted(tx, ctx, existing);
     await repo.remove(p.nodeId, tx);
+    invalidateCache(`wbs:${p.projectId}`);
     return { id: p.nodeId };
   });
 }

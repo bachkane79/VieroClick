@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Textarea } from "@vieroc/ui";
 import { Plus, Trash2, Link as LinkIcon, Folder, Box, ChevronDown, ChevronRight } from "lucide-react";
@@ -10,6 +10,7 @@ import {
   deleteWbsNodeAction,
   updateWbsNodeAction,
 } from "@/modules/wbs/wbs.actions";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 interface NodeRow {
   id: string;
@@ -49,14 +50,21 @@ export function WbsViewClient({
   const [newParentId, setNewParentId] = useState("");
   const [newLinkedTaskId, setNewLinkedTaskId] = useState("");
 
+  const [nodes, setNodes] = useState<NodeRow[]>(initialNodes);
+  const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setNodes(initialNodes);
+  }, [initialNodes]);
+
   const toggleExpand = (id: string) => {
     setExpandedNodes((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   // Build tree structure
-  const rootNodes = initialNodes.filter((n) => !n.parentId);
+  const rootNodes = nodes.filter((n) => !n.parentId);
   const childrenMap = new Map<string, NodeRow[]>();
-  for (const n of initialNodes) {
+  for (const n of nodes) {
     if (n.parentId) {
       const list = childrenMap.get(n.parentId) ?? [];
       list.push(n);
@@ -74,38 +82,66 @@ export function WbsViewClient({
     e.preventDefault();
     if (!newTitle.trim()) return;
 
+    const titleVal = newTitle.trim();
+    const descVal = newDescription.trim() || null;
+    const typeVal = newType;
+    const parentVal = newParentId || null;
+    const taskVal = newLinkedTaskId || null;
+
+    setIsAdding(false);
+    setNewTitle("");
+    setNewDescription("");
+    setNewParentId("");
+    setNewLinkedTaskId("");
+
+    // Optimistic add
+    const tempId = `temp-${Date.now()}`;
+    const newNode: NodeRow = {
+      id: tempId,
+      projectId,
+      parentId: parentVal,
+      title: titleVal,
+      description: descVal,
+      nodeType: typeVal,
+      linkedTaskId: taskVal,
+      position: nodes.length,
+    };
+    setNodes((current) => [...current, newNode]);
+    toast.success("WBS Node created");
+
     setSubmitting(true);
     const res = await createWbsNodeAction({
       workspaceId,
       projectId,
       slug: workspaceSlug,
       data: {
-        title: newTitle.trim(),
-        description: newDescription.trim() || undefined,
-        nodeType: newType,
-        parentId: newParentId || undefined,
-        linkedTaskId: newLinkedTaskId || undefined,
-        position: initialNodes.length,
+        title: titleVal,
+        description: descVal || undefined,
+        nodeType: typeVal,
+        parentId: parentVal || undefined,
+        linkedTaskId: taskVal || undefined,
+        position: nodes.length,
       },
     });
     setSubmitting(false);
 
     if (!res.ok) {
       toast.error(res.error);
-      return;
+      // rollback
+      setNodes((current) => current.filter((n) => n.id !== tempId));
+    } else {
+      router.refresh();
     }
-
-    toast.success("WBS Node created");
-    setIsAdding(false);
-    setNewTitle("");
-    setNewDescription("");
-    setNewParentId("");
-    setNewLinkedTaskId("");
-    router.refresh();
   }
 
-  async function deleteNode(nodeId: string) {
-    if (!confirm("Are you sure you want to delete this WBS node?")) return;
+  function deleteNode(nodeId: string) {
+    setDeleteCandidateId(nodeId);
+  }
+
+  async function executeDeleteNode(nodeId: string) {
+    const previousNodes = [...nodes];
+    setNodes((current) => current.filter((n) => n.id !== nodeId));
+    toast.success("WBS Node deleted");
 
     setSubmitting(true);
     const res = await deleteWbsNodeAction({
@@ -118,14 +154,20 @@ export function WbsViewClient({
 
     if (!res.ok) {
       toast.error(res.error);
-      return;
+      // rollback
+      setNodes(previousNodes);
+    } else {
+      router.refresh();
     }
-
-    toast.success("WBS Node deleted");
-    router.refresh();
   }
 
   async function handleLinkTask(nodeId: string, taskId: string) {
+    const previousNodes = [...nodes];
+    setNodes((current) =>
+      current.map((n) => (n.id === nodeId ? { ...n, linkedTaskId: taskId || null } : n))
+    );
+    toast.success("Task link updated");
+
     setSubmitting(true);
     const res = await updateWbsNodeAction({
       workspaceId,
@@ -140,11 +182,11 @@ export function WbsViewClient({
 
     if (!res.ok) {
       toast.error(res.error);
-      return;
+      // rollback
+      setNodes(previousNodes);
+    } else {
+      router.refresh();
     }
-
-    toast.success("Task link updated");
-    router.refresh();
   }
 
   // Recursive node renderer
@@ -243,7 +285,7 @@ export function WbsViewClient({
             )}
           </div>
 
-          {initialNodes.length === 0 ? (
+          {nodes.length === 0 ? (
             <div className="p-12 text-center text-muted-foreground rounded-xl border border-dashed border-neutral-200 dark:border-neutral-800">
               <Folder className="w-8 h-8 mx-auto mb-3 opacity-40 text-primary" />
               <p className="text-sm font-semibold">No WBS nodes defined</p>
@@ -360,6 +402,23 @@ export function WbsViewClient({
           </ul>
         </div>
       </div>
+
+      <ConfirmationDialog
+        isOpen={deleteCandidateId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteCandidateId(null);
+        }}
+        title="Delete WBS Node"
+        description="Are you sure you want to delete this WBS node? This action cannot be undone."
+        variant="destructive"
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          if (deleteCandidateId) {
+            await executeDeleteNode(deleteCandidateId);
+            setDeleteCandidateId(null);
+          }
+        }}
+      />
     </div>
   );
 }

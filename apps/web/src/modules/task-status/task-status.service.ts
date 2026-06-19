@@ -4,13 +4,14 @@ import { requireActor } from "@/server/lib/context";
 import { NotFoundError } from "@/server/lib/errors";
 import { createTaskStatusSchema, updateTaskStatusSchema } from "./task-status.schema";
 import { assertCanManageStatuses } from "./task-status.policy";
+import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
 import * as repo from "./task-status.repo";
 import * as events from "./task-status.events";
 
 /** Read: all statuses for a project. Requires workspace membership. */
 export async function listStatuses(workspaceId: string, projectId: string) {
   await requireActor(workspaceId, projectId);
-  return repo.listByProject(projectId);
+  return getOrSetCache(`statuses:${projectId}`, () => repo.listByProject(projectId));
 }
 
 export async function createStatus(p: {
@@ -35,6 +36,8 @@ export async function createStatus(p: {
     );
 
     await events.statusCreated(tx, ctx, status);
+    invalidateCache(`statuses:${p.projectId}`);
+    invalidateCache(`board:${p.projectId}`);
 
     return status;
   });
@@ -64,6 +67,8 @@ export async function updateStatus(p: {
     if (!updated) throw new NotFoundError("Task status");
 
     await events.statusUpdated(tx, ctx, existing, updated);
+    invalidateCache(`statuses:${p.projectId}`);
+    invalidateCache(`board:${p.projectId}`);
 
     return updated;
   });
@@ -83,6 +88,8 @@ export async function deleteStatus(p: {
   return db.transaction(async (tx) => {
     await events.statusDeleted(tx, ctx, existing);
     await repo.remove(p.statusId, tx);
+    invalidateCache(`statuses:${p.projectId}`);
+    invalidateCache(`board:${p.projectId}`);
     return { id: p.statusId };
   });
 }

@@ -34,6 +34,10 @@ export function TaskList({
   const [filter, setFilter] = useState<"all" | "blocked">("all");
   const [open, setOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TaskView | null>(null);
+  const currentSelectedTask = useMemo(() => {
+    if (!selectedTask) return null;
+    return tasks.find((t) => t.id === selectedTask.id) ?? selectedTask;
+  }, [tasks, selectedTask]);
   const statusById = useMemo(
     () => new Map(statuses.map((status) => [status.id, status])),
     [statuses]
@@ -137,7 +141,7 @@ export function TaskList({
         workspaceId={workspaceId}
         workspaceSlug={workspaceSlug}
         projectId={projectId}
-        task={selectedTask}
+        task={currentSelectedTask}
         tasks={tasks}
         statuses={statuses}
         members={members}

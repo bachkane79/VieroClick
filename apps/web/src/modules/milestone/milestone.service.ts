@@ -1,17 +1,19 @@
 import "server-only";
+import { cache } from "react";
 import { db } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
 import { NotFoundError } from "@/server/lib/errors";
+import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
 import { createMilestoneSchema, updateMilestoneSchema } from "./milestone.schema";
 import { assertCanManageMilestones } from "./milestone.policy";
 import * as repo from "./milestone.repo";
 import * as events from "./milestone.events";
 
 /** Read: milestones for a project. Requires workspace membership. */
-export async function listMilestones(workspaceId: string, projectId: string) {
+export const listMilestones = cache(async function listMilestones(workspaceId: string, projectId: string) {
   await requireActor(workspaceId, projectId);
-  return repo.listByProject(projectId);
-}
+  return getOrSetCache(`milestones:${projectId}`, () => repo.listByProject(projectId));
+});
 
 export async function createMilestone(p: {
   workspaceId: string;
@@ -35,6 +37,7 @@ export async function createMilestone(p: {
     );
 
     await events.milestoneCreated(tx, ctx, milestone);
+    invalidateCache(`milestones:${p.projectId}`);
 
     return milestone;
   });
@@ -64,6 +67,7 @@ export async function updateMilestone(p: {
     if (!updated) throw new NotFoundError("Milestone");
 
     await events.milestoneUpdated(tx, ctx, existing, updated);
+    invalidateCache(`milestones:${p.projectId}`);
 
     return updated;
   });
@@ -82,6 +86,7 @@ export async function deleteMilestone(p: {
 
   return db.transaction(async (tx) => {
     await repo.remove(p.milestoneId, tx);
+    invalidateCache(`milestones:${p.projectId}`);
     return { id: p.milestoneId };
   });
 }

@@ -1,5 +1,5 @@
 {
-  "extends": "@vieroc/config/typescript/nextjs",
+  "extends": "../config/typescript/nextjs.json",
   "compilerOptions": {
     "outDir": "dist"
   },

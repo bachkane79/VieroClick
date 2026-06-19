@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
 import { NotFoundError, ValidationError } from "@/server/lib/errors";
+import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
 import { enqueueNotifications } from "@/server/lib/notifications";
 import { addProjectMemberSchema, updateProjectMemberSchema } from "./project-member.schema";
 import { assertCanManageMembers } from "./project-member.policy";
@@ -10,7 +11,7 @@ import * as events from "./project-member.events";
 
 export async function listMembers(workspaceId: string, projectId: string) {
   await requireActor(workspaceId, projectId);
-  return repo.listByProject(projectId);
+  return getOrSetCache(`project_members:${projectId}`, () => repo.listByProject(projectId));
 }
 
 export async function addMember(p: { workspaceId: string; projectId: string; input: unknown }) {
@@ -43,6 +44,7 @@ export async function addMember(p: { workspaceId: string; projectId: string; inp
         entityId: p.projectId,
       },
     ]);
+    invalidateCache(`project_members:${p.projectId}`);
     return member;
   });
 }
@@ -64,6 +66,7 @@ export async function updateMember(p: {
     const updated = await repo.update(p.memberId, data, tx);
     if (!updated) throw new NotFoundError("Project member");
     await events.memberUpdated(tx, ctx, updated, { ...data });
+    invalidateCache(`project_members:${p.projectId}`);
     return updated;
   });
 }
@@ -78,6 +81,7 @@ export async function removeMember(p: { workspaceId: string; projectId: string; 
   return db.transaction(async (tx) => {
     await events.memberRemoved(tx, ctx, existing);
     await repo.remove(p.memberId, tx);
+    invalidateCache(`project_members:${p.projectId}`);
     return { id: p.memberId };
   });
 }

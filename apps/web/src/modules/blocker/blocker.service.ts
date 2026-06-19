@@ -1,18 +1,20 @@
 import "server-only";
+import { cache } from "react";
 import { db } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
 import { NotFoundError } from "@/server/lib/errors";
 import { enqueueNotifications } from "@/server/lib/notifications";
+import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
 import { createBlockerSchema, updateBlockerSchema } from "./blocker.schema";
 import { assertCanReport, assertCanResolve } from "./blocker.policy";
 import * as repo from "./blocker.repo";
 import * as events from "./blocker.events";
 
 /** Read: all blockers for a project. Requires workspace membership. */
-export async function listBlockers(workspaceId: string, projectId: string) {
+export const listBlockers = cache(async function listBlockers(workspaceId: string, projectId: string) {
   await requireActor(workspaceId, projectId);
-  return repo.listByProject(projectId);
-}
+  return getOrSetCache(`blockers:${projectId}`, () => repo.listByProject(projectId));
+});
 
 export async function reportBlocker(p: {
   workspaceId: string;
@@ -53,6 +55,8 @@ export async function reportBlocker(p: {
       ]);
     }
 
+    invalidateCache(`blockers:${p.projectId}`);
+
     return blocker;
   });
 }
@@ -92,6 +96,8 @@ export async function updateBlocker(p: {
     } else {
       await events.blockerUpdated(tx, ctx, existing, updated);
     }
+
+    invalidateCache(`blockers:${p.projectId}`);
 
     return updated;
   });
