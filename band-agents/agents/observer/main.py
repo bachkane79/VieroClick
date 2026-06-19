@@ -113,7 +113,7 @@ class ObserverAdapter(SimpleAdapter):
                     project_state=json.dumps(proj_data, default=str)
                 ),
                 response_format_json=True,
-                model_override=os.getenv("QA_MODEL")
+                model_override=os.getenv("OBSERVER_MODEL")
             )
             result = extract_json_payload(llm_response)
         except Exception as e:

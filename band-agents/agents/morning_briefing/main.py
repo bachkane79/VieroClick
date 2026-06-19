@@ -103,7 +103,7 @@ class MorningBriefingAdapter(SimpleAdapter):
                     project_state=json.dumps(proj_data, default=str)
                 ),
                 response_format_json=True,
-                model_override=os.getenv("PLANNER_MODEL")
+                model_override=os.getenv("MORNING_BRIEFING_MODEL")
             )
             result = extract_json_payload(llm_response)
         except Exception as e:

@@ -113,7 +113,7 @@ class PlanningAdapter(SimpleAdapter):
                 system_prompt=PLANNING_SYSTEM_PROMPT,
                 user_prompt=PLANNING_USER_TEMPLATE.format(request=message),
                 response_format_json=True,
-                model_override=os.getenv("PLANNER_MODEL")
+                model_override=os.getenv("PLANNING_MODEL")
             )
             plan = extract_json_payload(llm_response)
         except Exception as e:

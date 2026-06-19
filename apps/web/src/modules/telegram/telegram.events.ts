@@ -45,3 +45,26 @@ export function channelUnlinked(exec: Executor, ctx: ActorContext, channel: Chan
     before: { telegramChatId: channel.telegramChatId, title: channel.title },
   });
 }
+
+export function botConnected(
+  exec: Executor,
+  ctx: ActorContext,
+  bot: { id: string; botUsername: string | null }
+) {
+  return recordEvent(exec, {
+    ...actorFields(ctx),
+    entityType: "telegram_bot",
+    entityId: bot.id,
+    eventType: "telegram.bot_connected",
+    after: { botUsername: bot.botUsername },
+  });
+}
+
+export function botDisconnected(exec: Executor, ctx: ActorContext, botId: string) {
+  return recordEvent(exec, {
+    ...actorFields(ctx),
+    entityType: "telegram_bot",
+    entityId: botId,
+    eventType: "telegram.bot_disconnected",
+  });
+}

@@ -182,7 +182,7 @@ class AssignmentAdapter(SimpleAdapter):
                     } for x in calculated_assignments])
                 ),
                 response_format_json=True,
-                model_override=os.getenv("DEVELOPER_MODEL")
+                model_override=os.getenv("ASSIGNMENT_MODEL")
             )
             result = extract_json_payload(llm_response)
         except Exception as e:

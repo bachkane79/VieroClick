@@ -5,6 +5,25 @@ import { workspaces, workspaceMembers } from "./workspaces";
 import { projects } from "./projects";
 import { tasks } from "./tasks";
 
+/**
+ * One bot per workspace. The user creates a bot via @BotFather, pastes the
+ * token + a default chat id here, and every notification raised in the
+ * workspace is forwarded to that chat. Token is stored server-side only.
+ */
+export const telegramBots = pgTable("telegram_bots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id")
+    .notNull()
+    .unique()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  botToken: text("bot_token").notNull(),
+  botUsername: text("bot_username"),
+  defaultChatId: text("default_chat_id"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+  updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+});
+
 export const telegramChannels = pgTable(
   "telegram_channels",
   {

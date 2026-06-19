@@ -1,175 +1,113 @@
-# VieroClick × Band AI — Multi-Agent Pipeline
+# VieroClick × Band AI — 6-Agent Project Manager
 
-A **5-agent AI pipeline** built for the [Band of Agents Hackathon](https://lablab.ai/ai-hackathons/band-of-agents-hackathon), integrating VieroClick (a Next.js project management app) with [Band AI](https://band.ai) for real-time multi-agent collaboration.
+The six AI agents from the VieroClick design plan (§7.4–7.9), each connected to a
+[Band AI](https://band.ai) **External Agent** and collaborating in a shared Band
+chat room via `@mentions` and embedded JSON payloads.
 
 ---
 
-## 🏗️ Architecture & Workflows
+## 🤖 The 6 agents
 
-Band AI operates as a collaborative "agentic mesh". Instead of calling APIs sequentially in code, agents communicate in real-time in a shared **Band Chat Room** using `@mentions` and JSON payloads.
+| # | Agent | Band handle | Design | What it does |
+|---|-------|-------------|--------|--------------|
+| 1 | **Planner** | `@bachkane79/planner` | §7.4 | Turns a project abstract into a plan (tasks, milestones, risks); waits for human **approve**; then creates the project + tasks in VieroClick and hands off to the assigner. |
+| 2 | **Assigner** | `@bachkane79/assigner` | §7.5 | Recommends the best member per task (skill/load match), writes assignees to VieroClick, posts the final assigned plan. |
+| 3 | **Observer** | `@bachkane79/observer` | §7.6 | Scans project health and flags signals (silent assignee, overdue, unclear blocker, missing acceptance criteria, …). |
+| 4 | **Daily Report** | `@bachkane79/daily-report` | §7.7 | Drafts the leader end-of-day report (progress, risks, blockers, member demands, plan deviations, actions). |
+| 5 | **Morning Briefing** | `@bachkane79/morning-briefing` | §7.8 | Per-member + project briefings for the day; optional Telegram broadcast. |
+| 6 | **Q&A + Hole** | `@bachkane79/qa-and-hole` | §7.9 | Answers project questions from context **and** detects "project holes" (missing info the leader must clarify). |
 
-```mermaid
-graph TD
-    %% Define Styles
-    classDef human fill:#ececff,stroke:#9370db,stroke-width:2px;
-    classDef agent fill:#e1f5fe,stroke:#03a9f4,stroke-width:2px;
-    classDef db fill:#e8f5e9,stroke:#4caf50,stroke-width:2px;
-    
-    %% Elements
-    Human["🧑‍💼 Leader (Human)"]:::human
-    Planner["📋 Planner Agent<br>(@planner)"]:::agent
-    Notifier["🔔 Notifier Agent<br>(@notifier)"]:::agent
-    Assigner["🛠️ Assigner Agent<br>(@developer)"]:::agent
-    QA["💬 QA Chatbot Agent<br>(@qa-agent)"]:::agent
-    Reporter["📊 Reporter Agent<br>(@reviewer)"]:::agent
-    VieroDB[("🗄️ VieroClick DB<br>(Neon PostgreSQL)")]:::db
+---
 
-    %% Main Pipeline Flow
-    Human -->|1. Nhập Project Abstract| Planner
-    Planner -->|2. Yêu cầu Duyệt| Human
-    Human -->|3. Gõ 'approve'| Planner
-    Planner -->|4. Gửi Plan| Notifier
-    Notifier -->|5. Tạo Tasks & Timeline| VieroDB
-    Notifier -->|6. Chuyển tiếp Task list| Assigner
-    Assigner -->|7. Phân bổ Assignee| Notifier
-    Notifier -->|8. Cập nhật Assignee| VieroDB
-    Notifier -->|9. Báo cáo hoàn thành| Human
+## 🔄 Workflows
 
-    %% Standalone Agents
-    Human -.->|Mention @qa-agent [Câu hỏi]| QA
-    Human -.->|Mention @reviewer sáng/tối| Reporter
-    Reporter -.->|Đọc thay đổi timestamp| VieroDB
+**Planning pipeline (HITL-gated):**
+
+```
+Human ──@planner [abstract]──▶ Planner
+Planner ──posts plan + asks approval──▶ Human
+Human ──"approve"──▶ Planner ──creates project+tasks in VieroClick──▶ @assigner
+Assigner ──writes assignees to VieroClick──▶ posts final assigned plan
 ```
 
----
+**Standalone (mention any time):**
 
-## 🔄 Pipeline Workflow Details
-
-### 🛠️ Workflow 1: Project Planning & Assignment
-This workflow connects planning, backend sync, and member task assignment in one continuous loop:
-
-1. **Planner Agent** (`@planner`):
-   - Receives the raw abstract request from the Leader.
-   - Generates a structured JSON plan with prioritized **tasks**, **milestones** (timeline), and **risks**.
-   - Asks for Leader approval: *"Type **approve** to create the project plan."*
-2. **Leader types `approve`** in the room.
-3. **Notifier Agent** (`@notifier` — Stage 1):
-   - Receives the approved plan, makes HTTP calls to the VieroClick local server to create the tasks and milestones.
-   - Captures the created task IDs, then mentions the Assigner agent (`@developer`) to allocate team members.
-4. **Assigner Agent** (`@developer`):
-   - Reads the task categories and maps them to your **real team members** based on their hackathon responsibilities:
-     - **Người 1** (`member_1`): Auth, Notifications, Webhooks, Telegram.
-     - **Người 2** (`member_2`): Projects, Task system, Gantt charts, Milestones.
-     - **Người 3** (`member_3`): Comments, File uploads, Daily updates, Risks.
-   - Recommends the optimal assignees, then mentions the Notifier agent (`@notifier`).
-5. **Notifier Agent** (`@notifier` — Stage 2):
-   - Receives the assignments, calls the VieroClick API to update the assignees in the database.
-   - Announces the complete, fully assigned project plan in the chat room!
-
----
-
-### 📅 Workflow 2: Daily Morning & Evening Reports
-Provides status summaries directly in the chat room (manually triggered for easy demoing):
-
-- **Morning Report** (Trigger: `@reviewer morning` or `@reviewer sáng`):
-  - Automatically synthesizes active tasks, daily goals, and blockers.
-  - Lists what needs to be worked on today by Người 1, 2, and 3.
-- **Evening Report** (Trigger: `@reviewer evening` or `@reviewer tối`):
-  - Compares the morning database/task state against the evening database/task state (comparing timestamps).
-  - Outlines completed tasks, updated progresses, resolved blockers, and lists action items for tomorrow.
-
----
-
-### 💬 Standalone QA Chatbot
-- **QA Chatbot** (Trigger: `@qa-agent [Question]`):
-  - A standalone chatbot that anyone can mention to ask questions about VieroClick's tech stack (Next.js 14, tRPC, Drizzle, PostgreSQL), modules, or team responsibilities.
-  - Responds dynamically in natural language (Vietnamese).
-
----
-
-## 🚀 Quick Start
-
-### 1. Prerequisites
-- Python 3.11+
-- A [Band AI](https://app.band.ai) account
-- API key: OpenAI or Anthropic (single model provider setup)
-- VieroClick running at `localhost:3000`
-
-### 2. Install dependencies
-```bash
-cd d:\Project\band-agents
-pip install -r requirements.txt
+```
+@observer                     → risk-signal scan
+@daily-report                 → leader end-of-day report
+@morning-briefing             → per-member morning briefing
+@qa-and-hole  <câu hỏi>       → grounded answer + project holes
 ```
 
-### 3. Configure Band agents
-1. Go to [app.band.ai/agents](https://app.band.ai/agents)
-2. Create 5 **External Agents** with these exact handles and tags:
-   - **Planner**: handle `planner`, tags: `pm, plan, task`
-   - **Assigner**: handle `developer`, tags: `team, dev, role`
-   - **QA Chatbot**: handle `qa-agent`, tags: `qa, bot, chat`
-   - **Reporter**: handle `reviewer`, tags: `report, log, status`
-   - **Notifier**: handle `notifier`, tags: `sync, api, link`
-3. Copy the API key and Agent UUID for each.
-4. Fill them in `agent_config.yaml` (see [agent_config.yaml.example](file:///d:/Project/band-agents/agent_config.yaml.example)).
-
-### 4. Configure environment
-1. Copy `.env.example` to `.env`.
-2. Fill in: `OPENAI_API_KEY` (or `ANTHROPIC_API_KEY`), `VIEROC_API_TOKEN`, and `BAND_ROOM_ID`.
-
-### 5. Run all agents
-```bash
-python run_all.py
-```
+The observation/reporting agents read live data from VieroClick (`/api/test-db`);
+if the app is not running they fall back to a realistic mock snapshot so the demo
+still works (see [shared/context.py](shared/context.py)).
 
 ---
 
-## 📁 Project Structure
+## 🏗️ Project structure
 
 ```
 band-agents/
 ├── agents/
-│   ├── planner/      # Planner Agent (System prompt planning)
-│   ├── developer/    # Assigner Agent (Team skill mapping)
-│   ├── qa/           # QA Chatbot Agent (Project info lookup)
-│   ├── reviewer/     # Reporter Agent (Morning/Evening comparison reports)
-│   └── notifier/     # Notifier Agent & VieroClick Client (API sync)
+│   ├── planner/           # §7.4 — plan + HITL + create in VieroClick
+│   ├── assigner/          # §7.5 — recommend + assign
+│   ├── observer/          # §7.6 — signal detection
+│   ├── daily_report/      # §7.7 — leader report
+│   ├── morning_briefing/  # §7.8 — per-member briefing
+│   └── qa_hole/           # §7.9 — Q&A + hole detection
 ├── shared/
-│   ├── hitl.py           # Human-in-the-loop gate helpers
-│   ├── llm.py            # Unified single-LLM provider wrapper
-│   ├── message_parser.py # Band room message JSON parser
-│   └── state.py          # Pipeline states
-├── run_all.py        # Launch all 5 agents concurrently
-├── requirements.txt
-└── agent_config.yaml
+│   ├── base_adapter.py    # common Band wiring (mention gating, room context)
+│   ├── vieroc_client.py   # HTTP client for the VieroClick app
+│   ├── context.py         # live/mock project-context loader
+│   ├── llm.py             # unified OpenAI/Anthropic caller
+│   ├── message_parser.py  # JSON payload + approval-keyword parsing
+│   └── hitl.py            # human-in-the-loop prompt helpers
+├── run_all.py             # launch all 6 agents concurrently
+├── agent_config.yaml      # Band agent IDs + API keys (gitignored)
+└── .env                   # LLM keys, VieroClick config, handles (gitignored)
 ```
+
+Each `agents/<name>/main.py` subclasses `BandAgentAdapter` and implements
+`handle_message`; all the Band connection boilerplate lives in
+[shared/base_adapter.py](shared/base_adapter.py).
 
 ---
 
-## 🛠️ Tech Stack
+## 🚀 Quick start
+
+1. **Install** (Python 3.11+):
+   ```bash
+   cd band-agents
+   pip install -r requirements.txt
+   ```
+2. **Create 6 External Agents** at [app.band.ai/agents](https://app.band.ai/agents)
+   with handles `planner, assigner, observer, daily-report, morning-briefing, qa-and-hole`,
+   invite all 6 + yourself to one Band room.
+3. **Configure**:
+   - Copy [agent_config.yaml.example](agent_config.yaml.example) → `agent_config.yaml`
+     and fill in each agent's UUID + API key. The top-level keys must stay
+     `planner / assigner / observer / daily_report / morning_briefing / qa_hole`.
+   - Copy [.env.example](.env.example) → `.env`, set an LLM key (`OPENAI_API_KEY`
+     or `ANTHROPIC_API_KEY`), `VIEROC_API_URL/TOKEN`, and the `*_HANDLE` values to
+     your prefixed handles (e.g. `@bachkane79/planner`).
+4. **Run**:
+   ```bash
+   python run_all.py
+   ```
+   Then in the Band room: `@bachkane79/planner Xây dựng tính năng thông báo realtime ...`
+
+---
+
+## 🛠️ Tech stack
 
 | Component | Technology |
 |---|---|
-| Agent Mesh | [Band AI](https://band.ai) + band-sdk (WebSockets) |
-| Core LLM Engine | OpenAI (GPT-4o-mini) OR Anthropic (Claude-3.5-Sonnet) |
-| PM App | VieroClick (Next.js 14 + tRPC + Drizzle ORM + PostgreSQL) |
-| HTTP Clients | `httpx` (for VieroClick backend integrations) |
+| Agent mesh | [Band AI](https://band.ai) + `band-sdk` (WebSockets) |
+| LLM | OpenAI (`gpt-4o-mini`) **or** Anthropic (`claude-3-5-sonnet`) — auto-detected |
+| PM app | VieroClick (Next.js 15 + Drizzle ORM + Neon PostgreSQL) |
+| HTTP | `httpx` |
 
 ---
 
-## 🔑 Environment Variables
-
-| Variable | Required | Description |
-|---|---|---|
-| `OPENAI_API_KEY` | Yes | For Planner (GPT-4o) |
-| `ANTHROPIC_API_KEY` | Yes | For Developer, QA, Reviewer, Notifier |
-| `VIEROC_API_URL` | Yes | VieroClick app URL |
-| `VIEROC_API_TOKEN` | Yes | Auth token for VieroClick API |
-| `TELEGRAM_BOT_TOKEN` | Optional | For Telegram notifications |
-| `TELEGRAM_CHAT_ID` | Optional | Telegram chat/channel ID |
-| `VIEROC_DEFAULT_PROJECT_ID` | Optional | Default project for task creation |
-
----
-
-## 📜 License
-
-MIT — Built for Band of Agents Hackathon 2026
+MIT — Built for the Band of Agents Hackathon 2026

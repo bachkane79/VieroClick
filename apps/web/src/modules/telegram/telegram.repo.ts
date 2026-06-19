@@ -1,9 +1,62 @@
 import "server-only";
 import { and, desc, eq } from "drizzle-orm";
-import { db, telegramChannels, type Executor } from "@vieroc/db";
+import { db, telegramChannels, telegramBots, type Executor } from "@vieroc/db";
 
 export type TelegramChannelInsert = typeof telegramChannels.$inferInsert;
 export type TelegramChannelRow = typeof telegramChannels.$inferSelect;
+
+export type TelegramBotInsert = typeof telegramBots.$inferInsert;
+export type TelegramBotRow = typeof telegramBots.$inferSelect;
+
+export async function findBotByWorkspace(
+  workspaceId: string,
+  exec: Executor = db
+): Promise<TelegramBotRow | null> {
+  const [row] = await exec
+    .select()
+    .from(telegramBots)
+    .where(eq(telegramBots.workspaceId, workspaceId))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function upsertBot(
+  values: TelegramBotInsert,
+  exec: Executor = db
+): Promise<TelegramBotRow> {
+  const [row] = await exec
+    .insert(telegramBots)
+    .values(values)
+    .onConflictDoUpdate({
+      target: telegramBots.workspaceId,
+      set: {
+        botToken: values.botToken,
+        botUsername: values.botUsername ?? null,
+        defaultChatId: values.defaultChatId ?? null,
+        isActive: values.isActive ?? true,
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+  return row!;
+}
+
+export async function patchBot(
+  workspaceId: string,
+  patch: Partial<TelegramBotInsert>,
+  exec: Executor = db
+): Promise<TelegramBotRow | null> {
+  const [row] = await exec
+    .update(telegramBots)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(eq(telegramBots.workspaceId, workspaceId))
+    .returning();
+  return row ?? null;
+}
+
+export async function removeBot(workspaceId: string, exec: Executor = db): Promise<void> {
+  await exec.delete(telegramBots).where(eq(telegramBots.workspaceId, workspaceId));
+}
 
 export async function findChannelById(
   id: string,

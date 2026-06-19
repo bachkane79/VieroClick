@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import { getWorkspace, listWorkspaceMembers } from "@/modules/workspace/workspace.service";
+import { getBotConfig } from "@/modules/telegram/telegram.service";
 import { NotFoundError } from "@/server/lib/errors";
 import { WorkspaceSettingsForm } from "./settings-form";
+import { TelegramSettings } from "./telegram-settings";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -12,9 +14,11 @@ export default async function WorkspaceSettingsPage({ params }: Props) {
 
   let workspace;
   let members;
+  let botConfig;
   try {
     workspace = await getWorkspace(slug);
     members = await listWorkspaceMembers(workspace.id);
+    botConfig = await getBotConfig(workspace.id);
   } catch (err) {
     if (err instanceof NotFoundError) notFound();
     throw err;
@@ -30,6 +34,8 @@ export default async function WorkspaceSettingsPage({ params }: Props) {
       </div>
 
       <WorkspaceSettingsForm workspace={workspace} initialMembers={members} />
+
+      <TelegramSettings workspaceId={workspace.id} slug={slug} initialConfig={botConfig} />
     </div>
   );
 }
