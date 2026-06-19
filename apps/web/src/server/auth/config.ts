@@ -41,5 +41,11 @@ export const authConfig: NextAuthConfig = {
     authorized() {
       return true;
     },
+    async session({ session, token }) {
+      if (token.userId) {
+        session.user.id = token.userId as string;
+      }
+      return session;
+    },
   },
 };
