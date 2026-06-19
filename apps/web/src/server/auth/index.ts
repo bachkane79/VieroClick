@@ -19,16 +19,21 @@ const authResult = NextAuth({
         const fullName = user.name ?? email;
         const avatarUrl = null;
 
-        const [row] = await db
-          .insert(users)
-          .values({ email, fullName, avatarUrl })
-          .onConflictDoUpdate({
-            target: users.email,
-            set: { fullName, updatedAt: new Date() },
-          })
-          .returning({ id: users.id });
+        try {
+          const [row] = await db
+            .insert(users)
+            .values({ email, fullName, avatarUrl })
+            .onConflictDoUpdate({
+              target: users.email,
+              set: { fullName, updatedAt: new Date() },
+            })
+            .returning({ id: users.id });
 
-        if (row) token.userId = row.id;
+          if (row) token.userId = row.id;
+        } catch (dbError) {
+          console.error("[NextAuth JWT Callback] Failed to insert/update credentials user in database. Ensure your database is running and schema has been pushed:", dbError);
+          throw dbError;
+        }
       } else if (account && profile?.email) {
         const email = profile.email;
         const fullName = (profile.name as string | undefined) ?? email;
@@ -37,16 +42,21 @@ const authResult = NextAuth({
           (profile.avatar_url as string | undefined) ??
           null;
 
-        const [row] = await db
-          .insert(users)
-          .values({ email, fullName, avatarUrl })
-          .onConflictDoUpdate({
-            target: users.email,
-            set: { fullName, avatarUrl, updatedAt: new Date() },
-          })
-          .returning({ id: users.id });
+        try {
+          const [row] = await db
+            .insert(users)
+            .values({ email, fullName, avatarUrl })
+            .onConflictDoUpdate({
+              target: users.email,
+              set: { fullName, avatarUrl, updatedAt: new Date() },
+            })
+            .returning({ id: users.id });
 
-        if (row) token.userId = row.id;
+          if (row) token.userId = row.id;
+        } catch (dbError) {
+          console.error("[NextAuth JWT Callback] Failed to insert/update OAuth user in database. Ensure your database is running and schema has been pushed:", dbError);
+          throw dbError;
+        }
       }
       return token;
     },

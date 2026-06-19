@@ -8,34 +8,46 @@ import Credentials from "next-auth/providers/credentials";
  * No database access here so it can be imported by `middleware.ts` (edge runtime).
  * The full config in `./index.ts` extends this with DB-touching callbacks.
  */
-export const authConfig: NextAuthConfig = {
-  secret: process.env.AUTH_SECRET || "default-fallback-secret-for-development-only-12345",
-  trustHost: true,
-  providers: [
+const providers: any[] = [
+  Credentials({
+    name: "Developer Bypass",
+    credentials: {
+      email: { label: "Email", type: "email", placeholder: "dev@example.com" },
+      name: { label: "Name", type: "text", placeholder: "Developer" },
+    },
+    async authorize(credentials) {
+      if (!credentials?.email) return null;
+      return {
+        id: "",
+        email: credentials.email as string,
+        name: (credentials.name as string) || (credentials.email as string),
+      };
+    },
+  }),
+];
+
+if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
+  providers.push(
     GitHub({
       clientId: process.env.GITHUB_CLIENT_ID,
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
-    }),
+    })
+  );
+}
+
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  providers.push(
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    }),
-    Credentials({
-      name: "Developer Bypass",
-      credentials: {
-        email: { label: "Email", type: "email", placeholder: "dev@example.com" },
-        name: { label: "Name", type: "text", placeholder: "Developer" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email) return null;
-        return {
-          id: "",
-          email: credentials.email as string,
-          name: (credentials.name as string) || (credentials.email as string),
-        };
-      },
-    }),
-  ],
+    })
+  );
+}
+
+export const authConfig: NextAuthConfig = {
+  secret: process.env.AUTH_SECRET || "default-fallback-secret-for-development-only-12345",
+  trustHost: true,
+  providers,
   session: { strategy: "jwt" },
   pages: { signIn: "/login", error: "/login" },
   callbacks: {
