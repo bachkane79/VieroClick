@@ -9,13 +9,29 @@ import * as schema from "./schema/index";
 // supported over WebSockets.
 neonConfig.webSocketConstructor = globalThis.WebSocket ?? ws;
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is required");
+function createDb() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is required");
+  }
+
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  return drizzle(pool, { schema });
 }
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+type DrizzleDatabase = ReturnType<typeof createDb>;
 
-export const db = drizzle(pool, { schema });
+let dbInstance: DrizzleDatabase | null = null;
+
+function getDb() {
+  dbInstance ??= createDb();
+  return dbInstance;
+}
+
+export const db = new Proxy({} as DrizzleDatabase, {
+  get(_target, prop, receiver) {
+    return Reflect.get(getDb(), prop, receiver);
+  },
+});
 
 export type Database = typeof db;
 /** The transaction handle passed to `db.transaction(async (tx) => …)`. */
