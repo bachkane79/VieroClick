@@ -71,6 +71,39 @@ class VieroClickClient:
                 logger.error(f"Failed to create suggestion in VieroClick: {e}")
                 return {}
 
+    async def apply_plan(self, project_id: str, plan: dict) -> dict:
+        """Apply an agent-generated plan directly to VieroClick DB-backed objects."""
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            try:
+                resp = await client.post(
+                    f"{self.base_url}/api/agent/apply-plan",
+                    json={"projectId": project_id, "plan": plan},
+                    headers=self._headers,
+                )
+                resp.raise_for_status()
+                return resp.json()
+            except Exception as e:
+                logger.error(f"Failed to apply plan in VieroClick: {e}")
+                return {}
+
+    async def apply_assignments(self, project_id: str, assignments: dict) -> dict:
+        """Apply task assignments directly to VieroClick DB-backed tasks."""
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            try:
+                resp = await client.post(
+                    f"{self.base_url}/api/agent/apply-assignments",
+                    json={
+                        "projectId": project_id,
+                        "assignments": assignments.get("assignments", []),
+                    },
+                    headers=self._headers,
+                )
+                resp.raise_for_status()
+                return resp.json()
+            except Exception as e:
+                logger.error(f"Failed to apply assignments in VieroClick: {e}")
+                return {}
+
     async def create_report(
         self,
         report_date: str,

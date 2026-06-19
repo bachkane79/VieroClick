@@ -3,6 +3,7 @@ import { getWorkspace } from "@/modules/workspace/workspace.service";
 import { getProject } from "@/modules/project/project.service";
 import { NotFoundError } from "@/server/lib/errors";
 import { ProjectNav } from "./project-nav";
+import { AgentActivityTray } from "./agent-activity-tray";
 
 interface Props {
   children: React.ReactNode;
@@ -56,6 +57,7 @@ export default async function ProjectLayout({ children, params }: Props) {
 
       {/* Content Area */}
       <div className="flex-1 min-h-0">{children}</div>
+      <AgentActivityTray projectId={projectId} />
     </div>
   );
 }

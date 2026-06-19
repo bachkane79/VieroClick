@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     telegram_webhook_secret: str = ""
 
     # Band AI external agents
+    band_api_base_url: str = ""
     band_room_id: str = ""
     planning_handle: str = "@planning"
     planning_agent_id: str = ""

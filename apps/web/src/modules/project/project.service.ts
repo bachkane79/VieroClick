@@ -6,6 +6,7 @@ import { requireActor } from "@/server/lib/context";
 import { NotFoundError, ValidationError } from "@/server/lib/errors";
 import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
 import { enqueueNotifications } from "@/server/lib/notifications";
+import { dispatchBandAgent } from "@/server/lib/band-dispatch";
 import { createProjectSchema, updateProjectSchema } from "./project.schema";
 import { assertCanCreateProject, assertCanManageProject } from "./project.policy";
 import * as repo from "./project.repo";
@@ -52,7 +53,7 @@ export async function createProject(workspaceId: string, input: unknown) {
     }
   }
 
-  return db.transaction(async (tx) => {
+  const project = await db.transaction(async (tx) => {
     const project = await repo.create(
       {
         workspaceId,
@@ -108,6 +109,21 @@ export async function createProject(workspaceId: string, input: unknown) {
     invalidateCache(`projects:${workspaceId}`);
     return project;
   });
+
+  void dispatchBandAgent({
+    targetRole: "planning",
+    senderRole: "assignment",
+    projectId: project.id,
+    message: "A new VieroClick project was created. Generate and apply the implementation plan.",
+    payload: {
+      projectName: project.name,
+      createdBy: ctx.userId,
+    },
+  }).catch((error) => {
+    console.error("Failed to dispatch planning agent after project creation:", error);
+  });
+
+  return project;
 }
 
 export async function updateProject(workspaceId: string, projectId: string, input: unknown) {
