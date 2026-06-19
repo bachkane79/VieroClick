@@ -4,7 +4,7 @@ import { LoginForm } from "@/modules/auth/components/login-form";
 
 export default async function LoginPage() {
   const session = await auth();
-  if (session) redirect("/dashboard");
+  if (session?.user?.id) redirect("/dashboard");
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40">

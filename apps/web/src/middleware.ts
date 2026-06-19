@@ -5,7 +5,7 @@ import { authConfig } from "@/server/auth/config";
 const { auth } = NextAuth(authConfig);
 
 export default auth((req) => {
-  const isLoggedIn = !!req.auth;
+  const isLoggedIn = !!req.auth?.user?.id;
   const isAuthPage = req.nextUrl.pathname.startsWith("/login");
 
   if (isAuthPage) {

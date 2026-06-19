@@ -38,8 +38,8 @@ export const authConfig: NextAuthConfig = {
   session: { strategy: "jwt" },
   pages: { signIn: "/login", error: "/login" },
   callbacks: {
-    authorized({ auth }) {
-      return !!auth?.user;
+    authorized() {
+      return true;
     },
   },
 };
