@@ -147,7 +147,7 @@ export function DailyViewClient({
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Submit Update Panel */}
       <div className="lg:col-span-2 space-y-6">
-        <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm space-y-4">
+        <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
           <div className="flex items-center gap-2 border-b pb-3 border-neutral-100 dark:border-neutral-800">
             <ClipboardList className="w-5 h-5 text-primary" />
             <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
@@ -238,7 +238,7 @@ export function DailyViewClient({
         </div>
 
         {/* History / Feed list */}
-        <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm space-y-4">
+        <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
           <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground border-b pb-3 border-neutral-100 dark:border-neutral-800">
             Daily Updates History Feed
           </h3>
@@ -313,7 +313,7 @@ export function DailyViewClient({
 
       {/* Missing Updates Panel */}
       <div className="space-y-4">
-        <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm space-y-4">
+        <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
           <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 border-b pb-3 border-neutral-100 dark:border-neutral-800">
             <AlertCircle className="w-4 h-4 text-amber-500" />
             Missing Today's Update

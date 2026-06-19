@@ -7,13 +7,32 @@ export default async function LoginPage() {
   if (session?.user?.id) redirect("/dashboard");
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40">
-      <div className="w-full max-w-sm">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
+      {/* Soft decorative orange glow — the single splash of colour */}
+      <div className="pointer-events-none absolute -top-32 left-1/2 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-primary/15 blur-[120px]" />
+      <div className="pointer-events-none absolute bottom-0 right-10 h-[300px] w-[300px] rounded-full bg-primary/10 blur-[120px]" />
+
+      <div className="relative w-full max-w-sm animate-fade-in">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold">VieroClick</h1>
-          <p className="text-muted-foreground mt-1">AI-powered project management</p>
+          <div className="mb-5 inline-flex items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-foreground text-background text-base font-bold">
+              V
+            </span>
+            <span className="text-2xl font-bold tracking-tight">
+              Viero<span className="text-primary">Click</span>
+            </span>
+          </div>
+          <h1 className="text-[26px] font-bold tracking-tight leading-tight">
+            Welcome back
+          </h1>
+          <p className="text-muted-foreground mt-1.5 text-[15px]">
+            Your AI virtual project manager
+          </p>
         </div>
         <LoginForm />
+        <p className="mt-8 text-center text-xs text-muted-foreground">
+          By continuing you agree to our Terms &amp; Privacy Policy.
+        </p>
       </div>
     </div>
   );

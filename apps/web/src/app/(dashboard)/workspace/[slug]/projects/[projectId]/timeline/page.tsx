@@ -75,8 +75,8 @@ export default async function ProjectTimelinePage({ params }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Gantt View Chart */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="rounded-xl border border-neutral-200/50 dark:border-neutral-800/50 bg-card overflow-hidden shadow-sm">
-            <div className="p-4 border-b border-neutral-200/50 dark:border-neutral-800/50 bg-muted/10 flex items-center justify-between">
+          <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+            <div className="p-4 border-b border-border bg-muted/10 flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5" />
                 Interactive Gantt Scheduler
@@ -105,7 +105,7 @@ export default async function ProjectTimelinePage({ params }: Props) {
                 <div className="min-w-[800px] divide-y divide-neutral-200/40 dark:divide-neutral-800/40">
                   {/* Timeline header */}
                   <div className="flex bg-muted/5">
-                    <div className="w-1/3 shrink-0 p-3 text-xs font-bold text-muted-foreground border-r border-neutral-200/50 dark:border-neutral-800/50">
+                    <div className="w-1/3 shrink-0 p-3 text-xs font-bold text-muted-foreground border-r border-border">
                       Task Title
                     </div>
                     <div className="flex-1 flex overflow-hidden">
@@ -160,7 +160,7 @@ export default async function ProjectTimelinePage({ params }: Props) {
 
                     return (
                       <div key={t.id} className="flex hover:bg-neutral-50/50 dark:hover:bg-neutral-900/50 group">
-                        <div className="w-1/3 shrink-0 p-3 text-xs font-semibold truncate border-r border-neutral-200/50 dark:border-neutral-800/50 flex items-center justify-between">
+                        <div className="w-1/3 shrink-0 p-3 text-xs font-semibold truncate border-r border-border flex items-center justify-between">
                           <span className="truncate">{t.title}</span>
                           {isMilestone && (
                             <span className="shrink-0 ml-1.5 px-1.5 py-0.5 text-[8px] font-bold bg-amber-500/10 text-amber-500 rounded border border-amber-500/20">
@@ -214,7 +214,7 @@ export default async function ProjectTimelinePage({ params }: Props) {
 
         {/* Plan Deviations Panel */}
         <div className="space-y-4">
-          <div className="rounded-xl border border-neutral-200/50 dark:border-neutral-800/50 bg-card p-5 shadow-sm space-y-4">
+          <div className="rounded-xl border border-border bg-card p-5 shadow-sm space-y-4">
             <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <TrendingDown className="w-4 h-4 text-red-500" />
               Schedule Deviations

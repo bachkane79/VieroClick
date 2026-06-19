@@ -13,11 +13,11 @@ export default function ProjectSubPageLoading() {
       {/* Skeleton Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
-          <div className="h-[400px] bg-neutral-200 dark:bg-neutral-800 rounded-xl border border-neutral-200/50 dark:border-neutral-800/50" />
+          <div className="h-[400px] bg-neutral-200 dark:bg-neutral-800 rounded-xl border border-border" />
         </div>
         <div className="space-y-4">
-          <div className="h-[180px] bg-neutral-200 dark:bg-neutral-800 rounded-xl border border-neutral-200/50 dark:border-neutral-800/50" />
-          <div className="h-[180px] bg-neutral-200 dark:bg-neutral-800 rounded-xl border border-neutral-200/50 dark:border-neutral-800/50" />
+          <div className="h-[180px] bg-neutral-200 dark:bg-neutral-800 rounded-xl border border-border" />
+          <div className="h-[180px] bg-neutral-200 dark:bg-neutral-800 rounded-xl border border-border" />
         </div>
       </div>
     </div>

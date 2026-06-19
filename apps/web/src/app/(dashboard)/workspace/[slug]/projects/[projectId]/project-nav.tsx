@@ -95,8 +95,8 @@ export function ProjectNav({ slug, projectId }: Props) {
   ];
 
   return (
-    <div className="border-b border-neutral-200/50 dark:border-neutral-800/50 bg-card/50 backdrop-blur-sm sticky top-0 z-30 px-6">
-      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar scroll-smooth py-1">
+    <div className="border-b border-border bg-card/70 backdrop-blur-md sticky top-0 z-30 px-6">
+      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar scroll-smooth">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = tab.active ?? pathname === tab.href;
@@ -106,17 +106,22 @@ export function ProjectNav({ slug, projectId }: Props) {
               href={tab.href}
               prefetch={true}
               className={cn(
-                "flex items-center gap-2 px-3 py-3 text-xs font-semibold border-b-2 border-transparent transition-all whitespace-nowrap",
+                "flex items-center gap-1.5 px-3 py-3 text-[13px] font-medium border-b-2 border-transparent transition-colors whitespace-nowrap -mb-px",
                 isActive
-                  ? tab.highlight
-                    ? "border-purple-500 text-purple-600 dark:text-purple-400 font-bold"
-                    : "border-primary text-primary font-bold"
-                  : "text-muted-foreground hover:text-foreground hover:border-neutral-300 dark:hover:border-neutral-700",
-                tab.highlight && !isActive && "text-purple-500/80 hover:text-purple-500"
+                  ? "border-primary text-foreground font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <Icon className={cn("w-3.5 h-3.5 shrink-0", tab.highlight && "text-purple-500")} />
+              <Icon
+                className={cn(
+                  "w-3.5 h-3.5 shrink-0",
+                  isActive ? "text-primary" : tab.highlight && "text-primary/70"
+                )}
+              />
               <span>{tab.name}</span>
+              {tab.highlight && (
+                <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-primary" />
+              )}
             </Link>
           );
         })}

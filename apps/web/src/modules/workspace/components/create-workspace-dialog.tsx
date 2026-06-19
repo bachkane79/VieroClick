@@ -61,7 +61,7 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
         <Dialog.Overlay className="fixed inset-0 bg-neutral-950/40 backdrop-blur-sm z-50 transition-opacity animate-in fade-in" />
         
         {/* Content */}
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-card border rounded-2xl p-6 shadow-2xl z-50 focus:outline-none animate-in zoom-in-95 slide-in-from-top-4 duration-200 border-neutral-200/50 dark:border-neutral-800/50">
+        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-card border rounded-2xl p-6 shadow-2xl z-50 focus:outline-none animate-in zoom-in-95 slide-in-from-top-4 duration-200 border-border">
           <Dialog.Title className="text-xl font-bold tracking-tight">
             Create Workspace
           </Dialog.Title>
@@ -71,7 +71,7 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label htmlFor="ws-name" className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+              <label htmlFor="ws-name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Workspace Name
               </label>
               <input
@@ -81,12 +81,12 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
                 value={name}
                 onChange={(e) => handleNameChange(e.target.value)}
                 placeholder="Acme Corporation"
-                className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-background/50 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+                className="w-full px-3.5 py-2 rounded-xl border border-input bg-background/50 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label htmlFor="ws-slug" className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+              <label htmlFor="ws-slug" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Workspace Slug
               </label>
               <div className="relative flex items-center">
@@ -97,7 +97,7 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
                   placeholder="acme-corp"
-                  className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-background/50 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm pr-20"
+                  className="w-full px-3.5 py-2 rounded-xl border border-input bg-background/50 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm pr-20"
                 />
                 <span className="absolute right-3 text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded border">
                   viero.click/
@@ -105,7 +105,7 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-3 border-t border-neutral-200/50 dark:border-neutral-800/50 mt-6">
+            <div className="flex justify-end gap-3 pt-3 border-t border-border mt-6">
               <Dialog.Close asChild>
                 <Button type="button" variant="outline" className="rounded-xl px-4">
                   Cancel

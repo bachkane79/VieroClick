@@ -17,7 +17,6 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { toCommentView } from "@/modules/comment/comment.view";
 import type { CommentLinkView, CommentView } from "@/modules/comment/comment.view";
 import { uploadTaskAttachmentAction } from "@/modules/file/file.actions";
 import type { TaskAttachmentView } from "@/modules/file/file.view";
@@ -113,7 +112,6 @@ export function TaskDetailDrawer({
   statuses,
   members,
   dependencies,
-  comments: propComments,
   attachments,
   onSelectTask,
 }: Props) {
@@ -147,12 +145,9 @@ export function TaskDetailDrawer({
   const [linkedDocId, setLinkedDocId] = useState("");
   const [linkedDocLabel, setLinkedDocLabel] = useState("");
 
-  const [comments, setComments] = useState<CommentView[]>([]);
-  const [localDependencies, setLocalDependencies] = useState<TaskDependencyView[]>(dependencies);
-
-  useEffect(() => {
-    setLocalDependencies(dependencies);
-  }, [dependencies]);
+  const [comments, setComments] = useState<any[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [newCommentBody, setNewCommentBody] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -188,26 +183,70 @@ export function TaskDetailDrawer({
       return;
     }
     async function loadComments() {
+      setLoadingComments(true);
       const res = await listCommentsAction({
         workspaceId,
         projectId,
         taskId: task!.id,
       });
+      setLoadingComments(false);
       if (res.ok) {
-        setComments(res.data.map(toCommentView));
+        setComments(res.data);
       }
     }
     loadComments();
   }, [open, task, workspaceId, projectId]);
 
+  async function submitComment() {
+    if (!task || !newCommentBody.trim()) return;
+    const body = newCommentBody.trim();
+    setNewCommentBody("");
+    const result = await addCommentAction({
+      workspaceId,
+      projectId,
+      slug: workspaceSlug,
+      taskId: task.id,
+      data: { body },
+    });
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    const res = await listCommentsAction({
+      workspaceId,
+      projectId,
+      taskId: task.id,
+    });
+    if (res.ok) {
+      setComments(res.data);
+    }
+    toast.success("Comment posted");
+  }
+
+  async function deleteComment(commentId: string) {
+    if (!task) return;
+    const result = await deleteCommentAction({
+      workspaceId,
+      projectId,
+      slug: workspaceSlug,
+      commentId,
+    });
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    setComments((current) => current.filter((c) => c.id !== commentId));
+    toast.success("Comment deleted");
+  }
+
 
   const selectedStatus = statuses.find((status) => status.id === statusId);
   const taskById = useMemo(() => new Map(tasks.map((item) => [item.id, item])), [tasks]);
   const blockerDependencies = task
-    ? localDependencies.filter((dependency) => dependency.blockedTaskId === task.id)
+    ? dependencies.filter((dependency) => dependency.blockedTaskId === task.id)
     : [];
   const availableBlockers = tasks.filter((item) => item.id !== task?.id);
-  const taskComments = comments;
+  const taskComments = task ? comments.filter((comment) => comment.taskId === task.id) : [];
   const taskAttachments = task
     ? attachments.filter((attachment) => attachment.taskId === task.id)
     : [];
@@ -241,105 +280,75 @@ export function TaskDetailDrawer({
       allowBlockedOverride,
     };
 
-    if (task) {
-      // Optimistic update: close the drawer immediately
-      onOpenChange(false);
-      toast.success("Task updated");
-      
-      updateTaskAction({
-        workspaceId,
-        projectId,
-        slug: workspaceSlug,
-        taskId: task.id,
-        data: payload,
-      }).then((result) => {
-        if (!result.ok) {
-          toast.error(result.error);
-        } else {
-          router.refresh();
-        }
-      });
-    } else {
-      setSubmitting(true);
-      const result = await createTaskAction({
-        workspaceId,
-        projectId,
-        slug: workspaceSlug,
-        data: payload,
-      });
-      setSubmitting(false);
+    const result = task
+      ? await updateTaskAction({
+          workspaceId,
+          projectId,
+          slug: workspaceSlug,
+          taskId: task.id,
+          data: payload,
+        })
+      : await createTaskAction({
+          workspaceId,
+          projectId,
+          slug: workspaceSlug,
+          data: payload,
+        });
 
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
-      }
+    setSubmitting(false);
 
-      toast.success("Task created");
-      onOpenChange(false);
-      router.refresh();
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
     }
+
+    toast.success(task ? "Task updated" : "Task created");
+    onOpenChange(false);
+    router.refresh();
   }
 
   async function deleteTask() {
     if (!task) return;
-    onOpenChange(false);
-    toast.success("Task deleted");
-    
-    deleteTaskAction({
+    setSubmitting(true);
+    const result = await deleteTaskAction({
       workspaceId,
       projectId,
       slug: workspaceSlug,
       taskId: task.id,
-    }).then((result) => {
-      if (!result.ok) {
-        toast.error(result.error);
-      } else {
-        router.refresh();
-      }
     });
+    setSubmitting(false);
+
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+
+    toast.success("Task deleted");
+    onOpenChange(false);
+    router.refresh();
   }
 
   async function addDependency() {
     if (!task || !dependencyCandidate) return;
-    const blockerId = dependencyCandidate;
-    setDependencyCandidate("");
-
-    // Optimistic add
-    const tempId = `temp-dep-${Date.now()}`;
-    const newDep: TaskDependencyView = {
-      id: tempId,
-      projectId,
-      blockerTaskId: blockerId,
-      blockedTaskId: task.id,
-      dependencyType: "blocks",
-    };
-    
-    setLocalDependencies((current) => [...current, newDep]);
-    toast.success("Dependency added");
-
     const result = await addTaskDependencyFromTaskAction({
       workspaceId,
       projectId,
       slug: workspaceSlug,
-      blockerTaskId: blockerId,
+      blockerTaskId: dependencyCandidate,
       blockedTaskId: task.id,
     });
 
     if (!result.ok) {
       toast.error(result.error);
-      // rollback
-      setLocalDependencies((current) => current.filter((d) => d.id !== tempId));
-    } else {
-      router.refresh();
+      return;
     }
+
+    toast.success("Dependency added");
+    setDependencyCandidate("");
+    router.refresh();
   }
 
   async function removeDependency(dependencyId: string) {
-    // Optimistic remove
-    const deletedDep = localDependencies.find((d) => d.id === dependencyId);
-    setLocalDependencies((current) => current.filter((d) => d.id !== dependencyId));
-    toast.success("Dependency removed");
-
     const result = await removeTaskDependencyFromTaskAction({
       workspaceId,
       projectId,
@@ -349,13 +358,11 @@ export function TaskDetailDrawer({
 
     if (!result.ok) {
       toast.error(result.error);
-      // rollback
-      if (deletedDep) {
-        setLocalDependencies((current) => [...current, deletedDep]);
-      }
-    } else {
-      router.refresh();
+      return;
     }
+
+    toast.success("Dependency removed");
+    router.refresh();
   }
 
   function insertMention() {
@@ -414,26 +421,6 @@ export function TaskDetailDrawer({
   async function postComment() {
     if (!task || !commentBody.trim()) return;
 
-    const bodyText = commentBody.trim();
-    const linksData = [...commentLinks];
-
-    setCommentBody("");
-    setCommentLinks([]);
-
-    // Optimistic comment update
-    const tempId = `temp-${Date.now()}`;
-    const optimisticComment: CommentView = {
-      id: tempId,
-      taskId: task.id,
-      authorMemberId: "me",
-      body: bodyText,
-      links: linksData,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    setComments((current) => [...current, optimisticComment]);
-
     setCommentSubmitting(true);
     const result = await addCommentAction({
       workspaceId,
@@ -441,38 +428,24 @@ export function TaskDetailDrawer({
       slug: workspaceSlug,
       taskId: task.id,
       data: {
-        body: bodyText,
-        metadata: { links: linksData },
+        body: commentBody.trim(),
+        metadata: { links: commentLinks },
       },
     });
     setCommentSubmitting(false);
 
     if (!result.ok) {
       toast.error(result.error);
-      // Remove the optimistic comment
-      setComments((current) => current.filter((c) => c.id !== tempId));
       return;
     }
 
     toast.success("Comment added");
-
-    const res = await listCommentsAction({
-      workspaceId,
-      projectId,
-      taskId: task.id,
-    });
-    if (res.ok) {
-      setComments(res.data.map(toCommentView));
-    }
+    setCommentBody("");
+    setCommentLinks([]);
     router.refresh();
   }
 
   async function removeComment(commentId: string) {
-    // Optimistic remove
-    const deletedComment = comments.find((c) => c.id === commentId);
-    setComments((current) => current.filter((c) => c.id !== commentId));
-    toast.success("Comment deleted");
-
     const result = await deleteCommentAction({
       workspaceId,
       projectId,
@@ -482,13 +455,10 @@ export function TaskDetailDrawer({
 
     if (!result.ok) {
       toast.error(result.error);
-      // rollback
-      if (deletedComment) {
-        setComments((current) => [...current, deletedComment]);
-      }
       return;
     }
 
+    toast.success("Comment deleted");
     router.refresh();
   }
 
@@ -997,7 +967,7 @@ export function TaskDetailDrawer({
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
                                 <p className="truncate text-sm font-medium">
-                                  {comment.authorMemberId === "me" ? "You" : (author?.fullName ?? "Workspace member")}
+                                  {author?.fullName ?? "Workspace member"}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
                                   {formatDateTime(comment.createdAt)}
@@ -1016,9 +986,9 @@ export function TaskDetailDrawer({
                             <p className="mt-3 whitespace-pre-wrap text-sm leading-6">
                               {comment.body}
                             </p>
-                            {comment.links.length > 0 && (
+                            {comment.links?.length > 0 && (
                               <div className="mt-3 flex flex-wrap gap-1.5">
-                                {comment.links.map((link) => (
+                                {comment.links.map((link: CommentLinkView) => (
                                   <button
                                     key={`${comment.id}-${link.type}-${link.id}`}
                                     type="button"
@@ -1110,6 +1080,67 @@ export function TaskDetailDrawer({
                 />
                 Override blocker dependency
               </label>
+
+              {task && (
+                <section className="grid gap-3 border-t pt-5">
+                  <h3 className="text-sm font-semibold">Comments</h3>
+                  <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                    {loadingComments ? (
+                      <p className="text-xs text-muted-foreground">Loading comments...</p>
+                    ) : comments.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">No comments yet. Start the conversation!</p>
+                    ) : (
+                      comments.map((comment) => {
+                        const author = members.find((m) => m.id === comment.authorMemberId);
+                        const authorName = author?.fullName ?? "Unknown Member";
+                        return (
+                          <div
+                            key={comment.id}
+                            className="rounded-lg bg-neutral-50 dark:bg-neutral-900 border p-3 text-sm flex items-start justify-between gap-3 group"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-bold text-xs">{authorName}</span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {new Date(comment.createdAt).toLocaleString()}
+                                </span>
+                              </div>
+                              <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                {comment.body}
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                              onClick={() => deleteComment(comment.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                            </Button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                  <div className="flex gap-2 items-end mt-2">
+                    <Textarea
+                      placeholder="Add a comment... Use @name to mention"
+                      value={newCommentBody}
+                      onChange={(e) => setNewCommentBody(e.target.value)}
+                      className="min-h-16 flex-1 text-xs"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={!newCommentBody.trim()}
+                      onClick={submitComment}
+                    >
+                      Post
+                    </Button>
+                  </div>
+                </section>
+              )}
 
             </div>
 

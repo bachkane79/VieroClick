@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Textarea } from "@vieroc/ui";
 import { Plus, Trash2, Link as LinkIcon, Folder, Box, ChevronDown, ChevronRight } from "lucide-react";
@@ -10,7 +10,6 @@ import {
   deleteWbsNodeAction,
   updateWbsNodeAction,
 } from "@/modules/wbs/wbs.actions";
-import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 interface NodeRow {
   id: string;
@@ -50,21 +49,14 @@ export function WbsViewClient({
   const [newParentId, setNewParentId] = useState("");
   const [newLinkedTaskId, setNewLinkedTaskId] = useState("");
 
-  const [nodes, setNodes] = useState<NodeRow[]>(initialNodes);
-  const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setNodes(initialNodes);
-  }, [initialNodes]);
-
   const toggleExpand = (id: string) => {
     setExpandedNodes((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   // Build tree structure
-  const rootNodes = nodes.filter((n) => !n.parentId);
+  const rootNodes = initialNodes.filter((n) => !n.parentId);
   const childrenMap = new Map<string, NodeRow[]>();
-  for (const n of nodes) {
+  for (const n of initialNodes) {
     if (n.parentId) {
       const list = childrenMap.get(n.parentId) ?? [];
       list.push(n);
@@ -82,66 +74,38 @@ export function WbsViewClient({
     e.preventDefault();
     if (!newTitle.trim()) return;
 
-    const titleVal = newTitle.trim();
-    const descVal = newDescription.trim() || null;
-    const typeVal = newType;
-    const parentVal = newParentId || null;
-    const taskVal = newLinkedTaskId || null;
-
-    setIsAdding(false);
-    setNewTitle("");
-    setNewDescription("");
-    setNewParentId("");
-    setNewLinkedTaskId("");
-
-    // Optimistic add
-    const tempId = `temp-${Date.now()}`;
-    const newNode: NodeRow = {
-      id: tempId,
-      projectId,
-      parentId: parentVal,
-      title: titleVal,
-      description: descVal,
-      nodeType: typeVal,
-      linkedTaskId: taskVal,
-      position: nodes.length,
-    };
-    setNodes((current) => [...current, newNode]);
-    toast.success("WBS Node created");
-
     setSubmitting(true);
     const res = await createWbsNodeAction({
       workspaceId,
       projectId,
       slug: workspaceSlug,
       data: {
-        title: titleVal,
-        description: descVal || undefined,
-        nodeType: typeVal,
-        parentId: parentVal || undefined,
-        linkedTaskId: taskVal || undefined,
-        position: nodes.length,
+        title: newTitle.trim(),
+        description: newDescription.trim() || undefined,
+        nodeType: newType,
+        parentId: newParentId || undefined,
+        linkedTaskId: newLinkedTaskId || undefined,
+        position: initialNodes.length,
       },
     });
     setSubmitting(false);
 
     if (!res.ok) {
       toast.error(res.error);
-      // rollback
-      setNodes((current) => current.filter((n) => n.id !== tempId));
-    } else {
-      router.refresh();
+      return;
     }
+
+    toast.success("WBS Node created");
+    setIsAdding(false);
+    setNewTitle("");
+    setNewDescription("");
+    setNewParentId("");
+    setNewLinkedTaskId("");
+    router.refresh();
   }
 
-  function deleteNode(nodeId: string) {
-    setDeleteCandidateId(nodeId);
-  }
-
-  async function executeDeleteNode(nodeId: string) {
-    const previousNodes = [...nodes];
-    setNodes((current) => current.filter((n) => n.id !== nodeId));
-    toast.success("WBS Node deleted");
+  async function deleteNode(nodeId: string) {
+    if (!confirm("Are you sure you want to delete this WBS node?")) return;
 
     setSubmitting(true);
     const res = await deleteWbsNodeAction({
@@ -154,20 +118,14 @@ export function WbsViewClient({
 
     if (!res.ok) {
       toast.error(res.error);
-      // rollback
-      setNodes(previousNodes);
-    } else {
-      router.refresh();
+      return;
     }
+
+    toast.success("WBS Node deleted");
+    router.refresh();
   }
 
   async function handleLinkTask(nodeId: string, taskId: string) {
-    const previousNodes = [...nodes];
-    setNodes((current) =>
-      current.map((n) => (n.id === nodeId ? { ...n, linkedTaskId: taskId || null } : n))
-    );
-    toast.success("Task link updated");
-
     setSubmitting(true);
     const res = await updateWbsNodeAction({
       workspaceId,
@@ -182,11 +140,11 @@ export function WbsViewClient({
 
     if (!res.ok) {
       toast.error(res.error);
-      // rollback
-      setNodes(previousNodes);
-    } else {
-      router.refresh();
+      return;
     }
+
+    toast.success("Task link updated");
+    router.refresh();
   }
 
   // Recursive node renderer
@@ -214,7 +172,7 @@ export function WbsViewClient({
             {node.nodeType === "deliverable" ? (
               <Folder className="w-4 h-4 text-primary shrink-0" />
             ) : (
-              <Box className="w-4 h-4 text-purple-500 shrink-0" />
+              <Box className="w-4 h-4 text-primary shrink-0" />
             )}
 
             <div className="min-w-0 flex-1">
@@ -273,7 +231,7 @@ export function WbsViewClient({
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
       {/* Tree View Panel */}
       <div className="xl:col-span-2 space-y-4">
-        <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm space-y-4">
+        <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
           <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
             <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
               Work Breakdown structure Tree
@@ -285,8 +243,8 @@ export function WbsViewClient({
             )}
           </div>
 
-          {nodes.length === 0 ? (
-            <div className="p-12 text-center text-muted-foreground rounded-xl border border-dashed border-neutral-200 dark:border-neutral-800">
+          {initialNodes.length === 0 ? (
+            <div className="p-12 text-center text-muted-foreground rounded-xl border border-dashed border-input">
               <Folder className="w-8 h-8 mx-auto mb-3 opacity-40 text-primary" />
               <p className="text-sm font-semibold">No WBS nodes defined</p>
               <p className="text-xs mt-0.5">
@@ -307,7 +265,7 @@ export function WbsViewClient({
       {/* Creation / Sidebar Form Panel */}
       <div className="space-y-4">
         {isAdding && (
-          <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm space-y-4">
+          <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
               <h3 className="text-sm font-bold text-foreground">Create WBS Node</h3>
               <Button variant="ghost" size="sm" onClick={() => setIsAdding(false)}>
@@ -391,7 +349,7 @@ export function WbsViewClient({
           </div>
         )}
 
-        <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm text-xs space-y-3">
+        <div className="p-5 border border-border rounded-2xl bg-card shadow-sm text-xs space-y-3">
           <h4 className="font-bold text-foreground">WBS Integration Info</h4>
           <p className="text-muted-foreground leading-relaxed">
             A Work Breakdown Structure (WBS) is a hierarchical decomposition of the total scope of work to be carried out by the project team.
@@ -402,23 +360,6 @@ export function WbsViewClient({
           </ul>
         </div>
       </div>
-
-      <ConfirmationDialog
-        isOpen={deleteCandidateId !== null}
-        onOpenChange={(open) => {
-          if (!open) setDeleteCandidateId(null);
-        }}
-        title="Delete WBS Node"
-        description="Are you sure you want to delete this WBS node? This action cannot be undone."
-        variant="destructive"
-        confirmLabel="Delete"
-        onConfirm={async () => {
-          if (deleteCandidateId) {
-            await executeDeleteNode(deleteCandidateId);
-            setDeleteCandidateId(null);
-          }
-        }}
-      />
     </div>
   );
 }

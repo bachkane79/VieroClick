@@ -217,7 +217,7 @@ export function BlockersViewClient({
       {/* Blocker list/board */}
       <div className="xl:col-span-2 space-y-6">
         {/* Open Blockers */}
-        <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm space-y-4">
+        <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
           <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
             <h3 className="text-sm font-bold uppercase tracking-wider text-red-500 flex items-center gap-1.5">
               <AlertOctagon className="w-4 h-4" />
@@ -322,7 +322,7 @@ export function BlockersViewClient({
         </div>
 
         {/* Resolved Blockers */}
-        <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm space-y-4">
+        <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
           <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground border-b pb-3 border-neutral-100 dark:border-neutral-800">
             Resolved Blockers ({resolvedBlockers.length})
           </h3>
@@ -358,7 +358,7 @@ export function BlockersViewClient({
       {/* Side Form */}
       <div className="space-y-4">
         {isAdding && (
-          <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm space-y-4 animate-in fade-in slide-in-from-right-3 duration-250">
+          <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4 animate-in fade-in slide-in-from-right-3 duration-250">
             <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
               <h3 className="text-sm font-bold text-foreground">File Blocker Report</h3>
               <Button variant="ghost" size="sm" onClick={() => setIsAdding(false)}>
@@ -442,7 +442,7 @@ export function BlockersViewClient({
           </div>
         )}
 
-        <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm text-xs space-y-3">
+        <div className="p-5 border border-border rounded-2xl bg-card shadow-sm text-xs space-y-3">
           <h4 className="font-bold text-foreground flex items-center gap-1">
             <AlertTriangle className="w-4 h-4 text-amber-500" />
             Blocker Escalations

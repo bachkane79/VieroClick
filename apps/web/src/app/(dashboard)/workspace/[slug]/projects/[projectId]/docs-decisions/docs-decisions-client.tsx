@@ -264,7 +264,7 @@ export function DocsDecisionsClient({
   return (
     <div className="space-y-6">
       {/* Tab bar */}
-      <div className="flex border-b border-neutral-200/50 dark:border-neutral-800/50">
+      <div className="flex border-b border-border">
         <button
           onClick={() => setActiveTab("docs")}
           className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all ${
@@ -293,7 +293,7 @@ export function DocsDecisionsClient({
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Docs list */}
           <div className="xl:col-span-2 space-y-4">
-            <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm space-y-4">
+            <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
               <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
                   Project Wiki Docs
@@ -356,7 +356,7 @@ export function DocsDecisionsClient({
           {/* Add Doc Form */}
           <div className="space-y-4">
             {showAddDoc && (
-              <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm space-y-4">
+              <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
                 <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
                   <h3 className="text-sm font-bold text-foreground">Write Document</h3>
                   <Button variant="ghost" size="sm" onClick={() => setShowAddDoc(false)}>
@@ -414,7 +414,7 @@ export function DocsDecisionsClient({
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Decisions List */}
           <div className="xl:col-span-2 space-y-4">
-            <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm space-y-4">
+            <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
               <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
                   Project Decision Log
@@ -509,7 +509,7 @@ export function DocsDecisionsClient({
           {/* Add Decision Form */}
           <div className="space-y-4">
             {showAddDecision && (
-              <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm space-y-4">
+              <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
                 <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
                   <h3 className="text-sm font-bold text-foreground">Log Project Decision</h3>
                   <Button variant="ghost" size="sm" onClick={() => setShowAddDecision(false)}>
@@ -592,9 +592,9 @@ export function DocsDecisionsClient({
               </div>
             )}
 
-            <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm text-xs space-y-3">
+            <div className="p-5 border border-border rounded-2xl bg-card shadow-sm text-xs space-y-3">
               <h4 className="font-bold text-foreground flex items-center gap-1">
-                <Sparkles className="w-4 h-4 text-purple-500" />
+                <Sparkles className="w-4 h-4 text-primary" />
                 Decision Logs Trigger
               </h4>
               <p className="text-muted-foreground leading-relaxed">

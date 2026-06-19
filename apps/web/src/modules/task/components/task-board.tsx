@@ -21,10 +21,10 @@ interface Props {
 }
 
 const PRIORITY_COLORS: Record<string, string> = {
-  low: "border-neutral-200 bg-neutral-50 text-neutral-700",
-  medium: "border-sky-200 bg-sky-50 text-sky-700",
-  high: "border-amber-200 bg-amber-50 text-amber-700",
-  urgent: "border-red-200 bg-red-50 text-red-700",
+  low: "border-transparent bg-muted text-muted-foreground",
+  medium: "border-border bg-secondary text-secondary-foreground",
+  high: "border-amber-500/20 bg-amber-500/12 text-amber-700 dark:text-amber-400",
+  urgent: "border-primary/20 bg-primary/12 text-primary",
 };
 
 export function TaskBoard({

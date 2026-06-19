@@ -269,7 +269,7 @@ export function RisksMilestonesViewClient({
   return (
     <div className="space-y-6">
       {/* Tabs */}
-      <div className="flex border-b border-neutral-200/50 dark:border-neutral-800/50">
+      <div className="flex border-b border-border">
         <button
           onClick={() => setActiveTab("milestones")}
           className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all ${
@@ -298,7 +298,7 @@ export function RisksMilestonesViewClient({
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Milestones List */}
           <div className="xl:col-span-2 space-y-4">
-            <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm space-y-4">
+            <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
               <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                   Milestones Tracker
@@ -359,7 +359,7 @@ export function RisksMilestonesViewClient({
           {/* Add Milestone Form */}
           <div className="space-y-4">
             {showAddMilestone && (
-              <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm space-y-4">
+              <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
                 <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
                   <h3 className="text-sm font-bold text-foreground">Create Milestone</h3>
                   <Button variant="ghost" size="sm" onClick={() => setShowAddMilestone(false)}>
@@ -409,7 +409,7 @@ export function RisksMilestonesViewClient({
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Risks list */}
           <div className="xl:col-span-2 space-y-4">
-            <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm space-y-4">
+            <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
               <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
                   Active Risks Register
@@ -493,7 +493,7 @@ export function RisksMilestonesViewClient({
           {/* Add Risk Form */}
           <div className="space-y-4">
             {showAddRisk && (
-              <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm space-y-4 animate-in fade-in duration-200">
+              <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4 animate-in fade-in duration-200">
                 <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
                   <h3 className="text-sm font-bold text-foreground">Log Project Risk</h3>
                   <Button variant="ghost" size="sm" onClick={() => setShowAddRisk(false)}>
@@ -596,7 +596,7 @@ export function RisksMilestonesViewClient({
               </div>
             )}
 
-            <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm text-xs space-y-3">
+            <div className="p-5 border border-border rounded-2xl bg-card shadow-sm text-xs space-y-3">
               <h4 className="font-bold text-foreground flex items-center gap-1">
                 <AlertTriangle className="w-4 h-4 text-amber-500" />
                 Risk Calculations

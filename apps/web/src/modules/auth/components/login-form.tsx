@@ -35,11 +35,11 @@ export function LoginForm() {
   return (
     <div className="space-y-6">
       {/* OAuth Buttons */}
-      <div className="rounded-2xl border bg-card/60 backdrop-blur-md p-6 shadow-xl space-y-3 border-neutral-200/50 dark:border-neutral-800/50">
+      <div className="rounded-xl border border-border bg-card p-6 shadow-soft space-y-3">
         <button
           onClick={() => handleOAuthSignIn("github")}
           disabled={!!loading}
-          className="w-full flex items-center justify-center gap-3 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-background/50 hover:bg-neutral-50 dark:hover:bg-neutral-900 px-4 py-3 text-sm font-medium shadow-sm transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
+          className="w-full flex items-center justify-center gap-3 rounded-md border border-border bg-card hover:bg-accent px-4 py-2.5 text-sm font-medium shadow-sm transition-all duration-150 active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
         >
           {loading === "github" ? (
             <span className="flex items-center gap-2">
@@ -58,7 +58,7 @@ export function LoginForm() {
         <button
           onClick={() => handleOAuthSignIn("google")}
           disabled={!!loading}
-          className="w-full flex items-center justify-center gap-3 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-background/50 hover:bg-neutral-50 dark:hover:bg-neutral-900 px-4 py-3 text-sm font-medium shadow-sm transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
+          className="w-full flex items-center justify-center gap-3 rounded-md border border-border bg-card hover:bg-accent px-4 py-2.5 text-sm font-medium shadow-sm transition-all duration-150 active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
         >
           {loading === "google" ? (
             <span className="flex items-center gap-2">
@@ -82,7 +82,7 @@ export function LoginForm() {
       {/* Divider */}
       <div className="relative flex items-center justify-center">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-neutral-200 dark:border-neutral-800"></div>
+          <div className="w-full border-t border-input"></div>
         </div>
         <span className="relative px-3 text-xs uppercase tracking-wider text-muted-foreground bg-background">
           or developer bypass
@@ -90,9 +90,9 @@ export function LoginForm() {
       </div>
 
       {/* Developer Sign In */}
-      <form onSubmit={handleDevSignIn} className="rounded-2xl border bg-card/60 backdrop-blur-md p-6 shadow-xl space-y-4 border-neutral-200/50 dark:border-neutral-800/50">
+      <form onSubmit={handleDevSignIn} className="rounded-xl border border-border bg-card p-6 shadow-soft space-y-4">
         <div className="space-y-1">
-          <label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+          <label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Email Address
           </label>
           <input
@@ -103,12 +103,12 @@ export function LoginForm() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="developer@viero.click"
             disabled={!!loading}
-            className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-background/50 placeholder-neutral-400 dark:placeholder-neutral-600 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+            className="w-full px-3.5 py-2.5 rounded-md border border-input bg-card placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-ring/25 focus:border-primary transition-all text-sm"
           />
         </div>
 
         <div className="space-y-1">
-          <label htmlFor="name" className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+          <label htmlFor="name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Display Name (Optional)
           </label>
           <input
@@ -118,14 +118,14 @@ export function LoginForm() {
             onChange={(e) => setName(e.target.value)}
             placeholder="Jane Doe"
             disabled={!!loading}
-            className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-background/50 placeholder-neutral-400 dark:placeholder-neutral-600 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+            className="w-full px-3.5 py-2.5 rounded-md border border-input bg-card placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-ring/25 focus:border-primary transition-all text-sm"
           />
         </div>
 
         <button
           type="submit"
           disabled={!email || !!loading}
-          className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-3 text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
+          className="w-full flex items-center justify-center gap-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2.5 text-sm font-semibold shadow-soft transition-all duration-150 active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
         >
           {loading === "credentials" ? (
             <span className="flex items-center gap-2">

@@ -129,7 +129,7 @@ export function ReportsViewClient({
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
       {/* Reports List */}
       <div className="xl:col-span-2 space-y-6">
-        <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm space-y-4">
+        <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
           <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
             <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
               <TrendingUp className="w-4 h-4 text-primary" />
@@ -282,7 +282,7 @@ export function ReportsViewClient({
       {/* Side Compile Form */}
       <div className="space-y-4">
         {isCompiling && (
-          <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm space-y-4 animate-in fade-in duration-200">
+          <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4 animate-in fade-in duration-200">
             <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
               <h3 className="text-sm font-bold text-foreground">Compile Status Report</h3>
               <Button variant="ghost" size="sm" onClick={() => setIsCompiling(false)}>

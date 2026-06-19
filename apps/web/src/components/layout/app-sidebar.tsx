@@ -6,12 +6,14 @@ import { usePathname, useParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { User } from "next-auth";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { cn } from "@vieroc/ui";
 import { CreateWorkspaceDialog } from "@/modules/workspace/components/create-workspace-dialog";
 import {
   Briefcase,
-  ChevronDown,
+  ChevronsUpDown,
   LayoutDashboard,
   ListTodo,
+  LogOut,
   Plus,
   Settings,
   UserCircle,
@@ -29,58 +31,93 @@ export function AppSidebar({ user, workspaces }: Props) {
 
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  // Find active workspace
   const activeWorkspace = workspaces.find((ws) => ws.slug === currentSlug);
 
+  const navItem = (active: boolean) =>
+    cn(
+      "group relative flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+      active
+        ? "bg-primary/10 text-primary font-semibold"
+        : "text-muted-foreground hover:bg-accent hover:text-foreground"
+    );
+
+  const activeBar = (active: boolean) =>
+    active ? (
+      <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-primary" />
+    ) : null;
+
   return (
-    <aside className="w-60 border-r bg-muted/20 flex flex-col h-full shrink-0 border-neutral-200/50 dark:border-neutral-800/50">
+    <aside className="w-64 shrink-0 h-full flex flex-col border-r border-border bg-background/60">
+      {/* Wordmark */}
+      <div className="px-4 pt-4 pb-3">
+        <Link href="/dashboard" className="flex items-center gap-2 px-1">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-foreground text-background text-sm font-bold">
+            V
+          </span>
+          <span className="text-[15px] font-bold tracking-tight">
+            Viero<span className="text-primary">Click</span>
+          </span>
+        </Link>
+      </div>
+
       {/* Workspace Selector */}
-      <div className="px-4 py-3 border-b border-neutral-200/50 dark:border-neutral-800/50">
+      <div className="px-3 pb-3">
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
-            <button className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-card hover:bg-muted/60 border border-neutral-200/50 dark:border-neutral-800/50 shadow-sm transition-all focus:outline-none text-left">
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Workspace
-                </p>
-                <p className="text-sm font-semibold truncate text-foreground">
-                  {activeWorkspace ? activeWorkspace.name : "Select Workspace..."}
-                </p>
+            <button className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-card hover:bg-accent border border-border shadow-soft transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 text-left">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-secondary text-xs font-bold uppercase text-secondary-foreground">
+                  {(activeWorkspace?.name ?? "?").charAt(0)}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider leading-none">
+                    Workspace
+                  </p>
+                  <p className="text-sm font-semibold truncate text-foreground leading-tight mt-0.5">
+                    {activeWorkspace ? activeWorkspace.name : "Select…"}
+                  </p>
+                </div>
               </div>
-              <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+              <ChevronsUpDown className="w-4 h-4 text-muted-foreground shrink-0" />
             </button>
           </DropdownMenu.Trigger>
 
           <DropdownMenu.Portal>
-            <DropdownMenu.Content className="w-56 bg-card border rounded-2xl p-1.5 shadow-2xl z-50 focus:outline-none border-neutral-200/50 dark:border-neutral-800/50 animate-in fade-in slide-in-from-top-2 duration-150">
-              <DropdownMenu.Label className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            <DropdownMenu.Content
+              sideOffset={6}
+              className="w-[232px] bg-popover border border-border rounded-xl p-1.5 shadow-elevated z-50 focus:outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
+            >
+              <DropdownMenu.Label className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 Workspaces
               </DropdownMenu.Label>
-              
+
               {workspaces.map((ws) => (
                 <DropdownMenu.Item asChild key={ws.id}>
                   <Link
                     href={`/workspace/${ws.slug}`}
-                    className={`flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm font-medium transition-colors focus:outline-none focus:bg-muted ${
+                    className={cn(
+                      "flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none cursor-pointer",
                       ws.slug === currentSlug
                         ? "bg-primary/10 text-primary"
-                        : "text-foreground hover:bg-muted/50"
-                    }`}
+                        : "text-foreground hover:bg-accent focus:bg-accent"
+                    )}
                   >
-                    <Briefcase className="w-4 h-4 shrink-0" />
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-secondary text-[11px] font-bold uppercase">
+                      {ws.name.charAt(0)}
+                    </span>
                     <span className="truncate">{ws.name}</span>
                   </Link>
                 </DropdownMenu.Item>
               ))}
 
-              <DropdownMenu.Separator className="h-px bg-neutral-200/50 dark:border-neutral-800/50 my-1" />
-              
+              <DropdownMenu.Separator className="h-px bg-border my-1.5" />
+
               <DropdownMenu.Item
                 onClick={() => setDialogOpen(true)}
-                className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm font-semibold text-primary hover:bg-primary/5 focus:bg-primary/5 cursor-pointer transition-colors focus:outline-none"
+                className="flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-sm font-semibold text-primary hover:bg-primary/10 focus:bg-primary/10 cursor-pointer transition-colors focus:outline-none"
               >
                 <Plus className="w-4 h-4 shrink-0" />
-                <span>Create Workspace</span>
+                <span>Create workspace</span>
               </DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
@@ -88,91 +125,92 @@ export function AppSidebar({ user, workspaces }: Props) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        <Link
-          href="/dashboard"
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-            pathname === "/dashboard"
-              ? "bg-primary text-primary-foreground shadow-md font-semibold"
-              : "hover:bg-muted text-muted-foreground hover:text-foreground"
-          }`}
-        >
+      <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
+        <Link href="/dashboard" className={navItem(pathname === "/dashboard")}>
+          {activeBar(pathname === "/dashboard")}
           <LayoutDashboard className="w-4 h-4 shrink-0" />
           <span>Dashboard</span>
         </Link>
 
         {activeWorkspace && (
           <>
-            <div className="pt-4 pb-1 px-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Current Workspace
-              </p>
-            </div>
-            
-            <Link
-              href={`/workspace/${activeWorkspace.slug}/projects`}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+            <p className="pt-5 pb-1.5 px-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+              {activeWorkspace.name}
+            </p>
+
+            {(() => {
+              const projActive =
                 pathname === `/workspace/${activeWorkspace.slug}` ||
-                pathname.startsWith(`/workspace/${activeWorkspace.slug}/projects`)
-                  ? "bg-primary text-primary-foreground shadow-md font-semibold"
-                  : "hover:bg-muted text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Briefcase className="w-4 h-4 shrink-0" />
-              <span>Projects</span>
-            </Link>
+                pathname.startsWith(`/workspace/${activeWorkspace.slug}/project`);
+              const tasksActive =
+                pathname === `/workspace/${activeWorkspace.slug}/my-tasks`;
+              const settingsActive = pathname.endsWith("/settings");
+              return (
+                <>
+                  <Link
+                    href={`/workspace/${activeWorkspace.slug}/projects`}
+                    className={navItem(projActive && !settingsActive)}
+                  >
+                    {activeBar(projActive && !settingsActive)}
+                    <Briefcase className="w-4 h-4 shrink-0" />
+                    <span>Projects</span>
+                  </Link>
 
-            <Link
-              href={`/workspace/${activeWorkspace.slug}/my-tasks`}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                pathname === `/workspace/${activeWorkspace.slug}/my-tasks`
-                  ? "bg-primary text-primary-foreground shadow-md font-semibold"
-                  : "hover:bg-muted text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <ListTodo className="w-4 h-4 shrink-0" />
-              <span>My Tasks</span>
-            </Link>
+                  <Link
+                    href={`/workspace/${activeWorkspace.slug}/my-tasks`}
+                    className={navItem(tasksActive)}
+                  >
+                    {activeBar(tasksActive)}
+                    <ListTodo className="w-4 h-4 shrink-0" />
+                    <span>My Tasks</span>
+                  </Link>
 
-            <Link
-              href={`/workspace/${activeWorkspace.slug}/settings`}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                pathname.endsWith("/settings")
-                  ? "bg-primary text-primary-foreground shadow-md font-semibold"
-                  : "hover:bg-muted text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Settings className="w-4 h-4 shrink-0" />
-              <span>Members & Settings</span>
-            </Link>
+                  <Link
+                    href={`/workspace/${activeWorkspace.slug}/settings`}
+                    className={navItem(settingsActive)}
+                  >
+                    {activeBar(settingsActive)}
+                    <Settings className="w-4 h-4 shrink-0" />
+                    <span>Members & Settings</span>
+                  </Link>
+                </>
+              );
+            })()}
           </>
         )}
       </nav>
 
       {/* User Info / Footer */}
-      <div className="p-3 border-t border-neutral-200/50 dark:border-neutral-800/50">
-        <Link
-          href="/profile"
-          className={`flex items-center gap-2 mb-2 p-2 rounded-xl hover:bg-muted/50 transition-colors ${
-            pathname === "/profile" ? "bg-muted" : ""
-          }`}
-        >
-          {user.image ? (
-            <img src={user.image} alt="" className="w-8 h-8 rounded-full object-cover ring-2 ring-neutral-200/50" />
-          ) : (
-            <UserCircle className="w-8 h-8 text-neutral-400" />
-          )}
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold truncate text-foreground leading-tight">{user.name}</p>
-            <p className="text-[10px] text-muted-foreground truncate leading-none mt-0.5">{user.email}</p>
-          </div>
-        </Link>
-        <button
-          onClick={() => signOut({ callbackUrl: "/login" })}
-          className="w-full text-xs text-muted-foreground hover:text-red-500 font-semibold transition-colors text-left px-2 py-1.5 rounded-lg hover:bg-red-50/10"
-        >
-          Sign out
-        </button>
+      <div className="p-3 mt-2 border-t border-border">
+        <div className="flex items-center gap-2.5 p-1.5 rounded-lg">
+          <Link href="/profile" className="flex items-center gap-2.5 min-w-0 flex-1 group">
+            {user.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={user.image}
+                alt=""
+                className="w-8 h-8 rounded-full object-cover ring-1 ring-border"
+              />
+            ) : (
+              <UserCircle className="w-8 h-8 text-muted-foreground" strokeWidth={1.5} />
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold truncate text-foreground leading-tight group-hover:text-primary transition-colors">
+                {user.name}
+              </p>
+              <p className="text-[10px] text-muted-foreground truncate leading-none mt-0.5">
+                {user.email}
+              </p>
+            </div>
+          </Link>
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            title="Sign out"
+            className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-accent transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       <CreateWorkspaceDialog open={dialogOpen} onOpenChange={setDialogOpen} />

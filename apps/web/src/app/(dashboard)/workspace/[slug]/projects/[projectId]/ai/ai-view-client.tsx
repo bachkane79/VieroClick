@@ -118,9 +118,9 @@ export function AiViewClient({
   const getSuggestionIcon = (type: string) => {
     switch (type) {
       case "planning_package":
-        return <Compass className="w-5 h-5 text-blue-500" />;
+        return <Compass className="w-5 h-5 text-primary" />;
       case "assignment_suggestion":
-        return <Cpu className="w-5 h-5 text-purple-500" />;
+        return <Cpu className="w-5 h-5 text-primary" />;
       default:
         return <ShieldAlert className="w-5 h-5 text-amber-500" />;
     }
@@ -129,7 +129,7 @@ export function AiViewClient({
   return (
     <div className="space-y-6">
       {/* Tab selection */}
-      <div className="flex border-b border-neutral-200/50 dark:border-neutral-800/50">
+      <div className="flex border-b border-border">
         <button
           onClick={() => setActivePanel("assistant")}
           className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all ${
@@ -158,7 +158,7 @@ export function AiViewClient({
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Chat Assistant */}
           <div className="xl:col-span-2 space-y-4">
-            <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm h-[500px] flex flex-col justify-between">
+            <div className="p-5 border border-border rounded-2xl bg-card shadow-sm h-[500px] flex flex-col justify-between">
               {/* Message History */}
               <div className="flex-1 overflow-y-auto pr-1 space-y-4 mb-4 text-xs">
                 {chatLog.map((msg, idx) => (
@@ -207,7 +207,7 @@ export function AiViewClient({
 
           {/* Quick Actions / Jobs list */}
           <div className="space-y-4">
-            <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm space-y-4">
+            <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
               <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground border-b pb-3 border-neutral-100 dark:border-neutral-800">
                 Trigger AI Agents
               </h3>
@@ -223,7 +223,7 @@ export function AiViewClient({
                   disabled={submitting}
                   className="w-full justify-start gap-2 text-xs font-semibold py-2"
                 >
-                  <Compass className="w-4 h-4 text-blue-500" />
+                  <Compass className="w-4 h-4 text-primary" />
                   Generate AI Project Roadmap
                 </Button>
 
@@ -234,7 +234,7 @@ export function AiViewClient({
                   disabled={submitting}
                   className="w-full justify-start gap-2 text-xs font-semibold py-2"
                 >
-                  <Cpu className="w-4 h-4 text-purple-500" />
+                  <Cpu className="w-4 h-4 text-primary" />
                   Suggest Task Allocations
                 </Button>
 
@@ -256,7 +256,7 @@ export function AiViewClient({
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Suggestions List */}
           <div className="xl:col-span-2 space-y-4">
-            <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm space-y-4">
+            <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
               <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground border-b pb-3 border-neutral-100 dark:border-neutral-800">
                 Pending AI Proposals ({pendingSuggestions.length})
               </h3>
@@ -318,7 +318,7 @@ export function AiViewClient({
 
           {/* History / Reviewed Proposals */}
           <div className="space-y-4">
-            <div className="p-5 border border-neutral-200/50 dark:border-neutral-800/50 rounded-2xl bg-card shadow-sm space-y-4">
+            <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
               <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground border-b pb-3 border-neutral-100 dark:border-neutral-800">
                 Decision History
               </h3>

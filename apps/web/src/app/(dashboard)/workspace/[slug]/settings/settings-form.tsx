@@ -180,7 +180,7 @@ export function WorkspaceSettingsForm({ workspace, initialMembers }: Props) {
   return (
     <div className="space-y-8">
       {/* General Settings */}
-      <div className="rounded-2xl border bg-card/60 backdrop-blur-md p-6 border-neutral-200/50 dark:border-neutral-800/50 shadow-md">
+      <div className="rounded-2xl border bg-card/60 backdrop-blur-md p-6 border-border shadow-md">
         <h2 className="text-lg font-bold flex items-center gap-2 mb-4">
           <Shield className="w-5 h-5 text-primary" />
           General Details
@@ -188,7 +188,7 @@ export function WorkspaceSettingsForm({ workspace, initialMembers }: Props) {
         <form onSubmit={handleUpdateWorkspace} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label htmlFor="name" className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+              <label htmlFor="name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Workspace Name
               </label>
               <input
@@ -197,11 +197,11 @@ export function WorkspaceSettingsForm({ workspace, initialMembers }: Props) {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-background/50 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+                className="w-full px-3.5 py-2 rounded-xl border border-input bg-background/50 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
               />
             </div>
             <div className="space-y-1.5">
-              <label htmlFor="slug" className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+              <label htmlFor="slug" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Slug URL
               </label>
               <input
@@ -210,7 +210,7 @@ export function WorkspaceSettingsForm({ workspace, initialMembers }: Props) {
                 required
                 value={slug}
                 onChange={(e) => setSlug(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-background/50 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+                className="w-full px-3.5 py-2 rounded-xl border border-input bg-background/50 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
               />
             </div>
           </div>
@@ -228,18 +228,18 @@ export function WorkspaceSettingsForm({ workspace, initialMembers }: Props) {
       </div>
 
       {/* Invite Member Form */}
-      <div className="rounded-2xl border bg-card/60 backdrop-blur-md p-6 border-neutral-200/50 dark:border-neutral-800/50 shadow-md">
+      <div className="rounded-2xl border bg-card/60 backdrop-blur-md p-6 border-border shadow-md">
         <h2 className="text-lg font-bold flex items-center gap-2 mb-4">
           <UserPlus className="w-5 h-5 text-primary" />
           Invite Workspace Member
         </h2>
         <form onSubmit={handleInvite} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <div className="space-y-1.5 md:col-span-1.5">
-            <label htmlFor="invite-email" className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+            <label htmlFor="invite-email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Email Address
             </label>
             <div className="relative flex items-center">
-              <Mail className="w-4 h-4 text-neutral-400 absolute left-3" />
+              <Mail className="w-4 h-4 text-muted-foreground absolute left-3" />
               <input
                 id="invite-email"
                 type="email"
@@ -247,19 +247,19 @@ export function WorkspaceSettingsForm({ workspace, initialMembers }: Props) {
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
                 placeholder="colleague@company.com"
-                className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-background/50 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+                className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-input bg-background/50 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
               />
             </div>
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="invite-role" className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+            <label htmlFor="invite-role" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Workspace Role
             </label>
             <select
               id="invite-role"
               value={inviteRole}
               onChange={(e) => setInviteRole(e.target.value as any)}
-              className="w-full px-3.5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-background/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm appearance-none cursor-pointer"
+              className="w-full px-3.5 py-2 rounded-xl border border-input bg-background/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm appearance-none cursor-pointer"
             >
               <option value="admin">Administrator</option>
               <option value="leader">Leader</option>
@@ -278,16 +278,16 @@ export function WorkspaceSettingsForm({ workspace, initialMembers }: Props) {
       </div>
 
       {/* Members List */}
-      <div className="rounded-2xl border bg-card/60 backdrop-blur-md border-neutral-200/50 dark:border-neutral-800/50 shadow-md overflow-hidden">
-        <div className="p-6 border-b border-neutral-200/50 dark:border-neutral-800/50">
+      <div className="rounded-2xl border bg-card/60 backdrop-blur-md border-border shadow-md overflow-hidden">
+        <div className="p-6 border-b border-border">
           <h2 className="text-lg font-bold flex items-center gap-2">
             <User className="w-5 h-5 text-primary" />
             Current Members ({members.length})
           </h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left text-sm text-neutral-500 dark:text-neutral-400">
-            <thead className="bg-neutral-50 dark:bg-neutral-900 text-xs font-semibold uppercase tracking-wider text-neutral-500 border-b border-neutral-200/50 dark:border-neutral-800/50">
+          <table className="w-full border-collapse text-left text-sm text-muted-foreground">
+            <thead className="bg-neutral-50 dark:bg-neutral-900 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border">
               <tr>
                 <th scope="col" className="px-6 py-4">User</th>
                 <th scope="col" className="px-6 py-4">Email</th>
@@ -317,7 +317,7 @@ export function WorkspaceSettingsForm({ workspace, initialMembers }: Props) {
                     <td className="px-6 py-4 font-medium">{m.email}</td>
                     <td className="px-6 py-4">
                       {isOwner ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 border border-indigo-200/50">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
                           Owner
                         </span>
                       ) : (
@@ -325,7 +325,7 @@ export function WorkspaceSettingsForm({ workspace, initialMembers }: Props) {
                           value={m.role}
                           disabled={updatingMemberId === m.id}
                           onChange={(e) => handleRoleChange(m.id, e.target.value as any)}
-                          className="px-2 py-1 bg-background rounded-lg border border-neutral-200 dark:border-neutral-800 focus:outline-none focus:ring-1 focus:ring-primary text-xs font-medium cursor-pointer"
+                          className="px-2 py-1 bg-background rounded-lg border border-input focus:outline-none focus:ring-1 focus:ring-primary text-xs font-medium cursor-pointer"
                         >
                           <option value="admin">Admin</option>
                           <option value="leader">Leader</option>
@@ -334,7 +334,7 @@ export function WorkspaceSettingsForm({ workspace, initialMembers }: Props) {
                         </select>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-xs font-semibold flex items-center gap-1 text-neutral-400 mt-2 border-0">
+                    <td className="px-6 py-4 text-xs font-semibold flex items-center gap-1 text-muted-foreground mt-2 border-0">
                       <Calendar className="w-3.5 h-3.5" />
                       {new Date(m.joinedAt).toLocaleDateString()}
                     </td>

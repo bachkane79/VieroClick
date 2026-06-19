@@ -12,7 +12,7 @@ const nextConfig: NextConfig = {
   // ─── Experimental ────────────────────────────────────────────────────────
   experimental: {
     serverActions: {
-      allowedOrigins: ["localhost:3000"],
+      allowedOrigins: ["localhost:3000", "localhost:3001"],
     },
     // Optimise barrel-file imports: prevents Next from bundling the entire
     // Lucide/Radix/UI package when only a few icons/components are used.

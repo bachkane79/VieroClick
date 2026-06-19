@@ -42,11 +42,31 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        brand: {
+          DEFAULT: "hsl(var(--brand))",
+          foreground: "hsl(var(--brand-foreground))",
+          soft: "hsl(var(--brand-soft))",
+        },
       },
       borderRadius: {
+        xl: "calc(var(--radius) + 4px)",
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      boxShadow: {
+        soft: "rgba(15,15,15,0.012) 0 0.2px 1px, rgba(15,15,15,0.02) 0 1px 3px, rgba(15,15,15,0.028) 0 4px 12px",
+        elevated:
+          "rgba(15,15,15,0.02) 0 1px 3px, rgba(15,15,15,0.04) 0 8px 22px, rgba(15,15,15,0.05) 0 22px 48px",
+      },
+      keyframes: {
+        "fade-in": {
+          from: { opacity: "0", transform: "translateY(4px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        "fade-in": "fade-in 0.3s ease-out both",
       },
     },
   },
