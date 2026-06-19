@@ -40,7 +40,7 @@ export async function getUserId(): Promise<string> {
         try {
           decoded = await decode({
             token,
-            secret: process.env.AUTH_SECRET!,
+            secret: process.env.AUTH_SECRET || "default-fallback-secret-for-development-only-12345",
             salt,
           });
           if (decoded?.userId || decoded?.sub) {

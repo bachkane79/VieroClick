@@ -9,7 +9,7 @@ import Credentials from "next-auth/providers/credentials";
  * The full config in `./index.ts` extends this with DB-touching callbacks.
  */
 export const authConfig: NextAuthConfig = {
-  secret: process.env.AUTH_SECRET,
+  secret: process.env.AUTH_SECRET || "default-fallback-secret-for-development-only-12345",
   trustHost: true,
   providers: [
     GitHub({
