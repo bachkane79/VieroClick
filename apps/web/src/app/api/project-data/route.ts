@@ -19,10 +19,14 @@ import {
 } from "@vieroc/db";
 import { eq, and } from "drizzle-orm";
 import { getUserId } from "@/server/lib/context";
+import { isAgentRequest } from "@/server/lib/agent-auth";
 
 export async function GET(request: Request) {
   try {
-    await getUserId(); // Ensure authorized
+    // Accept agent service key OR user session
+    if (!isAgentRequest(request)) {
+      await getUserId(); // Falls back to session auth for human users
+    }
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get("projectId");
 

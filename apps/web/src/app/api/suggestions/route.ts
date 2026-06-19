@@ -2,11 +2,18 @@ import { NextResponse } from "next/server";
 import { db, agentSuggestions, agentJobs, projects } from "@vieroc/db";
 import { eq } from "drizzle-orm";
 import { getUserId } from "@/server/lib/context";
+import { isAgentRequest } from "@/server/lib/agent-auth";
 import { revalidatePath } from "next/cache";
 
 export async function POST(request: Request) {
   try {
-    const userId = await getUserId(); // Ensure authorized
+    // Accept agent service key OR user session
+    let userId: string;
+    if (isAgentRequest(request)) {
+      userId = "agent-service"; // Sentinel value for agent-originated actions
+    } else {
+      userId = await getUserId();
+    }
     const body = await request.json();
     const { projectId, suggestionType, title, body: textBody, payload } = body;
 

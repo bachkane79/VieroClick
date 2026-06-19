@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { db, leaderReports } from "@vieroc/db";
 import { getUserId } from "@/server/lib/context";
+import { isAgentRequest } from "@/server/lib/agent-auth";
 
 export async function POST(request: Request) {
   try {
-    await getUserId(); // Ensure authorized
+    // Accept agent service key OR user session
+    if (!isAgentRequest(request)) {
+      await getUserId();
+    }
     const body = await request.json();
     const {
       projectId,
