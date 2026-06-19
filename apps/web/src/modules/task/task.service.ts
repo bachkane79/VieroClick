@@ -4,6 +4,7 @@ import { db, type Executor } from "@vieroc/db";
 import { requireActor, type ActorContext } from "@/server/lib/context";
 import { isProjectManager } from "@/server/lib/permissions";
 import { NotFoundError, ValidationError } from "@/server/lib/errors";
+import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
 import { enqueueNotifications } from "@/server/lib/notifications";
 import { createTaskDependencySchema } from "@/modules/task-dependency/task-dependency.schema";
 import * as dependencyEvents from "@/modules/task-dependency/task-dependency.events";
@@ -133,12 +134,14 @@ async function createBlockerForTask(
  *  Wrapped with React cache() so identical calls within a single render are de-duplicated. */
 export const listBoard = cache(async function listBoard(workspaceId: string, projectId: string) {
   await requireActor(workspaceId, projectId);
-  const [tasks, statuses, dependencies] = await Promise.all([
-    repo.listByProject(projectId),
-    repo.listStatuses(projectId),
-    repo.listDependenciesByProject(projectId),
-  ]);
-  return { tasks, statuses, dependencies };
+  return getOrSetCache(`board:${projectId}`, async () => {
+    const [tasks, statuses, dependencies] = await Promise.all([
+      repo.listByProject(projectId),
+      repo.listStatuses(projectId),
+      repo.listDependenciesByProject(projectId),
+    ]);
+    return { tasks, statuses, dependencies };
+  });
 });
 
 export async function listMyTasks(workspaceId: string) {
@@ -201,6 +204,7 @@ export async function createTask(p: { workspaceId: string; projectId: string; in
       ]);
     }
 
+    invalidateCache(`board:${p.projectId}`);
     return task;
   });
 }
@@ -305,6 +309,7 @@ export async function updateTask(p: {
       }
     }
 
+    invalidateCache(`board:${p.projectId}`);
     return updated;
   });
 }
@@ -420,6 +425,7 @@ export async function addTaskDependency(p: {
     );
 
     await dependencyEvents.dependencyAdded(tx, ctx, blocked.id, blocker.id);
+    invalidateCache(`board:${p.projectId}`);
     return dependency;
   });
 }
@@ -438,6 +444,7 @@ export async function removeTaskDependency(p: {
   return db.transaction(async (tx) => {
     await dependencyEvents.dependencyRemoved(tx, ctx, existing.blockedTaskId, existing.blockerTaskId);
     await repo.removeDependency(p.dependencyId, tx);
+    invalidateCache(`board:${p.projectId}`);
     return { id: p.dependencyId };
   });
 }
@@ -451,6 +458,7 @@ export async function deleteTask(p: { workspaceId: string; projectId: string; ta
   return db.transaction(async (tx) => {
     await events.taskDeleted(tx, ctx, existing);
     await repo.remove(p.taskId, tx);
+    invalidateCache(`board:${p.projectId}`);
     return { id: p.taskId };
   });
 }

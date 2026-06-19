@@ -11,6 +11,7 @@ import {
 import { Button } from "@vieroc/ui";
 import { toast } from "sonner";
 import { UserPlus, Trash2, Shield, Save, Mail, Calendar, User } from "lucide-react";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 interface Member {
   id: string;
@@ -52,6 +53,7 @@ export function WorkspaceSettingsForm({ workspace, initialMembers }: Props) {
   // Members list state
   const [members, setMembers] = useState<Member[]>(initialMembers);
   const [updatingMemberId, setUpdatingMemberId] = useState<string | null>(null);
+  const [removeMemberCandidate, setRemoveMemberCandidate] = useState<{ id: string; email: string } | null>(null);
 
   const handleUpdateWorkspace = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,8 +150,11 @@ export function WorkspaceSettingsForm({ workspace, initialMembers }: Props) {
     }
   };
 
-  const handleRemoveMember = async (memberId: string, email: string) => {
-    if (!confirm(`Are you sure you want to remove ${email} from this workspace?`)) return;
+  const handleRemoveMember = (memberId: string, email: string) => {
+    setRemoveMemberCandidate({ id: memberId, email });
+  };
+
+  const executeRemoveMember = async (memberId: string, email: string) => {
     setUpdatingMemberId(memberId);
 
     try {
@@ -352,6 +357,23 @@ export function WorkspaceSettingsForm({ workspace, initialMembers }: Props) {
           </table>
         </div>
       </div>
+
+      <ConfirmationDialog
+        isOpen={removeMemberCandidate !== null}
+        onOpenChange={(open) => {
+          if (!open) setRemoveMemberCandidate(null);
+        }}
+        title="Remove Member"
+        description={removeMemberCandidate ? `Are you sure you want to remove ${removeMemberCandidate.email} from this workspace?` : ""}
+        variant="destructive"
+        confirmLabel="Remove"
+        onConfirm={async () => {
+          if (removeMemberCandidate) {
+            await executeRemoveMember(removeMemberCandidate.id, removeMemberCandidate.email);
+            setRemoveMemberCandidate(null);
+          }
+        }}
+      />
     </div>
   );
 }

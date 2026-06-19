@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { cn } from "@vieroc/ui";
 import {
   Info,
@@ -23,6 +24,15 @@ interface Props {
 
 export function ProjectNav({ slug, projectId }: Props) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    // Poll the backend every 3 seconds to update client views in real-time
+    const interval = setInterval(() => {
+      router.refresh();
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [router]);
 
   const tabs = [
     {

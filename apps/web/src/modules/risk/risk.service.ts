@@ -1,17 +1,19 @@
 import "server-only";
+import { cache } from "react";
 import { db } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
 import { NotFoundError } from "@/server/lib/errors";
+import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
 import { createRiskSchema, updateRiskSchema } from "./risk.schema";
 import { assertCanManageRisks } from "./risk.policy";
 import * as repo from "./risk.repo";
 import * as events from "./risk.events";
 
 /** Read: risks for a project. Requires workspace membership. */
-export async function listRisks(workspaceId: string, projectId: string) {
+export const listRisks = cache(async function listRisks(workspaceId: string, projectId: string) {
   await requireActor(workspaceId, projectId);
-  return repo.listByProject(projectId);
-}
+  return getOrSetCache(`risks:${projectId}`, () => repo.listByProject(projectId));
+});
 
 export async function createRisk(p: { workspaceId: string; projectId: string; input: unknown }) {
   const data = createRiskSchema.parse(p.input);
@@ -34,6 +36,7 @@ export async function createRisk(p: { workspaceId: string; projectId: string; in
     );
 
     await events.riskCreated(tx, ctx, risk);
+    invalidateCache(`risks:${p.projectId}`);
 
     return risk;
   });
@@ -66,6 +69,7 @@ export async function updateRisk(p: {
     if (!updated) throw new NotFoundError("Risk");
 
     await events.riskUpdated(tx, ctx, existing, updated);
+    invalidateCache(`risks:${p.projectId}`);
 
     return updated;
   });
@@ -80,6 +84,7 @@ export async function deleteRisk(p: { workspaceId: string; projectId: string; ri
 
   return db.transaction(async (tx) => {
     await repo.remove(p.riskId, tx);
+    invalidateCache(`risks:${p.projectId}`);
     return { id: p.riskId };
   });
 }

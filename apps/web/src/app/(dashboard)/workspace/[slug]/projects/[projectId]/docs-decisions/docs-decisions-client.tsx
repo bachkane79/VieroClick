@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Textarea } from "@vieroc/ui";
 import { toast } from "sonner";
 import { FileText, Plus, Trash2, BookOpen, AlertCircle, Sparkles, CheckSquare } from "lucide-react";
 import { createDocAction, deleteDocAction } from "@/modules/project-doc/project-doc.actions";
 import { logDecisionAction, deleteDecisionAction } from "@/modules/decision-log/decision-log.actions";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 interface DocRow {
   id: string;
@@ -62,6 +63,8 @@ export function DocsDecisionsClient({
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<"docs" | "decisions">("docs");
+  const [deleteDocCandidateId, setDeleteDocCandidateId] = useState<string | null>(null);
+  const [deleteDecisionCandidateId, setDeleteDecisionCandidateId] = useState<string | null>(null);
 
   // Form toggles
   const [showAddDoc, setShowAddDoc] = useState(false);
@@ -82,9 +85,43 @@ export function DocsDecisionsClient({
   const memberNameMap = new Map(members.map((m) => [m.id, m.fullName]));
   const taskTitleMap = new Map(tasks.map((t) => [t.id, t.title]));
 
+  const [docs, setDocs] = useState<DocRow[]>(initialDocs);
+  const [decisions, setDecisions] = useState<DecisionRow[]>(initialDecisions);
+
+  useEffect(() => {
+    setDocs(initialDocs);
+  }, [initialDocs]);
+
+  useEffect(() => {
+    setDecisions(initialDecisions);
+  }, [initialDecisions]);
+
   async function handleAddDoc(e: React.FormEvent) {
     e.preventDefault();
     if (!dTitle.trim() || !dContent.trim()) return;
+
+    const titleText = dTitle.trim();
+    const typeVal = dType;
+    const contentText = dContent.trim();
+
+    setShowAddDoc(false);
+    setDTitle("");
+    setDContent("");
+
+    // Optimistic add
+    const tempId = `temp-${Date.now()}`;
+    const newDoc: DocRow = {
+      id: tempId,
+      projectId,
+      title: titleText,
+      type: typeVal,
+      content: contentText,
+      createdBy: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    setDocs((current) => [newDoc, ...current]);
+    toast.success("Document created");
 
     setSubmitting(true);
     const res = await createDocAction({
@@ -92,27 +129,30 @@ export function DocsDecisionsClient({
       projectId,
       slug: workspaceSlug,
       data: {
-        title: dTitle.trim(),
-        type: dType,
-        content: dContent.trim(),
+        title: titleText,
+        type: typeVal,
+        content: contentText,
       },
     });
     setSubmitting(false);
 
     if (!res.ok) {
       toast.error(res.error);
-      return;
+      // rollback
+      setDocs((current) => current.filter((doc) => doc.id !== tempId));
+    } else {
+      router.refresh();
     }
-
-    toast.success("Document created");
-    setShowAddDoc(false);
-    setDTitle("");
-    setDContent("");
-    router.refresh();
   }
 
-  async function handleDeleteDoc(docId: string) {
-    if (!confirm("Delete this document?")) return;
+  function handleDeleteDoc(docId: string) {
+    setDeleteDocCandidateId(docId);
+  }
+
+  async function executeDeleteDoc(docId: string) {
+    const previousDocs = [...docs];
+    setDocs((current) => current.filter((d) => d.id !== docId));
+    toast.success("Document deleted");
 
     setSubmitting(true);
     const res = await deleteDocAction({
@@ -125,16 +165,44 @@ export function DocsDecisionsClient({
 
     if (!res.ok) {
       toast.error(res.error);
-      return;
+      // rollback
+      setDocs(previousDocs);
+    } else {
+      router.refresh();
     }
-
-    toast.success("Document deleted");
-    router.refresh();
   }
 
   async function handleAddDecision(e: React.FormEvent) {
     e.preventDefault();
     if (!decTitle.trim() || !decDecision.trim()) return;
+
+    const titleText = decTitle.trim();
+    const decisionText = decDecision.trim();
+    const reasonText = decReason.trim();
+    const decByVal = decByMemberId;
+    const affectedVal = decAffectedTasks;
+
+    setShowAddDecision(false);
+    setDecTitle("");
+    setDecDecision("");
+    setDecReason("");
+    setDecByMemberId("");
+    setDecAffectedTasks([]);
+
+    // Optimistic add
+    const tempId = `temp-${Date.now()}`;
+    const newDecision: DecisionRow = {
+      id: tempId,
+      projectId,
+      title: titleText,
+      decision: decisionText,
+      reason: reasonText || null,
+      decidedByMemberId: decByVal || null,
+      affectedTaskIds: affectedVal,
+      createdAt: new Date(),
+    };
+    setDecisions((current) => [newDecision, ...current]);
+    toast.success("Decision logged");
 
     setSubmitting(true);
     const res = await logDecisionAction({
@@ -142,32 +210,32 @@ export function DocsDecisionsClient({
       projectId,
       slug: workspaceSlug,
       data: {
-        title: decTitle.trim(),
-        decision: decDecision.trim(),
-        reason: decReason.trim() || undefined,
-        decidedByMemberId: decByMemberId || undefined,
-        affectedTaskIds: decAffectedTasks,
+        title: titleText,
+        decision: decisionText,
+        reason: reasonText || undefined,
+        decidedByMemberId: decByVal || undefined,
+        affectedTaskIds: affectedVal,
       },
     });
     setSubmitting(false);
 
     if (!res.ok) {
       toast.error(res.error);
-      return;
+      // rollback
+      setDecisions((current) => current.filter((d) => d.id !== tempId));
+    } else {
+      router.refresh();
     }
-
-    toast.success("Decision logged");
-    setShowAddDecision(false);
-    setDecTitle("");
-    setDecDecision("");
-    setDecReason("");
-    setDecByMemberId("");
-    setDecAffectedTasks([]);
-    router.refresh();
   }
 
-  async function handleDeleteDecision(decisionId: string) {
-    if (!confirm("Delete this decision log?")) return;
+  function handleDeleteDecision(decisionId: string) {
+    setDeleteDecisionCandidateId(decisionId);
+  }
+
+  async function executeDeleteDecision(decisionId: string) {
+    const previousDecisions = [...decisions];
+    setDecisions((current) => current.filter((d) => d.id !== decisionId));
+    toast.success("Decision deleted");
 
     setSubmitting(true);
     const res = await deleteDecisionAction({
@@ -180,11 +248,11 @@ export function DocsDecisionsClient({
 
     if (!res.ok) {
       toast.error(res.error);
-      return;
+      // rollback
+      setDecisions(previousDecisions);
+    } else {
+      router.refresh();
     }
-
-    toast.success("Decision deleted");
-    router.refresh();
   }
 
   const toggleTaskSelection = (taskId: string) => {
@@ -237,7 +305,7 @@ export function DocsDecisionsClient({
                 )}
               </div>
 
-              {initialDocs.length === 0 ? (
+              {docs.length === 0 ? (
                 <div className="p-12 text-center text-muted-foreground border border-dashed rounded-xl">
                   <FileText className="w-8 h-8 mx-auto mb-3 opacity-40 text-primary" />
                   <p className="text-sm font-semibold">No documents posted yet</p>
@@ -245,7 +313,7 @@ export function DocsDecisionsClient({
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {initialDocs.map((doc) => (
+                  {docs.map((doc) => (
                     <div
                       key={doc.id}
                       className="p-4 border border-neutral-200/40 dark:border-neutral-800/40 rounded-xl bg-card flex flex-col gap-3 shadow-sm hover:border-neutral-300 transition-all"
@@ -358,7 +426,7 @@ export function DocsDecisionsClient({
                 )}
               </div>
 
-              {initialDecisions.length === 0 ? (
+              {decisions.length === 0 ? (
                 <div className="p-12 text-center text-muted-foreground border border-dashed rounded-xl">
                   <AlertCircle className="w-8 h-8 mx-auto mb-3 opacity-40 text-primary" />
                   <p className="text-sm font-semibold">No decisions logged yet</p>
@@ -366,7 +434,7 @@ export function DocsDecisionsClient({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {initialDecisions.map((dec) => {
+                  {decisions.map((dec) => {
                     const decider = memberNameMap.get(dec.decidedByMemberId ?? "") ?? "Workspace member";
                     return (
                       <div
@@ -536,6 +604,40 @@ export function DocsDecisionsClient({
           </div>
         </div>
       )}
+
+      <ConfirmationDialog
+        isOpen={deleteDocCandidateId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteDocCandidateId(null);
+        }}
+        title="Delete Document"
+        description="Are you sure you want to delete this document? This action cannot be undone."
+        variant="destructive"
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          if (deleteDocCandidateId) {
+            await executeDeleteDoc(deleteDocCandidateId);
+            setDeleteDocCandidateId(null);
+          }
+        }}
+      />
+
+      <ConfirmationDialog
+        isOpen={deleteDecisionCandidateId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteDecisionCandidateId(null);
+        }}
+        title="Delete Decision Log"
+        description="Are you sure you want to delete this decision log? This action cannot be undone."
+        variant="destructive"
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          if (deleteDecisionCandidateId) {
+            await executeDeleteDecision(deleteDecisionCandidateId);
+            setDeleteDecisionCandidateId(null);
+          }
+        }}
+      />
     </div>
   );
 }

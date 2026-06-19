@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db, tasks, taskStatuses, taskDependencies } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
 import { NotFoundError, ValidationError } from "@/server/lib/errors";
+import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
 import { enqueueNotifications } from "@/server/lib/notifications";
 import { createProjectSchema, updateProjectSchema } from "./project.schema";
 import { assertCanCreateProject, assertCanManageProject } from "./project.policy";
@@ -14,7 +15,7 @@ import * as events from "./project.events";
 // e.g. layout.tsx + page.tsx both calling getProject() → only 1 DB query.
 export const listProjects = cache(async function listProjects(workspaceId: string) {
   await requireActor(workspaceId);
-  return repo.listByWorkspace(workspaceId);
+  return getOrSetCache(`projects:${workspaceId}`, () => repo.listByWorkspace(workspaceId));
 });
 
 export const getProject = cache(async function getProject(
@@ -22,9 +23,11 @@ export const getProject = cache(async function getProject(
   projectId: string
 ) {
   await requireActor(workspaceId, projectId);
-  const project = await repo.findById(projectId);
-  if (!project || project.workspaceId !== workspaceId) throw new NotFoundError("Project");
-  return project;
+  return getOrSetCache(`project:${projectId}`, async () => {
+    const project = await repo.findById(projectId);
+    if (!project || project.workspaceId !== workspaceId) throw new NotFoundError("Project");
+    return project;
+  });
 });
 
 export async function createProject(workspaceId: string, input: unknown) {
@@ -102,6 +105,7 @@ export async function createProject(workspaceId: string, input: unknown) {
       );
     }
 
+    invalidateCache(`projects:${workspaceId}`);
     return project;
   });
 }
@@ -132,6 +136,8 @@ export async function updateProject(workspaceId: string, projectId: string, inpu
     const updated = await repo.update(projectId, patch, tx);
     if (!updated) throw new NotFoundError("Project");
     await events.projectUpdated(tx, ctx, existing, { ...patch });
+    invalidateCache(`projects:${workspaceId}`);
+    invalidateCache(`project:${projectId}`);
     return updated;
   });
 }

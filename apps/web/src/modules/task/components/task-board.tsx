@@ -41,6 +41,10 @@ export function TaskBoard({
   const [open, setOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TaskView | null>(null);
   const [initialStatusId, setInitialStatusId] = useState<string | undefined>();
+  const currentSelectedTask = useMemo(() => {
+    if (!selectedTask) return null;
+    return tasks.find((t) => t.id === selectedTask.id) ?? selectedTask;
+  }, [tasks, selectedTask]);
   const memberNameById = useMemo(() => new Map(members.map((m) => [m.id, m.fullName])), [members]);
 
   const tasksByStatus = useMemo(
@@ -141,7 +145,7 @@ export function TaskBoard({
         workspaceId={workspaceId}
         workspaceSlug={workspaceSlug}
         projectId={projectId}
-        task={selectedTask}
+        task={currentSelectedTask}
         initialStatusId={initialStatusId}
         tasks={tasks}
         statuses={statuses}

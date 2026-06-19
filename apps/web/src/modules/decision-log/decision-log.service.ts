@@ -1,7 +1,9 @@
 import "server-only";
+import { cache } from "react";
 import { db } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
 import { NotFoundError } from "@/server/lib/errors";
+import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
 import { createDecisionLogSchema } from "./decision-log.schema";
 import { assertCanLogDecision } from "./decision-log.policy";
 import * as repo from "./decision-log.repo";
@@ -11,10 +13,10 @@ import * as projectMemberRepo from "../project-member/project-member.repo";
 import { enqueueNotifications } from "@/server/lib/notifications";
 
 /** Read: decision logs for a project. Requires workspace membership. */
-export async function listDecisions(workspaceId: string, projectId: string) {
+export const listDecisions = cache(async function listDecisions(workspaceId: string, projectId: string) {
   await requireActor(workspaceId, projectId);
-  return repo.listByProject(projectId);
-}
+  return getOrSetCache(`decisions:${projectId}`, () => repo.listByProject(projectId));
+});
 
 export async function logDecision(p: { workspaceId: string; projectId: string; input: unknown }) {
   const data = createDecisionLogSchema.parse(p.input);
@@ -55,6 +57,8 @@ export async function logDecision(p: { workspaceId: string; projectId: string; i
       await enqueueNotifications(tx, notifyItems);
     }
 
+    invalidateCache(`decisions:${p.projectId}`);
+
     return decision;
   });
 }
@@ -72,6 +76,7 @@ export async function deleteDecision(p: {
 
   return db.transaction(async (tx) => {
     await repo.remove(p.decisionId, tx);
+    invalidateCache(`decisions:${p.projectId}`);
     return { id: p.decisionId };
   });
 }
