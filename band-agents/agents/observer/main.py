@@ -70,10 +70,12 @@ class ObserverAdapter(SimpleAdapter):
         room_id: str,
     ) -> None:
         if msg.sender_id == self.agent_id:
+            await tools.send_event(content="Skipping own message", message_type="thought")
             return
 
         is_mentioned = f"[[{self.agent_id}]]" in msg.content or "@observer" in msg.content
         if not is_mentioned:
+            await tools.send_event(content="Not addressed to observer agent — skipping", message_type="thought")
             return
 
         message = msg.content
