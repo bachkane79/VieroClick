@@ -1,17 +1,12 @@
 """
 run_all.py
-Launch all 5 Band agents concurrently.
+Launch all 6 Band agents concurrently.
 
 Each agent connects to Band via WebSocket and listens for @mentions.
 They run indefinitely until interrupted (Ctrl+C).
 
 Usage:
     python run_all.py
-
-Requirements:
-    - agent_config.yaml with Band agent IDs and API keys
-    - .env with LLM API keys and VieroClick config
-    - Band room created with all 5 agents and the human user invited
 """
 import asyncio
 import logging
@@ -19,7 +14,7 @@ import signal
 import sys
 from dotenv import load_dotenv
 
-# Configure logging before anything else
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)-20s] %(levelname)-8s %(message)s",
@@ -29,38 +24,37 @@ logging.basicConfig(
 load_dotenv()
 logger = logging.getLogger("run_all")
 
-from agents.planner.main import run_planner
-from agents.developer.main import run_developer
-from agents.qa.main import run_qa
-from agents.reviewer.main import run_reviewer
-from agents.notifier.main import run_notifier
+from agents.planning.main import run_planning
+from agents.assignment.main import run_assignment
+from agents.observer.main import run_observer
+from agents.daily_report.main import run_daily_report
+from agents.morning_briefing.main import run_morning_briefing
+from agents.project_qa.main import run_project_qa
 
 
 async def main():
     logger.info("=" * 60)
-    logger.info("🤖 VieroClick × Band AI Multi-Agent Pipeline")
+    logger.info("🤖 VieroClick × Band AI Multi-Agent Pipeline (6 Agents)")
     logger.info("=" * 60)
     logger.info("")
-    logger.info("Starting 5 agents:")
-    logger.info("  1. @planner    — Planner (Abstract breakdown & Milestones)")
-    logger.info("  2. @developer  — Assigner (Allocates tasks to Người 1, 2, 3)")
-    logger.info("  3. @qa_agent   — QA Chatbot (Standalone Q&A for project info)")
-    logger.info("  4. @reviewer   — Reporter (Morning/Evening comparison reports)")
-    logger.info("  5. @notifier   — Notifier (Syncs tasks & assignees to VieroClick)")
+    logger.info("Starting 6 agents:")
+    logger.info("  1. @planning         — Planning roadmap suggested to suggestions")
+    logger.info("  2. @assignment       — Task Allocation rule-based score suggestions")
+    logger.info("  3. @observer         — Project health scan alert suggestions")
+    logger.info("  4. @daily_report     — Daily summary saved to pending leader reports")
+    logger.info("  5. @morning_briefing  — Personal member briefings via Web & Telegram")
+    logger.info("  6. @project_qa       — Context Q&A & project holes suggestion logging")
     logger.info("")
-    logger.info("Pipeline flow:")
-    logger.info("  Human → @planner → [approve] → @notifier → @developer → @notifier → VieroClick DB")
-    logger.info("  Standalone: @qa_agent [Question] | @reviewer [sáng/tối]")
     logger.info("=" * 60)
 
-
-    # Run all 5 agents concurrently
+    # Run all 6 agents concurrently
     tasks = [
-        asyncio.create_task(run_planner(),   name="planner"),
-        asyncio.create_task(run_developer(), name="developer"),
-        asyncio.create_task(run_qa(),        name="qa"),
-        asyncio.create_task(run_reviewer(),  name="reviewer"),
-        asyncio.create_task(run_notifier(),  name="notifier"),
+        asyncio.create_task(run_planning(),         name="planning"),
+        asyncio.create_task(run_assignment(),       name="assignment"),
+        asyncio.create_task(run_observer(),         name="observer"),
+        asyncio.create_task(run_daily_report(),     name="daily_report"),
+        asyncio.create_task(run_morning_briefing(), name="morning_briefing"),
+        asyncio.create_task(run_project_qa(),       name="project_qa"),
     ]
 
     try:
