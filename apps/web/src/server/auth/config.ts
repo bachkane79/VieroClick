@@ -10,6 +10,7 @@ import Credentials from "next-auth/providers/credentials";
  */
 export const authConfig: NextAuthConfig = {
   secret: process.env.AUTH_SECRET,
+  trustHost: true,
   providers: [
     GitHub({
       clientId: process.env.GITHUB_CLIENT_ID,
