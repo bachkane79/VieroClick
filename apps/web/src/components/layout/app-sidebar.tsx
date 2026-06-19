@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -51,9 +52,14 @@ export function AppSidebar({ user, workspaces }: Props) {
       {/* Wordmark */}
       <div className="px-4 pt-4 pb-3">
         <Link href="/dashboard" className="flex items-center gap-2 px-1">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-foreground text-background text-sm font-bold">
-            V
-          </span>
+          <Image
+            src="/logo_transparent.png"
+            alt="VieroClick"
+            width={28}
+            height={28}
+            className="h-7 w-7 shrink-0 object-contain"
+            priority
+          />
           <span className="text-[15px] font-bold tracking-tight">
             Viero<span className="text-primary">Click</span>
           </span>

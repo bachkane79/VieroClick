@@ -2,12 +2,10 @@
 Telegram agent: classifies incoming messages, routes to correct handler.
 """
 from typing import Any
-from openai import AsyncOpenAI
 import json
 
+from app.agents.openai_client import get_openai_client
 from app.settings import settings
-
-client = AsyncOpenAI(api_key=settings.openai_api_key)
 
 INTENT_PROMPT = """Classify the intent of this Telegram message in a project management context.
 Possible intents: daily_update, blocker_report, task_question, status_query, general_message.
@@ -16,7 +14,7 @@ Respond as JSON: {intent, confidence, extracted_data}.
 
 
 async def classify_message(text: str) -> dict[str, Any]:
-    response = await client.chat.completions.create(
+    response = await get_openai_client().chat.completions.create(
         model=settings.openai_model,
         messages=[
             {"role": "system", "content": INTENT_PROMPT},

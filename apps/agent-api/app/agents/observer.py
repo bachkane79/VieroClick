@@ -3,12 +3,10 @@ Observer agent: watches activity_events for anomalies, deadline risks, blocked c
 Generates alerts / suggestions proactively.
 """
 from typing import Any
-from openai import AsyncOpenAI
 import json
 
+from app.agents.openai_client import get_openai_client
 from app.settings import settings
-
-client = AsyncOpenAI(api_key=settings.openai_api_key)
 
 SYSTEM_PROMPT = """You are a project health monitoring AI.
 Analyze the provided activity events and project state.
@@ -23,7 +21,7 @@ async def scan_project_health(
 ) -> dict[str, Any]:
     payload = {"recent_events": events, "project_state": project_state}
 
-    response = await client.chat.completions.create(
+    response = await get_openai_client().chat.completions.create(
         model=settings.openai_model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},

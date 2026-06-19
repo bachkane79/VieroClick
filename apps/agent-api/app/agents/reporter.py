@@ -3,12 +3,10 @@ Reporter agent: generates daily/weekly project status reports.
 Reads daily_updates, blockers, task progress from DB and synthesizes.
 """
 from typing import Any
-from openai import AsyncOpenAI
 import json
 
+from app.agents.openai_client import get_openai_client
 from app.settings import settings
-
-client = AsyncOpenAI(api_key=settings.openai_api_key)
 
 SYSTEM_PROMPT = """You are a project status report writer.
 Given daily updates, blockers, and task completion data, generate a concise report for the project lead.
@@ -18,7 +16,7 @@ Respond as structured JSON.
 
 
 async def generate_report(project_data: dict[str, Any]) -> dict[str, Any]:
-    response = await client.chat.completions.create(
+    response = await get_openai_client().chat.completions.create(
         model=settings.openai_model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},

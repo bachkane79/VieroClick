@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
+
   // ─── Compiler ────────────────────────────────────────────────────────────
   // SWC minifier is on by default in Next 15, but we also want to remove
   // console.log in production while keeping errors/warns.
@@ -12,7 +14,7 @@ const nextConfig: NextConfig = {
   // ─── Experimental ────────────────────────────────────────────────────────
   experimental: {
     serverActions: {
-      allowedOrigins: ["localhost:3000", "localhost:3001"],
+      allowedOrigins: ["click.vieroc.com", "localhost:1988", "localhost:3000", "localhost:3001"],
     },
     // Optimise barrel-file imports: prevents Next from bundling the entire
     // Lucide/Radix/UI package when only a few icons/components are used.

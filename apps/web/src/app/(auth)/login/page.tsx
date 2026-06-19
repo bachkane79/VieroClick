@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Image from "next/image";
 import { auth } from "@/server/auth";
 import { LoginForm } from "@/modules/auth/components/login-form";
 
@@ -15,9 +16,14 @@ export default async function LoginPage() {
       <div className="relative w-full max-w-sm animate-fade-in">
         <div className="mb-8 text-center">
           <div className="mb-5 inline-flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-foreground text-background text-base font-bold">
-              V
-            </span>
+            <Image
+              src="/logo_transparent.png"
+              alt="VieroClick"
+              width={40}
+              height={40}
+              className="h-10 w-10 object-contain"
+              priority
+            />
             <span className="text-2xl font-bold tracking-tight">
               Viero<span className="text-primary">Click</span>
             </span>

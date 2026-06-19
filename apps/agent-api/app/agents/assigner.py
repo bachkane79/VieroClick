@@ -3,12 +3,10 @@ Assigner agent: recommends optimal task assignments based on member profiles.
 Phase 1: suggest only, never auto-assign.
 """
 from typing import Any
-from openai import AsyncOpenAI
 import json
 
+from app.agents.openai_client import get_openai_client
 from app.settings import settings
-
-client = AsyncOpenAI(api_key=settings.openai_api_key)
 
 SYSTEM_PROMPT = """You are a project resource allocation expert.
 Given a task description and a list of team members with their skills and availability,
@@ -23,7 +21,7 @@ async def suggest_assignment(
 ) -> dict[str, Any]:
     payload = {"task": task, "members": members}
 
-    response = await client.chat.completions.create(
+    response = await get_openai_client().chat.completions.create(
         model=settings.openai_model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},

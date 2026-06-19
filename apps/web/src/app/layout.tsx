@@ -12,6 +12,11 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "VieroClick — AI Project Manager",
   description: "AI-powered project management with autonomous agents",
+  icons: {
+    icon: [{ url: "/logo_transparent.png", type: "image/png" }],
+    shortcut: [{ url: "/logo_transparent.png", type: "image/png" }],
+    apple: [{ url: "/logo_transparent.png", type: "image/png" }],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

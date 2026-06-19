@@ -3,11 +3,9 @@ Planner agent: given project context, suggests task breakdown + milestones.
 Phase 1: generates suggestions only, never mutates DB directly.
 """
 from typing import Any
-from openai import AsyncOpenAI
 
+from app.agents.openai_client import get_openai_client
 from app.settings import settings
-
-client = AsyncOpenAI(api_key=settings.openai_api_key)
 
 SYSTEM_PROMPT = """You are an expert project manager AI assistant.
 Given a project's context, goals, and current state, you generate:
@@ -20,7 +18,7 @@ Always respond as structured JSON.
 
 
 async def plan_project(project_context: dict[str, Any]) -> dict[str, Any]:
-    response = await client.chat.completions.create(
+    response = await get_openai_client().chat.completions.create(
         model=settings.openai_model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
