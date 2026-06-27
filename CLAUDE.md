@@ -14,7 +14,18 @@ pnpm monorepo (Turborepo) with two apps and four shared packages:
 - `packages/ui` — minimal Tailwind component primitives
 - `packages/config` — shared ESLint / Prettier / tsconfig
 
+## Design specs (the authoritative source for `§` references)
+
+The section numbers cited throughout this file and the codebase (`§4.2`, `§4.3`, `§7.4–7.9`) live in two root-level design docs — read the relevant section before changing behavior it governs:
+
+- `nextjs_ai_monorepo_project_manager_design.md` — the product/architecture spec. `§4.1` domain modules, `§4.2` permission model, `§4.3` event-writing rule, `§7.1–7.3` agent service architecture, `§7.4–7.9` the six agents. This is where the rules the modules implement are defined.
+- `DESIGN-notion.md` — the visual design system (Notion-style: colors, typography, spacing tokens). Consult before UI work.
+
+`band-agents/README.md` documents the 6 Band agents, their handles, and the HITL planning pipeline.
+
 ## Commands
+
+> **This is a Windows repo.** The shell is PowerShell; command blocks below use bash/POSIX syntax — translate as needed (or use the `powershell.cmd` shims at the root and in `band-agents/`). Paths and the `cp`/`source` steps in the Python sections are POSIX-style.
 
 ```bash
 # install everything
@@ -82,6 +93,8 @@ FastAPI docs available at `http://localhost:8000/docs` only when `DEBUG=true`.
 ### Data flow — canonical contract
 
 SQL migrations in `packages/db/migrations/` are the **single source of truth** for the schema. The Drizzle schema (`packages/db/src/schema/`) must match the SQL. The Python service reads the same Postgres database using raw SQLAlchemy — it never uses Drizzle.
+
+Migration gotcha: `migrations/meta/_journal.json` is what `pnpm db:migrate` actually replays, and it currently tracks only the `0000_previous_ultimates` baseline. The other `.sql` files in that dir (`0000_initial_schema.sql`, `0001`–`0003`) are not all journaled, so `db:migrate` won't apply them automatically — for dev, `pnpm db:push` reconciles the live Neon DB to the Drizzle schema directly. Regenerate via `pnpm db:generate` after schema edits rather than hand-editing the journal.
 
 The `timestamptz` column helper lives in `packages/db/src/schema/_helpers.ts` because Drizzle has no native `timestamptz` builder. All schema files import it from there; never from `drizzle-orm/pg-core`.
 
