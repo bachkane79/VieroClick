@@ -227,8 +227,10 @@ export function ReportsViewClient({
                         <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
                           {rep.planDeviations.map((d: any, idx: number) => (
                             <li key={idx}>
-                              <strong className="capitalize text-foreground">{d.type.replace("_", " ")}: </strong>
-                              {d.reason}
+                              <strong className="capitalize text-foreground">
+                                {String(d.type ?? d.taskTitle ?? "Deviation").replace(/_/g, " ")}:{" "}
+                              </strong>
+                              {d.reason ?? d.deviation ?? d.description ?? ""}
                             </li>
                           ))}
                         </ul>

@@ -1,14 +1,12 @@
 from __future__ import annotations
+
 import asyncio
 import json
 import logging
 import os
 from datetime import date
-from dotenv import load_dotenv
 
-from band import Agent
-from band.core.simple_adapter import SimpleAdapter
-from band.config import load_agent_config
+from dotenv import load_dotenv
 
 from shared.llm import call_llm
 from shared.message_parser import extract_json_payload
@@ -47,112 +45,60 @@ Return the structured JSON daily report.
 """
 
 
-class DailyReportAdapter(SimpleAdapter):
-    def __init__(self, agent_id: str):
-        super().__init__()
-        self.agent_id = agent_id
-        self.vieroc = VieroClickClient()
+async def run(project_id: str | None = None, payload: dict | None = None) -> dict:
+    """Compile a daily leader report and save it as pending. Pure local I/O."""
+    vieroc = VieroClickClient()
+    project_id = project_id or vieroc.default_project_id
+    logger.info("Daily report agent: compiling report for %s", project_id)
 
-    async def on_message(
-        self,
-        msg,
-        tools,
-        history,
-        participants_msg: str | None,
-        contacts_msg: str | None,
-        *,
-        is_session_bootstrap: bool,
-        room_id: str,
-    ) -> None:
-        if msg.sender_id == self.agent_id:
-            await tools.send_event(content="Skipping own message", message_type="thought")
-            return
+    proj_data = await vieroc.fetch_project_data(project_id)
+    if not proj_data:
+        return {"ok": False, "error": "Failed to retrieve project state for daily report generation."}
 
-        is_mentioned = f"[[{self.agent_id}]]" in msg.content or "@daily_report" in msg.content
-        if not is_mentioned:
-            await tools.send_event(content="Not addressed to daily_report agent — skipping", message_type="thought")
-            return
-
-        message = msg.content
-        import re
-        class RoomContextWrapper:
-            def __init__(self, tools, msg):
-                self.tools = tools
-                self.msg = msg
-            async def send_message(self, content: str):
-                mentions = re.findall(r"(?<!\w)@[\w\-/]+", content)
-                if not mentions:
-                    mentions = [self.msg.sender_id]
-                else:
-                    mentions = list(dict.fromkeys(mentions))
-                await self.tools.send_message(content, mentions=mentions)
-        room_context = RoomContextWrapper(tools, msg)
-        await self.handle_message(message, room_context)
-
-    async def handle_message(self, message: str, room_context):
-        logger.info("Daily Report agent triggered.")
-        await room_context.send_message("⏳ Daily Report Agent: Compiling updates, task metrics, and active blockers...")
-
-        # 1. Fetch project data from VieroClick
-        proj_data = await self.vieroc.fetch_project_data()
-        if not proj_data:
-            await room_context.send_message("❌ Failed to retrieve project state for daily report generation.")
-            return
-
-        # 2. LLM synthesis
-        current_date = date.today().isoformat()
-        try:
-            llm_response = await call_llm(
-                system_prompt=DAILY_REPORT_SYSTEM_PROMPT,
-                user_prompt=DAILY_REPORT_USER_TEMPLATE.format(
-                    current_date=current_date,
-                    project_state=json.dumps(proj_data, default=str)
-                ),
-                response_format_json=True,
-                model_override=os.getenv("DAILY_REPORT_MODEL")
-            )
-            report = extract_json_payload(llm_response)
-        except Exception as e:
-            logger.error(f"Daily report generation failed: {e}")
-            await room_context.send_message(f"❌ Daily report generation failed: {e}")
-            return
-
-        if not report:
-            await room_context.send_message("❌ Failed to generate report. LLM response was not valid JSON.")
-            return
-
-        # 3. Post to VieroClick leader_reports
-        resp = await self.vieroc.create_report(
-            report_date=report.get("reportDate", current_date),
-            progress_summary=report.get("progressSummary", ""),
-            risk_summary=report.get("riskSummary"),
-            blocker_summary=report.get("blockerSummary"),
-            recommended_actions=report.get("recommendedActions", []),
-            member_demands=report.get("memberDemands", []),
-            plan_deviations=report.get("planDeviations", [])
+    current_date = date.today().isoformat()
+    try:
+        llm_response = await call_llm(
+            system_prompt=DAILY_REPORT_SYSTEM_PROMPT,
+            user_prompt=DAILY_REPORT_USER_TEMPLATE.format(
+                current_date=current_date,
+                project_state=json.dumps(proj_data, default=str),
+            ),
+            response_format_json=True,
+            model_override=os.getenv("DAILY_REPORT_MODEL"),
         )
+        report = extract_json_payload(llm_response)
+    except Exception as e:
+        logger.error("Daily report generation failed: %s", e)
+        return {"ok": False, "error": f"Daily report generation failed: {e}"}
 
-        if resp and "id" in resp:
-            re_message = (
-                f"📊 **Daily Report Generated!**\n\n"
-                f"- **Progress**: {report.get('progressSummary')}\n"
-                f"- **Blockers**: {report.get('blockerSummary') or 'None logged'}\n"
-                f"- **Recommendations**: {len(report.get('recommendedActions', []))} recommended actions suggested.\n\n"
-                f"👉 **Leader action required**: Open the **Reports** tab in VieroClick to edit and approve this report. *It remains pending until approved.*"
-            )
-            await room_context.send_message(re_message)
-        else:
-            await room_context.send_message("❌ Report generated, but failed to save in VieroClick database. It may already exist for today.")
+    if not report:
+        return {"ok": False, "error": "LLM response was not valid JSON."}
 
+    resp = await vieroc.create_report(
+        report_date=report.get("reportDate", current_date),
+        progress_summary=report.get("progressSummary", ""),
+        risk_summary=report.get("riskSummary"),
+        blocker_summary=report.get("blockerSummary"),
+        recommended_actions=report.get("recommendedActions", []),
+        member_demands=report.get("memberDemands", []),
+        plan_deviations=report.get("planDeviations", []),
+        project_id=project_id,
+    )
 
-async def run_daily_report():
-    agent_id, api_key = load_agent_config("daily_report")
-    adapter = DailyReportAdapter(agent_id)
-    agent = Agent.create(agent_id=agent_id, api_key=api_key, adapter=adapter)
-    logger.info("🚀 Daily report agent started — listening for @daily_report mentions")
-    await agent.run()
+    if resp and "id" in resp:
+        logger.info("Daily report saved (pending approval) for %s", project_id)
+        return {"ok": True, "projectId": project_id, "reportId": resp["id"], "report": report}
+
+    return {
+        "ok": False,
+        "error": "Report generated, but failed to save in VieroClick (it may already exist for today).",
+        "report": report,
+    }
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
-    asyncio.run(run_daily_report())
+    import sys
+
+    pid = sys.argv[1] if len(sys.argv) > 1 else None
+    print(json.dumps(asyncio.run(run(pid)), indent=2, ensure_ascii=False, default=str))

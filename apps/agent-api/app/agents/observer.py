@@ -5,8 +5,7 @@ Generates alerts / suggestions proactively.
 from typing import Any
 import json
 
-from app.agents.openai_client import get_openai_client
-from app.settings import settings
+from app.agents.gemini_client import generate
 
 SYSTEM_PROMPT = """You are a project health monitoring AI.
 Analyze the provided activity events and project state.
@@ -21,14 +20,5 @@ async def scan_project_health(
 ) -> dict[str, Any]:
     payload = {"recent_events": events, "project_state": project_state}
 
-    response = await get_openai_client().chat.completions.create(
-        model=settings.openai_model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": json.dumps(payload, default=str)},
-        ],
-        response_format={"type": "json_object"},
-    )
-
-    content = response.choices[0].message.content or "{}"
-    return json.loads(content)
+    content = await generate(SYSTEM_PROMPT, json.dumps(payload, default=str), as_json=True)
+    return json.loads(content or "{}")

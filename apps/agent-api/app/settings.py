@@ -11,10 +11,16 @@ class Settings(BaseSettings):
     # Auth
     agent_api_secret: str = "change-me"
 
-    # OpenAI
-    openai_api_key: str = ""
-    openai_model: str = "gpt-4o-mini"
-    embedding_model: str = "text-embedding-3-small"
+    # LLM provider: company Gemini API (native google-genai)
+    gemini_api_key: str = ""
+    gemini_base_url: str = ""
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_planner_model: str = "gemini-2.5-pro"
+    gemini_embedding_model: str = "text-embedding-004"
+
+    # Local agent service (replaces Band.ai dispatch)
+    agent_service_url: str = "http://localhost:8001"
+    agent_service_secret: str = ""
 
     # Redis
     redis_url: str = "redis://localhost:6379"

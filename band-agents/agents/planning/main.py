@@ -4,11 +4,7 @@ import asyncio
 import json
 import logging
 import os
-import re
 
-from band import Agent
-from band.config import load_agent_config
-from band.core.simple_adapter import SimpleAdapter
 from dotenv import load_dotenv
 
 from shared.llm import call_llm
@@ -17,6 +13,9 @@ from shared.vieroc_client import VieroClickClient
 
 load_dotenv()
 logger = logging.getLogger(__name__)
+
+# Planner uses the most capable model; everything else defaults to Flash.
+PLANNING_MODEL = os.getenv("PLANNING_MODEL") or "gemini-2.5-pro"
 
 PLANNING_SYSTEM_PROMPT = """You are an expert AI Planning Agent.
 Analyze the project intake details, constraints, deliverables, docs, and members to generate a structured project plan.
@@ -63,113 +62,64 @@ Build a practical implementation plan for this project. Return only structured J
 """
 
 
-class RoomContextWrapper:
-    def __init__(self, tools, msg):
-        self.tools = tools
-        self.msg = msg
+async def run(project_id: str | None = None, payload: dict | None = None) -> dict:
+    """
+    Generate and apply a project plan. Pure local I/O: takes a projectId,
+    returns a structured result dict. No Band room, no @mentions.
+    """
+    vieroc = VieroClickClient()
+    project_id = project_id or vieroc.default_project_id
+    if not project_id:
+        return {"ok": False, "error": "No projectId provided for planning."}
 
-    async def send_message(self, content: str):
-        mentions = re.findall(r"(?<!\w)@[\w\-/]+", content)
-        if not mentions:
-            mentions = [os.getenv("BAND_STATUS_MENTION", "bachkane79")]
-        await self.tools.send_message(content, mentions=list(dict.fromkeys(mentions)))
+    logger.info("Planning agent: generating and applying project plan for %s", project_id)
 
+    project_data = await vieroc.fetch_project_data(project_id)
+    if not project_data:
+        return {"ok": False, "error": "Could not fetch project data from VieroClick."}
 
-class PlanningAdapter(SimpleAdapter):
-    def __init__(self, agent_id: str):
-        super().__init__()
-        self.agent_id = agent_id
-        self.vieroc = VieroClickClient()
-        self.handle = os.getenv("PLANNING_HANDLE", "@planning")
-
-    async def on_message(
-        self,
-        msg,
-        tools,
-        history,
-        participants_msg: str | None,
-        contacts_msg: str | None,
-        *,
-        is_session_bootstrap: bool,
-        room_id: str,
-    ) -> None:
-        if msg.sender_id == self.agent_id:
-            await tools.send_event(content="Skipping own message", message_type="thought")
-            return
-
-        is_mentioned = (
-            f"[[{self.agent_id}]]" in msg.content
-            or "@planning" in msg.content
-            or self.handle in msg.content
+    try:
+        llm_response = await call_llm(
+            system_prompt=PLANNING_SYSTEM_PROMPT,
+            user_prompt=PLANNING_USER_TEMPLATE.format(
+                request=json.dumps(project_data, ensure_ascii=False, default=str)
+            ),
+            response_format_json=True,
+            model_override=PLANNING_MODEL,
         )
-        if not is_mentioned:
-            await tools.send_event(content="Not addressed to planning agent - skipping", message_type="thought")
-            return
+        plan = extract_json_payload(llm_response)
+    except Exception as e:
+        logger.error("Planning failed: %s", e)
+        return {"ok": False, "error": f"Planning LLM call failed: {e}"}
 
-        dispatch = extract_json_payload(msg.content) or {}
-        if not (dispatch.get("projectId") or self.vieroc.default_project_id):
-            await tools.send_event(content="No projectId in planning request - skipping", message_type="thought")
-            return
+    if not plan:
+        return {"ok": False, "error": "LLM response was not valid JSON."}
 
-        await self.handle_message(msg.content, RoomContextWrapper(tools, msg))
+    resp = await vieroc.apply_plan(project_id, plan)
+    if resp and resp.get("ok"):
+        logger.info(
+            "Planning applied: %s tasks, %s WBS, %s milestones, %s risks",
+            resp.get("tasksCreated", 0),
+            resp.get("wbsCreated", 0),
+            resp.get("milestonesCreated", 0),
+            resp.get("risksCreated", 0),
+        )
+        return {
+            "ok": True,
+            "projectId": project_id,
+            "tasksCreated": resp.get("tasksCreated", 0),
+            "wbsCreated": resp.get("wbsCreated", 0),
+            "milestonesCreated": resp.get("milestonesCreated", 0),
+            "risksCreated": resp.get("risksCreated", 0),
+            "plan": plan,
+        }
 
-    async def handle_message(self, message: str, room_context):
-        logger.info("Planning agent received request: %s", message[:120])
-        dispatch = extract_json_payload(message) or {}
-        project_id = dispatch.get("projectId") or self.vieroc.default_project_id
-        if not project_id:
-            return
-
-        await room_context.send_message("Planning Agent: generating and applying project plan...")
-
-        project_data = await self.vieroc.fetch_project_data(project_id)
-        if not project_data:
-            await room_context.send_message("Planning failed: could not fetch project data from VieroClick.")
-            return
-
-        try:
-            llm_response = await call_llm(
-                system_prompt=PLANNING_SYSTEM_PROMPT,
-                user_prompt=PLANNING_USER_TEMPLATE.format(
-                    request=json.dumps(project_data, ensure_ascii=False, default=str)
-                ),
-                response_format_json=True,
-                model_override=os.getenv("PLANNING_MODEL"),
-            )
-            plan = extract_json_payload(llm_response)
-        except Exception as e:
-            logger.error("Planning failed: %s", e)
-            await room_context.send_message(f"Planning failed: {e}")
-            return
-
-        if not plan:
-            await room_context.send_message("Planning failed: LLM response was not valid JSON.")
-            return
-
-        resp = await self.vieroc.apply_plan(project_id, plan)
-        if resp and resp.get("ok"):
-            await room_context.send_message(
-                "**Planning roadmap applied to VieroClick!**\n\n"
-                f"- Tasks created: {resp.get('tasksCreated', 0)}\n"
-                f"- WBS nodes created: {resp.get('wbsCreated', 0)}\n"
-                f"- Milestones created: {resp.get('milestonesCreated', 0)}\n"
-                f"- Risks created: {resp.get('risksCreated', 0)}\n\n"
-                "Assignment agent has been triggered through Band."
-            )
-        else:
-            await room_context.send_message(
-                "Planning generated a roadmap, but applying it to VieroClick failed."
-            )
-
-
-async def run_planning():
-    agent_id, api_key = load_agent_config("planning")
-    adapter = PlanningAdapter(agent_id)
-    agent = Agent.create(agent_id=agent_id, api_key=api_key, adapter=adapter)
-    logger.info("Planning agent started - listening for planning mentions")
-    await agent.run()
+    return {"ok": False, "error": "Generated a roadmap, but applying it to VieroClick failed.", "plan": plan}
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
-    asyncio.run(run_planning())
+    import sys
+
+    pid = sys.argv[1] if len(sys.argv) > 1 else None
+    print(json.dumps(asyncio.run(run(pid)), indent=2, ensure_ascii=False, default=str))

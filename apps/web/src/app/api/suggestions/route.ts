@@ -7,10 +7,13 @@ import { revalidatePath } from "next/cache";
 
 export async function POST(request: Request) {
   try {
-    // Accept agent service key OR user session
-    let userId: string;
+    // Accept agent service key OR user session.
+    // agent_jobs.requested_by_user_id is a nullable uuid FK — agent-originated
+    // suggestions have no human user, so store null. (A sentinel string is not a
+    // valid uuid and was causing a 500 on every agent-created suggestion.)
+    let userId: string | null;
     if (isAgentRequest(request)) {
-      userId = "agent-service"; // Sentinel value for agent-originated actions
+      userId = null;
     } else {
       userId = await getUserId();
     }

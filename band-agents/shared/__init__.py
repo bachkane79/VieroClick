@@ -18,11 +18,7 @@ from .message_parser import (
     is_human_rejection,
     format_agent_message,
 )
-from .hitl import (
-    make_hitl_prompt,
-    make_hitl_approved_message,
-    make_hitl_rejected_message,
-)
+from .llm import call_llm
 from .vieroc_client import VieroClickClient
 
 __all__ = [
@@ -31,6 +27,6 @@ __all__ = [
     "AcceptanceCriteria", "TestCase",
     "extract_json_payload", "extract_status", "is_human_approval",
     "is_human_rejection", "format_agent_message",
-    "make_hitl_prompt", "make_hitl_approved_message", "make_hitl_rejected_message",
+    "call_llm",
     "VieroClickClient",
 ]

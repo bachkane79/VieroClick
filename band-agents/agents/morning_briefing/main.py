@@ -1,13 +1,11 @@
 from __future__ import annotations
+
 import asyncio
 import json
 import logging
 import os
-from dotenv import load_dotenv
 
-from band import Agent
-from band.core.simple_adapter import SimpleAdapter
-from band.config import load_agent_config
+from dotenv import load_dotenv
 
 from shared.llm import call_llm
 from shared.message_parser import extract_json_payload
@@ -43,127 +41,72 @@ Synthesize this data and return the structured JSON morning briefings.
 """
 
 
-class MorningBriefingAdapter(SimpleAdapter):
-    def __init__(self, agent_id: str):
-        super().__init__()
-        self.agent_id = agent_id
-        self.vieroc = VieroClickClient()
+async def run(project_id: str | None = None, payload: dict | None = None) -> dict:
+    """Generate per-member + project briefings and dispatch notifications. Pure local I/O."""
+    vieroc = VieroClickClient()
+    project_id = project_id or vieroc.default_project_id
+    logger.info("Morning briefing agent: generating briefings for %s", project_id)
 
-    async def on_message(
-        self,
-        msg,
-        tools,
-        history,
-        participants_msg: str | None,
-        contacts_msg: str | None,
-        *,
-        is_session_bootstrap: bool,
-        room_id: str,
-    ) -> None:
-        if msg.sender_id == self.agent_id:
-            await tools.send_event(content="Skipping own message", message_type="thought")
-            return
+    proj_data = await vieroc.fetch_project_data(project_id)
+    if not proj_data:
+        return {"ok": False, "error": "Failed to retrieve project state for briefings."}
 
-        is_mentioned = f"[[{self.agent_id}]]" in msg.content or "@morning_briefing" in msg.content
-        if not is_mentioned:
-            await tools.send_event(content="Not addressed to morning_briefing agent — skipping", message_type="thought")
-            return
+    try:
+        llm_response = await call_llm(
+            system_prompt=BRIEFING_SYSTEM_PROMPT,
+            user_prompt=BRIEFING_USER_TEMPLATE.format(
+                project_state=json.dumps(proj_data, default=str)
+            ),
+            response_format_json=True,
+            model_override=os.getenv("MORNING_BRIEFING_MODEL"),
+        )
+        result = extract_json_payload(llm_response)
+    except Exception as e:
+        logger.error("Briefing generation failed: %s", e)
+        return {"ok": False, "error": f"Briefing generation failed: {e}"}
 
-        message = msg.content
-        import re
-        class RoomContextWrapper:
-            def __init__(self, tools, msg):
-                self.tools = tools
-                self.msg = msg
-            async def send_message(self, content: str):
-                mentions = re.findall(r"(?<!\w)@[\w\-/]+", content)
-                if not mentions:
-                    mentions = [self.msg.sender_id]
-                else:
-                    mentions = list(dict.fromkeys(mentions))
-                await self.tools.send_message(content, mentions=mentions)
-        room_context = RoomContextWrapper(tools, msg)
-        await self.handle_message(message, room_context)
+    if not result or "project_briefings" not in result:
+        return {"ok": False, "error": "Failed to parse briefings payload."}
 
-    async def handle_message(self, message: str, room_context):
-        logger.info("Morning Briefing agent triggered.")
-        await room_context.send_message("⏳ Morning Briefing Agent: Generating personalized briefings and announcements...")
+    workspace_id = proj_data.get("project", {}).get("workspaceId")
+    resolved_project_id = proj_data.get("project", {}).get("id") or project_id
 
-        # 1. Fetch project data from VieroClick
-        proj_data = await self.vieroc.fetch_project_data()
-        if not proj_data:
-            await room_context.send_message("❌ Failed to retrieve project state for briefings.")
-            return
+    p_briefings = result.get("project_briefings", {})
+    team_brief = p_briefings.get("team_briefing", "")
 
-        # 2. LLM synthesis
-        try:
-            llm_response = await call_llm(
-                system_prompt=BRIEFING_SYSTEM_PROMPT,
-                user_prompt=BRIEFING_USER_TEMPLATE.format(
-                    project_state=json.dumps(proj_data, default=str)
-                ),
-                response_format_json=True,
-                model_override=os.getenv("MORNING_BRIEFING_MODEL")
+    notified = 0
+    for mb in result.get("member_briefings", []):
+        member_id = mb.get("member_id")
+        briefing_text = mb.get("briefing")
+
+        if workspace_id and member_id:
+            resp = await vieroc.create_notification(
+                workspace_id=workspace_id,
+                recipient_member_id=member_id,
+                project_id=resolved_project_id,
+                type="morning_briefing",
+                title="Your Morning Briefing is Ready",
+                body=briefing_text,
             )
-            result = extract_json_payload(llm_response)
-        except Exception as e:
-            logger.error(f"Briefing generation failed: {e}")
-            await room_context.send_message(f"❌ Briefing generation failed: {e}")
-            return
+            if resp and "id" in resp:
+                notified += 1
 
-        if not result or "project_briefings" not in result:
-            await room_context.send_message("❌ Failed to parse briefings payload.")
-            return
+    # Broadcast the team briefing over Telegram (best-effort).
+    await vieroc.send_telegram_notification(f"📢 *Morning Briefing Overview*\n\n{team_brief}")
 
-        # 3. Dispatch briefings
-        workspace_id = proj_data.get("project", {}).get("workspaceId")
-        project_id = proj_data.get("project", {}).get("id")
-
-        p_briefings = result.get("project_briefings", {})
-        lead_brief = p_briefings.get("lead_briefing", "")
-        team_brief = p_briefings.get("team_briefing", "")
-
-        # Post to Band room
-        lines = [
-            "☀️ **Morning Briefing Overview:**",
-            f"**Lead Briefing**: {lead_brief}",
-            f"**Team Briefing**: {team_brief}",
-            "",
-            "**Personal Member Tasks for Today:**"
-        ]
-
-        # Send Web Notifications to each member & add to report message
-        for mb in result.get("member_briefings", []):
-            member_id = mb.get("member_id")
-            member_name = mb.get("member_name")
-            briefing_text = mb.get("briefing")
-            lines.append(f"- **{member_name}**: {briefing_text}")
-
-            if workspace_id and member_id:
-                await self.vieroc.create_notification(
-                    workspace_id=workspace_id,
-                    recipient_member_id=member_id,
-                    project_id=project_id,
-                    type="morning_briefing",
-                    title="Your Morning Briefing is Ready",
-                    body=briefing_text
-                )
-
-        final_msg = "\n".join(lines)
-        await room_context.send_message(final_msg)
-
-        # Dispatch Telegram notification
-        await self.vieroc.send_telegram_notification(f"📢 *Morning Briefing Overview*\n\n{team_brief}")
-
-
-async def run_morning_briefing():
-    agent_id, api_key = load_agent_config("morning_briefing")
-    adapter = MorningBriefingAdapter(agent_id)
-    agent = Agent.create(agent_id=agent_id, api_key=api_key, adapter=adapter)
-    logger.info("🚀 Morning briefing agent started — listening for @morning_briefing mentions")
-    await agent.run()
+    logger.info("Morning briefing complete: %s member notifications sent", notified)
+    return {
+        "ok": True,
+        "projectId": resolved_project_id,
+        "membersNotified": notified,
+        "project_briefings": p_briefings,
+        "member_briefings": result.get("member_briefings", []),
+    }
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
-    asyncio.run(run_morning_briefing())
+    import sys
+
+    pid = sys.argv[1] if len(sys.argv) > 1 else None
+    print(json.dumps(asyncio.run(run(pid)), indent=2, ensure_ascii=False, default=str))
