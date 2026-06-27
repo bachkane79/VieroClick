@@ -1,0 +1,31 @@
+# =============================================================================
+# Band AI Agent Configuration (EXAMPLE)
+# Copy this to agent_config.yaml and fill in your real values
+# IMPORTANT: Add agent_config.yaml to .gitignore — contains live API keys!
+# =============================================================================
+
+# Step to get these values:
+# 1. Go to app.band.ai -> Agents -> New Agent -> External Agent
+# 2. Give it a name & description
+# 3. Copy the API Key shown ONCE after creation
+# 4. Get the Agent UUID from the agent settings page
+
+planner:
+  agent_id: "uuid-for-planner-agent"
+  api_key: "band-api-key-for-planner"
+
+developer:
+  agent_id: "uuid-for-developer-agent"
+  api_key: "band-api-key-for-developer"
+
+qa:
+  agent_id: "uuid-for-qa-agent"
+  api_key: "band-api-key-for-qa"
+
+reviewer:
+  agent_id: "uuid-for-reviewer-agent"
+  api_key: "band-api-key-for-reviewer"
+
+notifier:
+  agent_id: "uuid-for-notifier-agent"
+  api_key: "band-api-key-for-notifier"
