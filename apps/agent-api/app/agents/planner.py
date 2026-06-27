@@ -2,9 +2,10 @@
 Planner agent: given project context, suggests task breakdown + milestones.
 Phase 1: generates suggestions only, never mutates DB directly.
 """
+import json
 from typing import Any
 
-from app.agents.openai_client import get_openai_client
+from app.agents.gemini_client import generate
 from app.settings import settings
 
 SYSTEM_PROMPT = """You are an expert project manager AI assistant.
@@ -18,18 +19,10 @@ Always respond as structured JSON.
 
 
 async def plan_project(project_context: dict[str, Any]) -> dict[str, Any]:
-    response = await get_openai_client().chat.completions.create(
-        model=settings.openai_model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": f"Project context:\n{project_context}",
-            },
-        ],
-        response_format={"type": "json_object"},
+    content = await generate(
+        SYSTEM_PROMPT,
+        f"Project context:\n{project_context}",
+        model=settings.gemini_planner_model,
+        as_json=True,
     )
-
-    import json
-    content = response.choices[0].message.content or "{}"
-    return json.loads(content)
+    return json.loads(content or "{}")

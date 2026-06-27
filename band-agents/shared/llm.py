@@ -1,117 +1,106 @@
-import os
+"""
+shared/llm.py
+Unified LLM caller for all local agents — backed by the company Gemini API.
+
+All agents call Gemini 2.5 Flash by default; the planning agent overrides to
+Gemini 2.5 Pro for deeper reasoning. The provider is the native Google Gemini
+API via the `google-genai` SDK (GEMINI_API_KEY). An optional GEMINI_BASE_URL is
+honoured for company gateway / proxy deployments.
+"""
+from __future__ import annotations
+
+import asyncio
 import logging
+import os
+import random
+
 from dotenv import load_dotenv
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 
+DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
+_client = None
+
+
+def _get_client():
+    """Lazily construct a shared google-genai client."""
+    global _client
+    if _client is not None:
+        return _client
+
+    from google import genai
+    from google.genai import types
+
+    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY is required for LLM calls")
+
+    base_url = os.getenv("GEMINI_BASE_URL", "").strip()
+    if base_url:
+        _client = genai.Client(api_key=api_key, http_options=types.HttpOptions(base_url=base_url))
+    else:
+        _client = genai.Client(api_key=api_key)
+    return _client
+
+
 async def call_llm(
     system_prompt: str,
     user_prompt: str,
     response_format_json: bool = False,
-    model_override: str | None = None
+    model_override: str | None = None,
 ) -> str:
     """
-    Unified LLM caller that seamlessly supports both OpenAI and Anthropic.
-    Auto-detects the provider based on environment variables or LLM_PROVIDER setting.
+    Call the company Gemini API and return the text content.
+
+    Args:
+        system_prompt: System instruction.
+        user_prompt: User content.
+        response_format_json: When True, ask Gemini for a JSON response.
+        model_override: Specific Gemini model id (e.g. "gemini-2.5-pro").
     """
-    provider = os.getenv("LLM_PROVIDER", "").lower().strip()
-    
-    # Auto-detection logic if not explicitly specified
-    if not provider:
-        openai_key = os.getenv("OPENAI_API_KEY", "")
-        anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
-        
-        # Check if keys are filled with real values (not placeholders)
-        has_openai = openai_key and not openai_key.startswith("sk-your") and not openai_key.startswith("sk-...")
-        has_anthropic = anthropic_key and not anthropic_key.startswith("sk-ant-your") and not anthropic_key.startswith("sk-ant-...")
-        
-        if has_openai:
-            provider = "openai"
-        elif has_anthropic:
-            provider = "anthropic"
-        else:
-            # Default fallback
-            if openai_key:
-                provider = "openai"
-            else:
-                provider = "anthropic"
+    from google.genai import types
 
-    # Cross-provider model safety check
-    if model_override:
-        is_anthropic_model = "claude" in model_override.lower()
-        is_openai_model = "gpt" in model_override.lower()
-        
-        if provider == "openai" and is_anthropic_model:
-            model_override = None  # Fallback to OpenAI default
-        elif provider == "anthropic" and is_openai_model:
-            model_override = None  # Fallback to Anthropic default
+    model = (model_override or DEFAULT_MODEL).strip()
+    client = _get_client()
 
-    import asyncio
-    import random
-    
+    config = types.GenerateContentConfig(
+        system_instruction=system_prompt,
+        temperature=0.2,
+        response_mime_type="application/json" if response_format_json else "text/plain",
+    )
+
     max_retries = 6
     base_delay = 2.0
 
     for attempt in range(max_retries):
         try:
-            if provider == "openai":
-                from openai import AsyncOpenAI
-                model = model_override or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-                logger.info(f"Using OpenAI provider with model: {model} (Attempt {attempt+1}/{max_retries})")
-                
-                openai_base_url = os.getenv("OPENAI_BASE_URL", "").strip()
-                client_kwargs = {"api_key": os.getenv("OPENAI_API_KEY")}
-                if openai_base_url:
-                    client_kwargs["base_url"] = openai_base_url
-                    
-                client = AsyncOpenAI(**client_kwargs)
-                kwargs = {
-                    "model": model,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    "temperature": 0.2
-                }
-                if response_format_json:
-                    kwargs["response_format"] = {"type": "json_object"}
-                    
-                response = await client.chat.completions.create(**kwargs)
-                return response.choices[0].message.content or ""
-                
-            else:  # anthropic
-                from anthropic import AsyncAnthropic
-                model = model_override or os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
-                logger.info(f"Using Anthropic provider with model: {model} (Attempt {attempt+1}/{max_retries})")
-                
-                anthropic_base_url = os.getenv("ANTHROPIC_BASE_URL", "").strip()
-                client_kwargs = {"api_key": os.getenv("ANTHROPIC_API_KEY")}
-                if anthropic_base_url:
-                    client_kwargs["base_url"] = anthropic_base_url
-                    
-                client = AsyncAnthropic(**client_kwargs)
-                response = await client.messages.create(
-                    model=model,
-                    max_tokens=4096,
-                    system=system_prompt,
-                    messages=[
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    temperature=0.2
-                )
-                return response.content[0].text or ""
+            logger.info(f"Calling Gemini model: {model} (attempt {attempt + 1}/{max_retries})")
+            response = await client.aio.models.generate_content(
+                model=model,
+                contents=user_prompt,
+                config=config,
+            )
+            return response.text or ""
         except Exception as e:
             err_msg = str(e).lower()
-            if "429" in err_msg or "concurrency" in err_msg or "too many requests" in err_msg:
-                if attempt == max_retries - 1:
-                    raise e
+            is_rate_limited = (
+                "429" in err_msg
+                or "resource_exhausted" in err_msg
+                or "quota" in err_msg
+                or "too many requests" in err_msg
+                or "overloaded" in err_msg
+                or "503" in err_msg
+            )
+            if is_rate_limited and attempt < max_retries - 1:
                 delay = base_delay * (2 ** attempt) + random.uniform(0.5, 1.5)
                 logger.warning(
-                    f"LLM call got 429/concurrency limit: {e}. "
-                    f"Retrying in {delay:.2f}s... (Attempt {attempt+1}/{max_retries})"
+                    f"Gemini call rate-limited/overloaded: {e}. "
+                    f"Retrying in {delay:.2f}s... (attempt {attempt + 1}/{max_retries})"
                 )
                 await asyncio.sleep(delay)
             else:
                 raise e
 
+    raise RuntimeError("Gemini call failed after all retries")

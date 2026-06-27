@@ -1,13 +1,11 @@
 from __future__ import annotations
+
 import asyncio
 import json
 import logging
 import os
-from dotenv import load_dotenv
 
-from band import Agent
-from band.core.simple_adapter import SimpleAdapter
-from band.config import load_agent_config
+from dotenv import load_dotenv
 
 from shared.llm import call_llm
 from shared.message_parser import extract_json_payload
@@ -42,122 +40,73 @@ Return the structured JSON Q&A response.
 """
 
 
-class QAAdapter(SimpleAdapter):
-    def __init__(self, agent_id: str):
-        super().__init__()
-        self.agent_id = agent_id
-        self.vieroc = VieroClickClient()
+async def run(project_id: str | None = None, payload: dict | None = None) -> dict:
+    """
+    Answer a project question and log a project hole if context is missing.
+    The question is read from payload["question"] (or payload["message"]).
+    """
+    payload = payload or {}
+    question = (payload.get("question") or payload.get("message") or "").strip()
+    if not question:
+        return {"ok": False, "error": "No question provided for Q&A."}
 
-    async def on_message(
-        self,
-        msg,
-        tools,
-        history,
-        participants_msg: str | None,
-        contacts_msg: str | None,
-        *,
-        is_session_bootstrap: bool,
-        room_id: str,
-    ) -> None:
-        if msg.sender_id == self.agent_id:
-            await tools.send_event(content="Skipping own message", message_type="thought")
-            return
+    vieroc = VieroClickClient()
+    project_id = project_id or vieroc.default_project_id
+    logger.info("Q&A agent: answering query for %s: %s", project_id, question[:100])
 
-        is_mentioned = f"[[{self.agent_id}]]" in msg.content or "@project_qa" in msg.content
-        if not is_mentioned:
-            await tools.send_event(content="Not addressed to project_qa agent — skipping", message_type="thought")
-            return
+    proj_data = await vieroc.fetch_project_data(project_id)
+    if not proj_data:
+        return {"ok": False, "error": "Failed to retrieve project state for lookup."}
 
-        message = msg.content
-        import re
-        class RoomContextWrapper:
-            def __init__(self, tools, msg):
-                self.tools = tools
-                self.msg = msg
-            async def send_message(self, content: str):
-                mentions = re.findall(r"(?<!\w)@[\w\-/]+", content)
-                if not mentions:
-                    mentions = [self.msg.sender_id]
-                else:
-                    mentions = list(dict.fromkeys(mentions))
-                await self.tools.send_message(content, mentions=mentions)
-        room_context = RoomContextWrapper(tools, msg)
-        await self.handle_message(message, room_context)
+    try:
+        llm_response = await call_llm(
+            system_prompt=QA_SYSTEM_PROMPT,
+            user_prompt=QA_USER_TEMPLATE.format(
+                question=question,
+                project_state=json.dumps(proj_data, default=str),
+            ),
+            response_format_json=True,
+            model_override=os.getenv("PROJECT_QA_MODEL"),
+        )
+        result = extract_json_payload(llm_response)
+    except Exception as e:
+        logger.error("Q&A lookup failed: %s", e)
+        return {"ok": False, "error": f"Q&A lookup failed: {e}"}
 
-    async def handle_message(self, message: str, room_context):
-        logger.info(f"Q&A agent received query: {message[:100]}...")
-        await room_context.send_message("⏳ Q&A Agent: Searching project docs, decisions, and tasks...")
+    if not result or "answer" not in result:
+        return {"ok": False, "error": "Failed to resolve answer from LLM."}
 
-        # 1. Fetch project data from VieroClick
-        proj_data = await self.vieroc.fetch_project_data()
-        if not proj_data:
-            await room_context.send_message("❌ Failed to retrieve project state for lookup.")
-            return
+    answer_text = result.get("answer", "")
+    out: dict = {"ok": True, "projectId": project_id, "answer": answer_text, "hole_detected": False}
 
-        # Clean user mention from question
-        question_clean = message.replace(f"[[{self.agent_id}]]", "").replace("@project_qa", "").strip()
+    if result.get("hole_detected", False):
+        hole = result.get("hole_details", {})
+        hole_type = hole.get("hole_type", "unclear_scope")
+        logger.info("Project hole detected: %s", hole_type)
 
-        # 2. LLM resolution
-        try:
-            llm_response = await call_llm(
-                system_prompt=QA_SYSTEM_PROMPT,
-                user_prompt=QA_USER_TEMPLATE.format(
-                    question=question_clean,
-                    project_state=json.dumps(proj_data, default=str)
-                ),
-                response_format_json=True,
-                model_override=os.getenv("PROJECT_QA_MODEL")
-            )
-            result = extract_json_payload(llm_response)
-        except Exception as e:
-            logger.error(f"Q&A lookup failed: {e}")
-            await room_context.send_message(f"❌ Q&A lookup failed: {e}")
-            return
+        title = f"Project Hole Detected: {hole_type.replace('_', ' ').title()}"
+        body = (
+            f"The AI Q&A Agent detected missing project parameters while answering a query:\n"
+            f"- **Query**: \"{hole.get('question')}\"\n"
+            f"- **Action**: {hole.get('recommended_leader_action')}"
+        )
+        resp = await vieroc.create_suggestion(
+            suggestion_type="project_hole",
+            title=title,
+            body=body,
+            payload=hole,
+            project_id=project_id,
+        )
+        out["hole_detected"] = True
+        out["hole_details"] = hole
+        out["hole_logged"] = bool(resp and "id" in resp)
 
-        if not result or "answer" not in result:
-            await room_context.send_message("❌ Failed to resolve answer from LLM.")
-            return
-
-        answer_text = result.get("answer", "")
-        await room_context.send_message(f"💬 **Q&A Answer:**\n{answer_text}")
-
-        # 3. Handle Hole Detection
-        if result.get("hole_detected", False):
-            hole = result.get("hole_details", {})
-            hole_type = hole.get("hole_type", "unclear_scope")
-            logger.info(f"Hole detected: {hole_type}")
-
-            # Persist suggestion as "project_hole"
-            title = f"Project Hole Detected: {hole_type.replace('_', ' ').title()}"
-            body = (
-                f"The AI Q&A Agent detected missing project parameters while answering a query:\n"
-                f"- **Query**: \"{hole.get('question')}\"\n"
-                f"- **Action**: {hole.get('recommended_leader_action')}"
-            )
-
-            resp = await self.vieroc.create_suggestion(
-                suggestion_type="project_hole",
-                title=title,
-                body=body,
-                payload=hole
-            )
-
-            if resp and "id" in resp:
-                await room_context.send_message(
-                    f"⚠️ **Project Hole Logged!**\n"
-                    f"Created a suggestion alert in VieroClick to resolve this missing information:\n"
-                    f"- *Action Required*: {hole.get('recommended_leader_action')}"
-                )
-
-
-async def run_project_qa():
-    agent_id, api_key = load_agent_config("project_qa")
-    adapter = QAAdapter(agent_id)
-    agent = Agent.create(agent_id=agent_id, api_key=api_key, adapter=adapter)
-    logger.info("🚀 Q&A agent started — listening for @project_qa mentions")
-    await agent.run()
+    return out
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
-    asyncio.run(run_project_qa())
+    import sys
+
+    q = sys.argv[1] if len(sys.argv) > 1 else "What is the current status of this project?"
+    print(json.dumps(asyncio.run(run(payload={"question": q})), indent=2, ensure_ascii=False, default=str))

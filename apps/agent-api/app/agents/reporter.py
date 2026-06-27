@@ -5,8 +5,7 @@ Reads daily_updates, blockers, task progress from DB and synthesizes.
 from typing import Any
 import json
 
-from app.agents.openai_client import get_openai_client
-from app.settings import settings
+from app.agents.gemini_client import generate
 
 SYSTEM_PROMPT = """You are a project status report writer.
 Given daily updates, blockers, and task completion data, generate a concise report for the project lead.
@@ -16,14 +15,9 @@ Respond as structured JSON.
 
 
 async def generate_report(project_data: dict[str, Any]) -> dict[str, Any]:
-    response = await get_openai_client().chat.completions.create(
-        model=settings.openai_model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Project data:\n{json.dumps(project_data, default=str)}"},
-        ],
-        response_format={"type": "json_object"},
+    content = await generate(
+        SYSTEM_PROMPT,
+        f"Project data:\n{json.dumps(project_data, default=str)}",
+        as_json=True,
     )
-
-    content = response.choices[0].message.content or "{}"
-    return json.loads(content)
+    return json.loads(content or "{}")

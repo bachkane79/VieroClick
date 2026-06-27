@@ -1,27 +1,27 @@
-import json
+"""
+Agent dispatch route.
 
+Historically this forwarded messages into a Band.ai room. Band.ai is gone — this
+now forwards the dispatch to the local agent service over plain HTTP, preserving
+the original request/response contract so existing callers keep working.
+"""
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.api.deps import verify_api_secret
-from app.band_registry import (
-    BAND_AGENT_ROLES,
-    BandAgentRole,
-    PublicBandAgentEndpoint,
-    get_band_agent,
-    list_public_band_agents,
-)
+from app.band_registry import BAND_AGENT_ROLES, BandAgentRole
 from app.settings import settings
 
 router = APIRouter(dependencies=[Depends(verify_api_secret)])
 
 
-class BandAgentsResponse(BaseModel):
-    room_id_configured: bool
-    agents: list[PublicBandAgentEndpoint]
+class AgentsResponse(BaseModel):
+    service_configured: bool
+    agents: list[str]
 
 
-class BandDispatchRequest(BaseModel):
+class DispatchRequest(BaseModel):
     targetRole: BandAgentRole
     projectId: str
     message: str
@@ -29,65 +29,46 @@ class BandDispatchRequest(BaseModel):
     payload: dict | None = None
 
 
-@router.get("/agents", response_model=BandAgentsResponse)
-async def get_band_agents() -> BandAgentsResponse:
-    room_id_configured = bool(settings.band_room_id and settings.band_room_id != "your-band-room-id")
-    return BandAgentsResponse(
-        room_id_configured=room_id_configured,
-        agents=list_public_band_agents(),
+@router.get("/agents", response_model=AgentsResponse)
+async def get_agents() -> AgentsResponse:
+    return AgentsResponse(
+        service_configured=bool(settings.agent_service_url),
+        agents=list(BAND_AGENT_ROLES),
     )
 
 
 @router.post("/dispatch")
-async def dispatch_band_message(body: BandDispatchRequest) -> dict:
-    from band.client.rest import (
-        AsyncRestClient,
-        ChatMessageRequest,
-        ChatMessageRequestMentionsItem,
-    )
+async def dispatch_message(body: DispatchRequest) -> dict:
+    """Forward the dispatch to the local agent service: POST /agents/{role}."""
+    base_url = settings.agent_service_url.rstrip("/")
+    if not base_url:
+        raise HTTPException(status_code=400, detail="AGENT_SERVICE_URL is not configured")
 
-    if not settings.band_room_id or settings.band_room_id == "your-band-room-id":
-        raise HTTPException(status_code=400, detail="BAND_ROOM_ID is not configured")
+    headers = {"Content-Type": "application/json"}
+    if settings.agent_service_secret:
+        headers["X-Api-Secret"] = settings.agent_service_secret
 
-    target = get_band_agent(body.targetRole)
-    sender_role = body.senderRole
-    if sender_role is None or sender_role == body.targetRole:
-        sender_role = next(role for role in BAND_AGENT_ROLES if role != body.targetRole)
-    sender = get_band_agent(sender_role)
-
-    dispatch_payload = json.dumps(
-        {"projectId": body.projectId, "payload": body.payload or {}},
-        ensure_ascii=False,
-    )
-    content = (
-        f"{target.handle} {body.message}\n\n"
-        f"```json\n"
-        f"{dispatch_payload}\n"
-        f"```"
-    )
-
-    client_kwargs = {"api_key": sender.api_key}
-    if settings.band_api_base_url:
-        client_kwargs["base_url"] = settings.band_api_base_url
-
-    client = AsyncRestClient(**client_kwargs)
-    response = await client.agent_api_messages.create_agent_chat_message(
-        settings.band_room_id,
-        message=ChatMessageRequest(
-            content=content,
-            mentions=[
-                ChatMessageRequestMentionsItem(
-                    id=target.agent_id,
-                    handle=target.handle.lstrip("@"),
-                    name=body.targetRole,
-                )
-            ],
-        ),
-    )
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            resp = await client.post(
+                f"{base_url}/agents/{body.targetRole}",
+                json={
+                    "projectId": body.projectId,
+                    "message": body.message,
+                    "payload": body.payload or {},
+                    "senderRole": body.senderRole,
+                    "targetRole": body.targetRole,
+                },
+                headers=headers,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"Local agent service call failed: {e}")
 
     return {
         "dispatched": True,
         "targetRole": body.targetRole,
-        "senderRole": sender_role,
-        "message_id": getattr(response, "id", None),
+        "senderRole": body.senderRole,
+        "result": data.get("result"),
     }

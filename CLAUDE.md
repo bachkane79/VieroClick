@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository overview
 
-pnpm monorepo (Turborepo) with two apps, a standalone Band agent service, and four shared packages:
+pnpm monorepo (Turborepo) with two apps, a standalone local agent service, and four shared packages:
 
 - `apps/web` — Next.js 15 App Router (TypeScript)
 - `apps/agent-api` — Python 3.11 FastAPI + Celery worker
-- `band-agents/` — 6 independent Band AI agents (separate Python service, not part of the monorepo build)
+- `band-agents/` — 6 local AI agents exposed as a FastAPI service (separate Python service, not part of the monorepo build; formerly Band.ai, now plain HTTP + Gemini)
 - `packages/db` — Drizzle ORM schema + Neon client (shared by web)
 - `packages/types` — shared TypeScript interfaces
 - `packages/validators` — shared Zod schemas
@@ -22,7 +22,7 @@ The section numbers cited throughout this file and the codebase (`§4.2`, `§4.3
 - `nextjs_ai_monorepo_project_manager_design.md` — the product/architecture spec. `§4.1` domain modules, `§4.2` permission model, `§4.3` event-writing rule, `§7.1–7.3` agent service architecture, `§7.4–7.9` the six agents. This is where the rules the modules implement are defined.
 - `DESIGN-notion.md` — the visual design system (Notion-style: colors, typography, spacing tokens). Consult before UI work.
 
-`band-agents/README.md` documents the 6 Band agents, their handles, and the HITL planning pipeline.
+`band-agents/README.md` documents the 6 local agents and the `POST /agents/{role}` service interface.
 
 ## Commands
 
@@ -91,7 +91,9 @@ mypy app/
 
 FastAPI docs available at `http://localhost:8000/docs` only when `DEBUG=true`.
 
-### Band agents (`band-agents/`)
+### Local agents (`band-agents/`)
+
+> Band.ai has been removed. The six agents no longer connect to a Band room — they run as a single **local FastAPI service** exposed over plain HTTP (`POST /agents/{role}`). All LLM calls go to the company **Gemini API** (`gemini-2.5-flash`; the planner uses `gemini-2.5-pro`).
 
 ```bash
 cd band-agents
@@ -99,15 +101,14 @@ cd band-agents
 # install
 pip install -r requirements.txt
 
-# copy and fill agent credentials
+# copy and fill config (GEMINI_API_KEY, VIEROC_API_URL/TOKEN)
 cp .env.example .env
-cp agent_config.yaml.example agent_config.yaml
 
-# run all 6 agents concurrently
+# run the local agent service (default :8001)
 python run_all.py
 ```
 
-Each agent needs its own Band handle, agent ID, and API key in `agent_config.yaml`. The agents connect to a shared Band room and communicate with VieroClick via `VIEROC_API_URL` / `VIEROC_API_KEY` set in `.env`.
+The agents communicate with VieroClick via `VIEROC_API_URL` / `VIEROC_API_TOKEN` and call Gemini via `GEMINI_API_KEY` (set in `.env`). The web app dispatches jobs to `AGENT_SERVICE_URL` (default `http://localhost:8001`).
 
 ### Docker (full stack)
 
@@ -130,11 +131,11 @@ Key variables (see `.env.example` for the full list):
 | `AUTH_SECRET` / `NEXTAUTH_URL` | web auth |
 | `AGENT_API_URL` / `AGENT_API_SECRET` | web → agent-api calls |
 | `REDIS_URL` | agent-api Celery broker/backend |
-| `OPENAI_API_KEY` | agent-api LLM calls |
+| `GEMINI_API_KEY` (+ `GEMINI_MODEL`, `GEMINI_PLANNER_MODEL`) | agent-api + band-agents LLM calls (company Gemini API) |
+| `AGENT_SERVICE_URL` / `AGENT_SERVICE_SECRET` | web → local agent service dispatch |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_WEBHOOK_SECRET` | agent-api Telegram integration |
 | `STORAGE_*` | S3-compatible file storage (endpoint, keys, bucket, region) |
-| `BAND_ROOM_ID` + 6× `*_HANDLE` / `*_AGENT_ID` / `*_API_KEY` | band-agents |
-| `VIEROC_API_URL` / `VIEROC_API_KEY` | band-agents → web API calls |
+| `VIEROC_API_URL` / `VIEROC_API_TOKEN` | band-agents → web API calls |
 
 ## Architecture
 
@@ -188,13 +189,13 @@ Next.js calls the Python service only for AI jobs (planning, assignment, report 
 
 **The Python agent never mutates the DB directly.** It returns structured suggestions that the web layer reviews before applying (via `/api/agent/apply-*` routes).
 
-### Band agent boundary
+### Local agent boundary
 
-Band agents (`band-agents/`) are an entirely separate process that connects to the VieroClick API over HTTP — not to the database directly. They read live project state from `GET /api/test-db` (authenticated with `VIEROC_API_KEY`) and submit suggestions/actions back through the same REST API. The `band-agents/shared/vieroc_client.py` module wraps all these calls.
+The local agents (`band-agents/`) are a separate Python process that talks to the VieroClick API over HTTP — not to the database directly. They read live project state from `GET /api/project-data` (authenticated with `VIEROC_API_TOKEN`) and submit suggestions/actions back through the same REST API. The `band-agents/shared/vieroc_client.py` module wraps all these calls.
 
-The 6 Band agents (planner, assigner, observer, daily_report, morning_briefing, project_qa) collaborate in a shared Band room and communicate with each other via the Band WebSocket mesh. Human-in-the-loop approval prompts are handled by `shared/hitl.py`.
+Band.ai is gone: the 6 agents (planning, assignment, observer, daily_report, morning_briefing, project_qa) are now plain `async def run(project_id, payload)` callables registered in `band-agents/server.py`, a FastAPI app (`run_all.py` launches it). Each is invoked via `POST /agents/{role}` and returns a structured JSON result — normal request/response I/O, no room or @mentions. Inter-agent orchestration is driven by the web layer: creating a project dispatches `planning`; `apply-plan` dispatches `assignment`. All reasoning uses the company Gemini API via `shared/llm.py`.
 
-`apps/agent-api/band_registry.py` and `app/api/routes/band.py` are the VieroClick-side webhook receivers for Band agent callbacks.
+The web app's `apps/web/src/server/lib/band-dispatch.ts` POSTs directly to the agent service (`AGENT_SERVICE_URL`). `apps/agent-api/app/api/routes/band.py` still exposes `/api/band/dispatch` for back-compat but now forwards to the same local service instead of Band.
 
 ### Auth
 

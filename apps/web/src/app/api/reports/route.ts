@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db, leaderReports } from "@vieroc/db";
 import { getUserId } from "@/server/lib/context";
 import { isAgentRequest } from "@/server/lib/agent-auth";
+import { invalidateCache } from "@/server/lib/cache";
 
 export async function POST(request: Request) {
   try {
@@ -39,6 +40,10 @@ export async function POST(request: Request) {
         generatedByAgent: true,
       })
       .returning();
+
+    // Invalidate the cached report list so the agent-created report shows up
+    // (listReports uses an in-memory cache keyed by project).
+    invalidateCache(`reports:${projectId}`);
 
     return NextResponse.json(report, { status: 201 });
   } catch (err: any) {
