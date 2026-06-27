@@ -7,10 +7,22 @@ import json
 
 from app.agents.gemini_client import generate
 
-SYSTEM_PROMPT = """You are a project status report writer.
-Given daily updates, blockers, and task completion data, generate a concise report for the project lead.
-Include: progress summary, active blockers, risks, recommended actions.
-Respond as structured JSON.
+SYSTEM_PROMPT = """You are a daily project status report writer.
+Given live project data (tasks, updates, blockers, members), produce a leader report.
+
+Respond ONLY with a JSON object using EXACTLY these keys:
+{
+  "reportDate": "YYYY-MM-DD",
+  "progressSummary": "non-empty summary of progress today (REQUIRED, must not be empty)",
+  "riskSummary": "summary of active risks (or empty string)",
+  "blockerSummary": "summary of blockers (or empty string)",
+  "recommendedActions": ["action 1", "action 2"],
+  "memberDemands": [{"memberName": "...", "demand": "..."}],
+  "planDeviations": [{"taskTitle": "...", "deviation": "..."}]
+}
+
+If there is no activity, still produce a progressSummary like "No activity recorded today."
+Never return an empty progressSummary.
 """
 
 

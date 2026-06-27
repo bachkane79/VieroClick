@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_webhook_secret: str = ""
 
+    # VieroClick web API (used by report_runner)
+    vieroc_api_url: str = "http://localhost:3000"
+    vieroc_api_key: str = ""
+
     # Band AI external agents
     band_api_base_url: str = ""
     band_room_id: str = ""

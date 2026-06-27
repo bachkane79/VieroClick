@@ -39,6 +39,20 @@ export async function POST(request: Request) {
         planDeviations: planDeviations || [],
         generatedByAgent: true,
       })
+      .onConflictDoUpdate({
+        target: [leaderReports.projectId, leaderReports.reportDate],
+        set: {
+          progressSummary,
+          riskSummary: riskSummary || null,
+          blockerSummary: blockerSummary || null,
+          recommendedActions: recommendedActions || [],
+          memberDemands: memberDemands || [],
+          planDeviations: planDeviations || [],
+          generatedByAgent: true,
+          approvedAt: null,
+          approvedByMemberId: null,
+        },
+      })
       .returning();
 
     // Invalidate the cached report list so the agent-created report shows up
