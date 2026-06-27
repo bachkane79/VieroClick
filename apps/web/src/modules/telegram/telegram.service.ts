@@ -13,6 +13,22 @@ import * as repo from "./telegram.repo";
 import * as events from "./telegram.events";
 import * as tg from "./telegram.client";
 
+const WEBHOOK_PATH = "/api/telegram/webhook";
+
+function webhookUrl(): string | null {
+  const base = process.env.PUBLIC_BASE_URL?.trim().replace(/\/$/, "");
+  return base ? `${base}${WEBHOOK_PATH}` : null;
+}
+
+async function registerBotWebhook(token: string): Promise<void> {
+  const url = webhookUrl();
+  if (!url) return;
+  const res = await tg.setWebhook(token, url, process.env.TELEGRAM_WEBHOOK_SECRET);
+  if (!res.ok) {
+    console.warn("telegram.setWebhook failed:", res.description);
+  }
+}
+
 /** Public, token-free view of a workspace bot for the UI. */
 export interface BotConfigView {
   connected: boolean;
@@ -61,6 +77,8 @@ export async function saveBot(p: { workspaceId: string; input: unknown }): Promi
     return saved;
   });
 
+  await registerBotWebhook(data.botToken);
+
   return {
     connected: true,
     isActive: bot.isActive,
@@ -106,6 +124,7 @@ export async function removeBot(p: { workspaceId: string }): Promise<{ ok: true 
     await events.botDisconnected(tx, ctx, existing.id);
     await repo.removeBot(p.workspaceId, tx);
   });
+  await tg.deleteWebhook(existing.botToken);
   return { ok: true };
 }
 

@@ -46,6 +46,36 @@ export async function getMe(token: string): Promise<BotIdentity | null> {
   }
 }
 
+/**
+ * Register the webhook URL so Telegram pushes updates to our agent-api
+ * `/api/telegram/webhook` route. Idempotent — safe to call repeatedly.
+ * Returns the Telegram API description on failure (best-effort).
+ */
+export async function setWebhook(
+  token: string,
+  url: string,
+  secretToken?: string
+): Promise<{ ok: boolean; description?: string }> {
+  try {
+    const body: Record<string, unknown> = { url };
+    if (secretToken) body.secret_token = secretToken;
+    const res = await call<unknown>(token, "setWebhook", body);
+    return { ok: res.ok, description: res.description };
+  } catch (err) {
+    return { ok: false, description: err instanceof Error ? err.message : "Network error" };
+  }
+}
+
+/** Remove the webhook so Telegram stops pushing updates to this bot. */
+export async function deleteWebhook(token: string): Promise<{ ok: boolean }> {
+  try {
+    const res = await call<unknown>(token, "deleteWebhook");
+    return { ok: res.ok };
+  } catch {
+    return { ok: false };
+  }
+}
+
 /** Send a Markdown message to a chat. Returns true on success. */
 export async function sendMessage(
   token: string,
