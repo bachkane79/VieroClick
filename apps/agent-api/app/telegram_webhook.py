@@ -86,6 +86,36 @@ async def delete_webhook(client: httpx.AsyncClient, token: str) -> tuple[bool, s
     return False, body.get("description") or f"HTTP {resp.status_code}"
 
 
+def _html_escape(s: str) -> str:
+    """Escape the three characters Telegram HTML parse_mode requires."""
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+async def send_message(
+    client: httpx.AsyncClient,
+    token: str,
+    chat_id: str,
+    text: str,
+    parse_mode: str = "HTML",
+) -> tuple[bool, str | None]:
+    """POST {TELEGRAM_API}/bot{token}/sendMessage."""
+    payload: dict[str, object] = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": parse_mode,
+        "disable_web_page_preview": True,
+    }
+    try:
+        resp = await client.post(f"{TELEGRAM_API}/bot{token}/sendMessage", json=payload)
+        body = resp.json()
+    except Exception as exc:
+        return False, f"network error: {exc}"
+
+    if resp.status_code == 200 and body.get("ok"):
+        return True, None
+    return False, body.get("description") or f"HTTP {resp.status_code}"
+
+
 async def register_all_webhooks() -> None:
     """Register the per-bot webhook URL for every active bot on startup."""
     if not settings.public_base_url.rstrip("/"):

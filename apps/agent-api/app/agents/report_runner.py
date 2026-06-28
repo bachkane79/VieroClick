@@ -8,11 +8,14 @@ from datetime import date
 import httpx
 
 from app.agents.reporter import generate_report
-from app.db.queries import find_workspace_by_default_chat, get_project_ids_for_workspace
+from app.db.queries import find_bot_by_chat_id, get_project_ids_for_workspace
 from app.settings import settings
+from app.telegram_webhook import _html_escape, send_message
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+MAX_TELEGRAM_MESSAGE = 4000
 
 
 async def _fetch_project_data(project_id: str) -> dict:
@@ -54,23 +57,66 @@ async def _post_report(project_id: str, report: dict) -> dict:
         return resp.json()
 
 
-async def _run_daily_report_for_project(project_id: str) -> None:
+def _format_report_message(project_name: str, report: dict) -> str:
+    """Render the report as a Telegram HTML message. LLM strings are escaped."""
+    lines: list[str] = [
+        f"<b>Daily Report — {_html_escape(project_name)}</b>",
+        _html_escape(str(report.get("reportDate", ""))),
+        "",
+        "<b>Progress</b>",
+        _html_escape(str(report.get("progressSummary", ""))),
+    ]
+
+    risk = report.get("riskSummary") or ""
+    if risk:
+        lines += ["", "<b>Risks</b>", _html_escape(str(risk))]
+
+    blocker = report.get("blockerSummary") or ""
+    if blocker:
+        lines += ["", "<b>Blockers</b>", _html_escape(str(blocker))]
+
+    actions = report.get("recommendedActions") or []
+    if actions:
+        lines += ["", "<b>Recommended Actions</b>"]
+        lines += [f"• {_html_escape(str(a))}" for a in actions]
+
+    out = "\n".join(lines)
+    if len(out) > MAX_TELEGRAM_MESSAGE:
+        out = out[: MAX_TELEGRAM_MESSAGE - len("...(truncated)")] + "...(truncated)"
+    return out
+
+
+async def _run_daily_report_for_project(project_id: str) -> tuple[dict, str] | None:
+    """Generate + save the report for one project.
+
+    Returns (saved_report, project_name) on full success, or None if any step
+    failed (fetch / LLM / save) or the LLM returned an empty progressSummary.
+    """
     logger.info("daily_report: generating for project %s", project_id)
     try:
         project_data = await _fetch_project_data(project_id)
     except Exception as exc:
         logger.error("daily_report: failed to fetch project data for %s: %s", project_id, exc)
-        return
+        return None
+
+    project_name = next(
+        (
+            p["name"]
+            for p in project_data.get("projects", [])
+            if p.get("id") == project_id
+        ),
+        project_id,
+    )
 
     try:
         report = await generate_report(project_data)
     except Exception as exc:
         logger.error("daily_report: LLM generation failed for %s: %s", project_id, exc)
-        return
+        return None
 
     if not report:
         logger.warning("daily_report: empty report for project %s", project_id)
-        return
+        return None
 
     if not report.get("progressSummary"):
         logger.warning(
@@ -78,29 +124,57 @@ async def _run_daily_report_for_project(project_id: str) -> None:
             project_id,
             list(report.keys()),
         )
-        return
+        return None
 
     try:
         saved = await _post_report(project_id, report)
         logger.info("daily_report: saved report %s for project %s", saved.get("id"), project_id)
+        return saved, project_name
     except Exception as exc:
         logger.error("daily_report: failed to save report for %s: %s", project_id, exc)
+        return None
 
 
 async def handle_report_command(chat_id: str) -> None:
     """Entry point called when a Telegram user sends /report."""
-    workspace_id = await find_workspace_by_default_chat(chat_id)
-    if not workspace_id:
+    bot = await find_bot_by_chat_id(chat_id)
+    if not bot:
         logger.warning("daily_report: no active bot found for chat_id=%s", chat_id)
         return
 
-    project_ids = await get_project_ids_for_workspace(workspace_id)
+    project_ids = await get_project_ids_for_workspace(bot["workspace_id"])
     if not project_ids:
-        logger.info("daily_report: workspace %s has no projects", workspace_id)
+        logger.info("daily_report: workspace %s has no projects", bot["workspace_id"])
         return
 
     logger.info(
-        "daily_report: running for workspace=%s, projects=%s", workspace_id, project_ids
+        "daily_report: running for workspace=%s, projects=%s",
+        bot["workspace_id"],
+        project_ids,
     )
-    for pid in project_ids:
-        await _run_daily_report_for_project(pid)
+
+    token = bot["bot_token"]
+    async with httpx.AsyncClient(timeout=10) as tg:
+        await send_message(
+            tg,
+            token,
+            chat_id,
+            f"Generating report for {len(project_ids)} project(s)...",
+        )
+
+        for pid in project_ids:
+            result = await _run_daily_report_for_project(pid)
+            if result is None:
+                await send_message(
+                    tg,
+                    token,
+                    chat_id,
+                    f"Could not generate report for project <code>{_html_escape(pid)}</code>.",
+                )
+                continue
+
+            report, project_name = result
+            text = _format_report_message(project_name, report)
+            ok, err = await send_message(tg, token, chat_id, text)
+            if not ok:
+                logger.error("daily_report: sendMessage failed for %s: %s", pid, err)
