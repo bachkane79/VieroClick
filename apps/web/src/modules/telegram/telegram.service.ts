@@ -13,19 +13,53 @@ import * as repo from "./telegram.repo";
 import * as events from "./telegram.events";
 import * as tg from "./telegram.client";
 
-const WEBHOOK_PATH = "/api/telegram/webhook";
-
-function webhookUrl(): string | null {
-  const base = process.env.PUBLIC_BASE_URL?.trim().replace(/\/$/, "");
-  return base ? `${base}${WEBHOOK_PATH}` : null;
+/**
+ * Ask agent-api to (de)register a Telegram webhook for a single bot.
+ * agent-api is the only place that owns the webhook URL — web never calls
+ * Telegram's setWebhook directly. This avoids the dual-source problem where
+ * web and agent-api would race to overwrite each other's webhook URL.
+ */
+async function callAgentApi(path: string, body: { botId: string; botToken: string }) {
+  const base = process.env.AGENT_API_URL?.trim().replace(/\/$/, "");
+  const secret = process.env.AGENT_API_SECRET ?? "";
+  if (!base) {
+    throw new ValidationError("AGENT_API_URL is not configured.");
+  }
+  let res: Response;
+  try {
+    res = await fetch(`${base}${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Api-Secret": secret,
+      },
+      body: JSON.stringify({ bot_id: body.botId, bot_token: body.botToken }),
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (err) {
+    throw new ValidationError(
+      `Could not reach agent-api: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+  if (!res.ok) {
+    const detail = await res
+      .json()
+      .then((b) => (b as { detail?: string }).detail)
+      .catch(() => undefined);
+    throw new ValidationError(detail ?? `agent-api returned ${res.status}`);
+  }
 }
 
-async function registerBotWebhook(token: string): Promise<void> {
-  const url = webhookUrl();
-  if (!url) return;
-  const res = await tg.setWebhook(token, url, process.env.TELEGRAM_WEBHOOK_SECRET);
-  if (!res.ok) {
-    console.warn("telegram.setWebhook failed:", res.description);
+async function registerBotWebhook(botId: string, botToken: string): Promise<void> {
+  await callAgentApi("/api/telegram/admin/register-webhook", { botId, botToken });
+}
+
+async function deleteBotWebhook(botId: string, botToken: string): Promise<void> {
+  try {
+    await callAgentApi("/api/telegram/admin/delete-webhook", { botId, botToken });
+  } catch (err) {
+    // Best-effort: removal in our DB proceeds even if Telegram rejects.
+    console.warn("telegram.deleteWebhook failed:", err);
   }
 }
 
@@ -77,7 +111,7 @@ export async function saveBot(p: { workspaceId: string; input: unknown }): Promi
     return saved;
   });
 
-  await registerBotWebhook(data.botToken);
+  await registerBotWebhook(bot.id, data.botToken);
 
   return {
     connected: true,
@@ -124,13 +158,15 @@ export async function removeBot(p: { workspaceId: string }): Promise<{ ok: true 
     await events.botDisconnected(tx, ctx, existing.id);
     await repo.removeBot(p.workspaceId, tx);
   });
-  await tg.deleteWebhook(existing.botToken);
+  await deleteBotWebhook(existing.id, existing.botToken);
   return { ok: true };
 }
 
 /**
- * Auto-detect the chat id from recent updates (after the user sends /start to
- * the bot or adds it to a group). Persists it so notifications have a target.
+ * Returns the chat id agent-api has auto-saved from the first incoming
+ * Telegram update for this bot. With the webhook active, Telegram doesn't
+ * let us call getUpdates anymore — agent-api is the one that sees messages,
+ * so we just read the value it wrote.
  */
 export async function detectChat(p: {
   workspaceId: string;
@@ -140,12 +176,9 @@ export async function detectChat(p: {
 
   const bot = await repo.findBotByWorkspace(p.workspaceId);
   if (!bot) throw new NotFoundError("Telegram bot");
+  if (!bot.defaultChatId) return null;
 
-  const detected = await tg.detectChat(bot.botToken);
-  if (!detected) return null;
-
-  await repo.patchBot(p.workspaceId, { defaultChatId: detected.chatId });
-  return { chatId: detected.chatId, title: detected.title };
+  return { chatId: bot.defaultChatId, title: `Chat ${bot.defaultChatId}` };
 }
 
 /** Send a test message to the configured chat. */
@@ -156,7 +189,7 @@ export async function sendTest(p: { workspaceId: string }): Promise<{ ok: true }
   const bot = await repo.findBotByWorkspace(p.workspaceId);
   if (!bot) throw new NotFoundError("Telegram bot");
   if (!bot.defaultChatId) {
-    throw new ValidationError("Set a chat ID first (send /start to your bot, then Detect).");
+    throw new ValidationError("No chat linked yet. Send /start to your bot first.");
   }
 
   const res = await tg.sendMessage(
