@@ -28,6 +28,14 @@ class Settings(BaseSettings):
     # Telegram
     telegram_bot_token: str = ""
     telegram_webhook_secret: str = ""
+    # Public HTTPS base URL that Telegram can reach (ngrok in dev, real domain in prod).
+    # When set, all active bots get their webhook auto-registered on app startup.
+    public_base_url: str = ""
+    telegram_webhook_path: str = "/api/telegram/webhook"
+
+    # VieroClick web API (used by report_runner)
+    vieroc_api_url: str = "http://localhost:3000"
+    vieroc_api_key: str = ""
 
     # Band AI external agents
     band_api_base_url: str = ""

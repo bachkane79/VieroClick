@@ -5,6 +5,12 @@ import "server-only";
  * the workspace (created via @BotFather), never a global secret. All calls are
  * best-effort from the caller's perspective — failures are surfaced as a
  * typed result so the service can decide whether to throw or swallow.
+ *
+ * Webhook lifecycle (setWebhook / deleteWebhook) is NOT here — it lives in
+ * agent-api so there's a single source of truth for the webhook URL.
+ * getUpdates is also gone: while a webhook is active Telegram rejects
+ * getUpdates with 409, and agent-api now auto-saves the chat id on the
+ * first inbound message.
  */
 
 const API_BASE = "https://api.telegram.org";
@@ -24,7 +30,6 @@ async function call<T>(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body ?? {}),
-    // Telegram should respond quickly; bound it so a stuck request never hangs
     signal: AbortSignal.timeout(10_000),
   });
   return (await res.json()) as TelegramResult<T>;
@@ -62,50 +67,5 @@ export async function sendMessage(
     return { ok: res.ok, description: res.description };
   } catch (err) {
     return { ok: false, description: err instanceof Error ? err.message : "Network error" };
-  }
-}
-
-interface TgChat {
-  id: number;
-  type?: string;
-  title?: string;
-  username?: string;
-}
-
-interface Update {
-  message?: { chat?: TgChat };
-  channel_post?: { chat?: TgChat };
-  my_chat_member?: { chat?: TgChat };
-}
-
-export interface DetectedChat {
-  chatId: string;
-  title: string;
-  type: string;
-}
-
-/**
- * Read recent updates and surface the most recent chat that messaged the bot,
- * so the user can auto-fill the chat id after sending /start (or adding the
- * bot to a group).
- */
-export async function detectChat(token: string): Promise<DetectedChat | null> {
-  try {
-    const res = await call<Update[]>(token, "getUpdates", { limit: 20, timeout: 0 });
-    if (!res.ok || !res.result?.length) return null;
-    for (let i = res.result.length - 1; i >= 0; i--) {
-      const u = res.result[i]!;
-      const chat = u.message?.chat ?? u.channel_post?.chat ?? u.my_chat_member?.chat;
-      if (chat?.id != null) {
-        return {
-          chatId: String(chat.id),
-          title: chat.title ?? chat.username ?? `Chat ${chat.id}`,
-          type: chat.type ?? "private",
-        };
-      }
-    }
-    return null;
-  } catch {
-    return null;
   }
 }

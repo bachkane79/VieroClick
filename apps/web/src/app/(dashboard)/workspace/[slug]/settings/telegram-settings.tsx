@@ -182,7 +182,7 @@ export function TelegramSettings({ workspaceId, slug, initialConfig }: Props) {
               and send <code className="rounded bg-card px-1 py-0.5 text-xs">/newbot</code>.
             </li>
             <li>2. Copy the token it gives you and paste it below.</li>
-            <li>3. Send <code className="rounded bg-card px-1 py-0.5 text-xs">/start</code> to your new bot (or add it to a group), then auto-detect the chat.</li>
+            <li>3. After connecting, send <code className="rounded bg-card px-1 py-0.5 text-xs">/start</code> to your bot (or add it to a group). The chat ID auto-fills on the next message.</li>
           </ol>
 
           <div className="space-y-1.5">
