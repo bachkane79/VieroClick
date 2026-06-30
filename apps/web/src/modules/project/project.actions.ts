@@ -33,3 +33,19 @@ export async function detectPlanDeviationsAction(args: { workspaceId: string; pr
   });
 }
 
+export async function triggerReplanAction(args: {
+  workspaceId: string;
+  projectId: string;
+  reason: string;
+}) {
+  return runAction(async () => {
+    return service.triggerReplan(args.workspaceId, args.projectId, args.reason);
+  });
+}
+
+export async function runObserverAction(args: { workspaceId: string; projectId: string }) {
+  return runAction(async () => {
+    return service.triggerObserver(args.workspaceId, args.projectId);
+  });
+}
+

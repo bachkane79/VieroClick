@@ -305,3 +305,18 @@ export async function triggerReplan(workspaceId: string, projectId: string, reas
     },
   });
 }
+
+export async function triggerObserver(workspaceId: string, projectId: string) {
+  const ctx = await requireActor(workspaceId, projectId);
+  assertCanManageProject(ctx);
+
+  // Run deterministic deviation checks first so LLM doesn't re-compute what code already knows
+  const deviations = await detectPlanDeviations(workspaceId, projectId);
+
+  return dispatchBandAgent({
+    targetRole: "observer",
+    projectId,
+    message: "Run observer scan with pre-computed deviations.",
+    payload: { plan_deviations: deviations },
+  });
+}

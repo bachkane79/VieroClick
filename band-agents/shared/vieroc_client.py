@@ -71,6 +71,21 @@ class VieroClickClient:
                 logger.error(f"Failed to create suggestion in VieroClick: {e}")
                 return {}
 
+    async def post_observer_suggestions(self, project_id: str, suggestions: list) -> dict:
+        """Post observer suggestions to apply-observer-suggestions route — executes actions immediately."""
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                resp = await client.post(
+                    f"{self.base_url}/api/agent/apply-observer-suggestions",
+                    json={"projectId": project_id, "suggestions": suggestions},
+                    headers=self._headers,
+                )
+                resp.raise_for_status()
+                return resp.json()
+            except Exception as e:
+                logger.error(f"Failed to post observer suggestions: {e}")
+                return {}
+
     async def apply_plan(self, project_id: str, plan: dict, mode: str = "initial") -> dict:
         """Apply an agent-generated plan directly to VieroClick DB-backed objects."""
         async with httpx.AsyncClient(timeout=60.0) as client:

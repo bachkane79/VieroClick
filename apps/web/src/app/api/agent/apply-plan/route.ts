@@ -258,8 +258,29 @@ export async function POST(request: Request) {
       const taskRefToId = new Map<string, string>();
 
       for (const task of planTasks) {
-        const title = text(task.title, "Untitled Task");
+        const rawTitle = task.title !== undefined ? text(task.title) : null;
+        const title = rawTitle || "Untitled Task";
         const ref = text(task.planRef);
+        const action = text((task as Record<string, unknown>).action, "add");
+
+        // In replan mode, skip tasks with action "keep" — nothing to update
+        if (mode === "replan" && action === "keep" && existingTasksByRef.has(ref)) {
+          taskRefToId.set(ref, existingTasksByRef.get(ref)!.id);
+          counts.skipped++;
+          continue;
+        }
+
+        // Build update set: only include fields the LLM explicitly provided
+        const updateSet: Record<string, unknown> = { updatedAt: new Date() };
+        if (rawTitle) updateSet.title = rawTitle;
+        if (task.description !== undefined) updateSet.description = nullableText(task.description);
+        if (task.priority !== undefined) updateSet.priority = priority(task.priority);
+        if (task.startDate !== undefined) updateSet.startDate = dateText(task.startDate);
+        if (task.dueDate !== undefined) updateSet.dueDate = dateText(task.dueDate);
+        if (task.estimateHours !== undefined || task.estimatedHours !== undefined)
+          updateSet.estimateHours = numberString(task.estimateHours ?? task.estimatedHours);
+        if (task.acceptanceCriteria !== undefined) updateSet.acceptanceCriteria = criteria(task.acceptanceCriteria);
+        if (task.labels !== undefined) updateSet.labels = labelsList(task.labels);
 
         const definitionFields = {
           title,
@@ -283,23 +304,15 @@ export async function POST(request: Request) {
             ...definitionFields,
           };
           // Upsert: on conflict (project_id, plan_ref) update only definition fields
+          // updateSet only contains fields explicitly provided by LLM (avoids overwriting title with "Untitled Task")
           const [row] = await tx
             .insert(tasks)
             .values(insertValues)
             .onConflictDoUpdate({
               target: [tasks.projectId, tasks.planRef],
-              set: {
-                title: definitionFields.title,
-                description: definitionFields.description,
-                priority: definitionFields.priority,
-                startDate: definitionFields.startDate,
-                dueDate: definitionFields.dueDate,
-                estimateHours: definitionFields.estimateHours,
-                acceptanceCriteria: definitionFields.acceptanceCriteria,
-                labels: definitionFields.labels,
-                updatedAt: definitionFields.updatedAt,
-                // statusId, assigneeMemberId, completedAt, actualHours intentionally NOT updated
-              },
+              targetWhere: sql`plan_ref IS NOT NULL`,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              set: updateSet as any,
             })
             .returning({ id: tasks.id, planRef: tasks.planRef });
 
@@ -382,6 +395,7 @@ export async function POST(request: Request) {
             .values({ ...milestoneValues, status: text(record.status, "planned") })
             .onConflictDoUpdate({
               target: [milestones.projectId, milestones.planRef],
+              targetWhere: sql`plan_ref IS NOT NULL`,
               set: {
                 title: milestoneValues.title,
                 description: milestoneValues.description,
@@ -423,6 +437,7 @@ export async function POST(request: Request) {
             .values({ ...riskValues, status: "open" })
             .onConflictDoUpdate({
               target: [projectRisks.projectId, projectRisks.planRef],
+              targetWhere: sql`plan_ref IS NOT NULL`,
               set: {
                 title: riskValues.title,
                 description: riskValues.description,

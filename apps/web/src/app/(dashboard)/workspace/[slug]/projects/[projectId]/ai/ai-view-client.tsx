@@ -4,9 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Textarea } from "@vieroc/ui";
 import { toast } from "sonner";
-import { Sparkles, MessageSquare, Send, CheckCircle, XCircle, AlertTriangle, Compass, ShieldAlert, Cpu } from "lucide-react";
+import { Sparkles, MessageSquare, Send, CheckCircle, XCircle, AlertTriangle, Compass, ShieldAlert, Cpu, RefreshCw, Eye } from "lucide-react";
 import { reviewSuggestionAction } from "@/modules/agent-suggestion/agent-suggestion.actions";
 import { askAiQuestionAction, generateAiSuggestionsAction } from "@/modules/agent-job/agent-job.actions";
+import { triggerReplanAction, runObserverAction } from "@/modules/project/project.actions";
 
 interface SuggestionRow {
   id: string;
@@ -37,6 +38,8 @@ export function AiViewClient({
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [activePanel, setActivePanel] = useState<"assistant" | "suggestions">("assistant");
+  const [replanReason, setReplanReason] = useState("");
+  const [showReplanInput, setShowReplanInput] = useState(false);
 
   // Q&A States
   const [question, setQuestion] = useState("");
@@ -92,6 +95,36 @@ export function AiViewClient({
 
     toast.success("AI job executed successfully. New suggestion generated!");
     setActivePanel("suggestions");
+    router.refresh();
+  }
+
+  async function handleReplan() {
+    if (!replanReason.trim()) {
+      toast.error("Please enter a reason for replanning.");
+      return;
+    }
+    setSubmitting(true);
+    const res = await triggerReplanAction({ workspaceId, projectId, reason: replanReason.trim() });
+    setSubmitting(false);
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success("Replan dispatched — AI is updating the project plan.");
+    setReplanReason("");
+    setShowReplanInput(false);
+    router.refresh();
+  }
+
+  async function handleObserver() {
+    setSubmitting(true);
+    const res = await runObserverAction({ workspaceId, projectId });
+    setSubmitting(false);
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success("Observer scan dispatched — AI is scanning project health.");
     router.refresh();
   }
 
@@ -248,6 +281,49 @@ export function AiViewClient({
                   <ShieldAlert className="w-4 h-4 text-amber-500" />
                   Run AI Project Health Check
                 </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleObserver}
+                  disabled={submitting}
+                  className="w-full justify-start gap-2 text-xs font-semibold py-2"
+                >
+                  <Eye className="w-4 h-4 text-blue-500" />
+                  Run Observer Scan
+                </Button>
+
+                <div className="space-y-1.5 pt-1 border-t border-neutral-100 dark:border-neutral-800">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowReplanInput((v) => !v)}
+                    disabled={submitting}
+                    className="w-full justify-start gap-2 text-xs font-semibold py-2"
+                  >
+                    <RefreshCw className="w-4 h-4 text-orange-500" />
+                    Replan Project
+                  </Button>
+                  {showReplanInput && (
+                    <div className="space-y-1.5">
+                      <Textarea
+                        placeholder="Why are you replanning? (e.g. velocity lower than expected, scope changed...)"
+                        value={replanReason}
+                        onChange={(e) => setReplanReason(e.target.value)}
+                        disabled={submitting}
+                        className="text-xs min-h-[72px] resize-none"
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleReplan}
+                        disabled={submitting || !replanReason.trim()}
+                        className="w-full text-xs font-bold h-8"
+                      >
+                        Confirm Replan
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
