@@ -1,4 +1,6 @@
 from celery import Celery
+from celery.schedules import crontab
+
 from app.settings import settings
 
 celery_app = Celery(
@@ -18,3 +20,21 @@ celery_app.conf.update(
     task_acks_late=True,
     worker_prefetch_multiplier=1,
 )
+
+celery_app.conf.beat_schedule = {
+    # 07:30 UTC+7 = 00:30 UTC
+    "morning-briefing": {
+        "task": "app.workers.tasks.run_scheduled_morning_briefing",
+        "schedule": crontab(hour=0, minute=30),
+    },
+    # 12:00 UTC+7 = 05:00 UTC
+    "midday-health-scan": {
+        "task": "app.workers.tasks.run_scheduled_health_scan",
+        "schedule": crontab(hour=5, minute=0),
+    },
+    # 17:30 UTC+7 = 10:30 UTC
+    "eod-report": {
+        "task": "app.workers.tasks.run_scheduled_eod_report",
+        "schedule": crontab(hour=10, minute=30),
+    },
+}

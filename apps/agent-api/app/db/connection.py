@@ -27,6 +27,8 @@ connect_args = {"ssl": "require"} if sslmode == "require" else {}
 engine = create_async_engine(db_url, pool_pre_ping=True, connect_args=connect_args)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
+__all__ = ["engine", "AsyncSessionLocal", "db_url", "connect_args", "get_db"]
+
 
 async def get_db() -> AsyncSession:
     async with AsyncSessionLocal() as session:

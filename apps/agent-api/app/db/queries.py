@@ -1,7 +1,22 @@
 """Raw async DB queries for the agent-api service."""
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.db.connection import AsyncSessionLocal
+from app.db.connection import AsyncSessionLocal, db_url, connect_args
+
+
+def _make_session() -> async_sessionmaker:
+    """Create a fresh engine+session bound to the current event loop.
+
+    The global engine/AsyncSessionLocal in connection.py is bound to the event
+    loop that was running when the module was first imported (typically the
+    FastAPI / uvicorn loop). Celery workers spin up their own event loops per
+    task, so reusing that global engine causes asyncpg to raise
+    'ValueError: not enough values to unpack'. Creating a fresh engine per
+    query function avoids the issue without requiring any external state.
+    """
+    eng = create_async_engine(db_url, pool_pre_ping=True, connect_args=connect_args)
+    return async_sessionmaker(eng, expire_on_commit=False, class_=AsyncSession)
 
 
 async def find_workspace_by_default_chat(chat_id: str) -> str | None:
@@ -49,3 +64,17 @@ async def get_project_ids_for_workspace(workspace_id: str) -> list[str]:
             {"workspace_id": workspace_id},
         )
         return [str(row[0]) for row in result.fetchall()]
+
+
+async def get_all_active_projects() -> list[dict]:
+    """Return id + workspace_id for all projects with status='active'.
+
+    Uses a fresh engine so this is safe to call from a Celery worker that runs
+    in its own event loop separate from the FastAPI import-time loop.
+    """
+    session_factory = _make_session()
+    async with session_factory() as session:
+        result = await session.execute(
+            text("SELECT id, workspace_id FROM projects WHERE status = 'active'")
+        )
+        return [{"id": str(row[0]), "workspace_id": str(row[1])} for row in result.fetchall()]
