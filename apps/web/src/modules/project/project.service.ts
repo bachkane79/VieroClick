@@ -289,3 +289,19 @@ export async function detectPlanDeviations(workspaceId: string, projectId: strin
 
   return deviations;
 }
+
+export async function triggerReplan(workspaceId: string, projectId: string, reason: string) {
+  const ctx = await requireActor(workspaceId, projectId);
+  assertCanManageProject(ctx);
+
+  return dispatchBandAgent({
+    targetRole: "planning",
+    projectId,
+    message: `Replan requested: ${reason}`,
+    payload: {
+      mode: "replan",
+      reason,
+      requestedBy: ctx.userId,
+    },
+  });
+}

@@ -82,6 +82,7 @@ export const tasks = pgTable("tasks", {
   completedAt: timestamptz("completed_at"),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
   updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+  planRef: text("plan_ref"),
 });
 
 export const taskDependencies = pgTable(

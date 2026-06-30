@@ -71,13 +71,13 @@ class VieroClickClient:
                 logger.error(f"Failed to create suggestion in VieroClick: {e}")
                 return {}
 
-    async def apply_plan(self, project_id: str, plan: dict) -> dict:
+    async def apply_plan(self, project_id: str, plan: dict, mode: str = "initial") -> dict:
         """Apply an agent-generated plan directly to VieroClick DB-backed objects."""
         async with httpx.AsyncClient(timeout=60.0) as client:
             try:
                 resp = await client.post(
                     f"{self.base_url}/api/agent/apply-plan",
-                    json={"projectId": project_id, "plan": plan},
+                    json={"projectId": project_id, "plan": plan, "mode": mode},
                     headers=self._headers,
                 )
                 resp.raise_for_status()

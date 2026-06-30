@@ -15,6 +15,7 @@ export const milestones = pgTable("milestones", {
   targetDate: date("target_date"),
   status: text("status").notNull().default("planned"),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
+  planRef: text("plan_ref"),
 });
 
 export const projectRisks = pgTable(
@@ -34,6 +35,7 @@ export const projectRisks = pgTable(
     status: text("status").notNull().default("open"),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
     updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+    planRef: text("plan_ref"),
   },
   (t) => [
     check("probability_range", sql`${t.probability} between 1 and 5`),
@@ -53,4 +55,5 @@ export const wbsNodes = pgTable("wbs_nodes", {
   linkedTaskId: uuid("linked_task_id").references(() => tasks.id, { onDelete: "set null" }),
   position: integer("position").notNull().default(0),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
+  planRef: text("plan_ref"),
 });
