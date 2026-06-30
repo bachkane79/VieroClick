@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
-import { eq } from "drizzle-orm";
-import { db, tasks, taskStatuses, taskDependencies } from "@vieroc/db";
+import { and, eq, lt, ne, sql } from "drizzle-orm";
+import { db, tasks, taskStatuses, taskDependencies, blockers, projectRisks } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
 import { NotFoundError, ValidationError } from "@/server/lib/errors";
 import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
@@ -319,4 +319,68 @@ export async function triggerObserver(workspaceId: string, projectId: string) {
     message: "Run observer scan with pre-computed deviations.",
     payload: { plan_deviations: deviations },
   });
+}
+
+/**
+ * Compute a project health score (0–100) from real DB signals.
+ *
+ * Scoring:
+ *   -5 per overdue task (max -30)
+ *   -8 per open/in-review blocker (max -24)
+ *   -5 per high-risk (probability*impact >= 12, max -20)
+ *   +26 * completionPct/100 (bonus for task completion)
+ */
+export async function computeHealthScore(projectId: string): Promise<number> {
+  const todayStr = new Date().toISOString().split("T")[0]!;
+
+  const [allTasks, openBlockers, highRisks] = await Promise.all([
+    db
+      .select({ statusType: taskStatuses.type })
+      .from(tasks)
+      .innerJoin(taskStatuses, eq(taskStatuses.id, tasks.statusId))
+      .where(and(eq(tasks.projectId, projectId), ne(taskStatuses.type, "cancelled"))),
+    db
+      .select({ id: blockers.id })
+      .from(blockers)
+      .where(
+        and(
+          eq(blockers.projectId, projectId),
+          sql`${blockers.status} in ('open','in_review')`
+        )
+      ),
+    db
+      .select({ id: projectRisks.id })
+      .from(projectRisks)
+      .where(
+        and(
+          eq(projectRisks.projectId, projectId),
+          eq(projectRisks.status, "open"),
+          sql`coalesce(${projectRisks.probability}, 1) * coalesce(${projectRisks.impact}, 1) >= 12`
+        )
+      ),
+  ]);
+
+  const overdueTasks = await db
+    .select({ id: tasks.id })
+    .from(tasks)
+    .innerJoin(taskStatuses, eq(taskStatuses.id, tasks.statusId))
+    .where(
+      and(
+        eq(tasks.projectId, projectId),
+        lt(tasks.dueDate, todayStr),
+        sql`${taskStatuses.type} not in ('done','cancelled')`
+      )
+    );
+
+  const totalTasks = allTasks.length;
+  const doneTasks = allTasks.filter((t) => t.statusType === "done").length;
+  const completionPct = totalTasks > 0 ? doneTasks / totalTasks : 0;
+
+  let score = 100;
+  score -= Math.min(overdueTasks.length * 5, 30);
+  score -= Math.min(openBlockers.length * 8, 24);
+  score -= Math.min(highRisks.length * 5, 20);
+  score += completionPct * 26;
+
+  return Math.round(Math.max(0, Math.min(100, score)));
 }

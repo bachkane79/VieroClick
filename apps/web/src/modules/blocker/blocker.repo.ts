@@ -1,5 +1,5 @@
 import "server-only";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull, lt, sql } from "drizzle-orm";
 import { db, blockers, type Executor } from "@vieroc/db";
 
 export type BlockerInsert = typeof blockers.$inferInsert;
@@ -41,4 +41,23 @@ export async function update(
 
 export async function remove(id: string, exec: Executor = db): Promise<void> {
   await exec.delete(blockers).where(eq(blockers.id, id));
+}
+
+/** Return open/in_review blockers older than cutoffDate that haven't been escalated yet. */
+export async function listOpenForEscalation(
+  projectId: string,
+  cutoffDate: Date,
+  exec: Executor = db
+): Promise<BlockerRow[]> {
+  return exec
+    .select()
+    .from(blockers)
+    .where(
+      and(
+        eq(blockers.projectId, projectId),
+        sql`${blockers.status} in ('open','in_review')`,
+        lt(blockers.createdAt, cutoffDate),
+        isNull(blockers.escalatedAt)
+      )
+    );
 }

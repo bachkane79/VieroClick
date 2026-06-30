@@ -63,6 +63,7 @@ export const blockers = pgTable("blockers", {
   ownerMemberId: uuid("owner_member_id").references(() => workspaceMembers.id),
   resolvedByMemberId: uuid("resolved_by_member_id").references(() => workspaceMembers.id),
   resolvedAt: timestamptz("resolved_at"),
+  escalatedAt: timestamptz("escalated_at"),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
   updatedAt: timestamptz("updated_at").notNull().defaultNow(),
 });

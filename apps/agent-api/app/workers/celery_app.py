@@ -37,4 +37,14 @@ celery_app.conf.beat_schedule = {
         "task": "app.workers.tasks.run_scheduled_eod_report",
         "schedule": crontab(hour=10, minute=30),
     },
+    # 09:00 UTC+7 = 02:00 UTC
+    "escalation-scan": {
+        "task": "app.workers.tasks.run_scheduled_escalation_scan",
+        "schedule": crontab(hour=2, minute=0),
+    },
+    # 17:00 UTC+7 = 10:00 UTC
+    "daily-update-reminder": {
+        "task": "app.workers.tasks.run_scheduled_daily_update_reminder",
+        "schedule": crontab(hour=10, minute=0),
+    },
 }

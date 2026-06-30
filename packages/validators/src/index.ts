@@ -70,6 +70,7 @@ export const createTaskSchema = z.object({
   assigneeMemberId: z.string().uuid().nullable().optional(),
   reporterMemberId: z.string().uuid().nullable().optional(),
   parentTaskId: z.string().uuid().nullable().optional(),
+  milestoneId: z.string().uuid().nullable().optional(),
   startDate: z.string().date().optional(),
   dueDate: z.string().date().optional(),
   estimateHours: z.number().min(0).optional(),

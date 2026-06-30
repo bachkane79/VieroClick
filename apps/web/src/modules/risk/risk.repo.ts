@@ -1,5 +1,5 @@
 import "server-only";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db, projectRisks, type Executor } from "@vieroc/db";
 
 export type RiskInsert = typeof projectRisks.$inferInsert;
@@ -38,4 +38,23 @@ export async function update(
 
 export async function remove(id: string, exec: Executor = db): Promise<void> {
   await exec.delete(projectRisks).where(eq(projectRisks.id, id));
+}
+
+/** Return open risks whose probability*impact >= minScore and haven't been escalated yet. */
+export async function listAboveThreshold(
+  projectId: string,
+  minScore: number,
+  exec: Executor = db
+): Promise<RiskRow[]> {
+  return exec
+    .select()
+    .from(projectRisks)
+    .where(
+      and(
+        eq(projectRisks.projectId, projectId),
+        eq(projectRisks.status, "open"),
+        sql`coalesce(${projectRisks.probability}, 1) * coalesce(${projectRisks.impact}, 1) >= ${minScore}`,
+        isNull(projectRisks.escalatedAt)
+      )
+    );
 }

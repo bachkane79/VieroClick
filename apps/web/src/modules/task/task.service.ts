@@ -171,6 +171,7 @@ export async function createTask(p: { workspaceId: string; projectId: string; in
         assigneeMemberId: data.assigneeMemberId ?? null,
         reporterMemberId: data.reporterMemberId ?? ctx.workspaceMemberId,
         parentTaskId: data.parentTaskId ?? null,
+        milestoneId: data.milestoneId ?? null,
         startDate: data.startDate ?? null,
         dueDate: data.dueDate ?? null,
         estimateHours: data.estimateHours != null ? String(data.estimateHours) : null,
@@ -240,6 +241,7 @@ export async function updateTask(p: {
     if (data.labels !== undefined) values.labels = data.labels;
     if (data.position !== undefined) values.position = data.position;
     if (data.isMilestone !== undefined) values.isMilestone = data.isMilestone;
+    if (data.milestoneId !== undefined) values.milestoneId = data.milestoneId ?? null;
   } else if (data.statusId !== undefined) {
     values.statusId = data.statusId;
   }

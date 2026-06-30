@@ -1,6 +1,6 @@
 import "server-only";
-import { asc, eq } from "drizzle-orm";
-import { db, milestones, type Executor } from "@vieroc/db";
+import { asc, count, eq, sql } from "drizzle-orm";
+import { db, milestones, tasks, taskStatuses, type Executor } from "@vieroc/db";
 
 export type MilestoneInsert = typeof milestones.$inferInsert;
 export type MilestoneRow = typeof milestones.$inferSelect;
@@ -37,4 +37,33 @@ export async function update(
 
 export async function remove(id: string, exec: Executor = db): Promise<void> {
   await exec.delete(milestones).where(eq(milestones.id, id));
+}
+
+export async function getMilestoneCompletion(
+  projectId: string,
+  exec: Executor = db
+): Promise<Map<string, { total: number; done: number; completionPct: number }>> {
+  const rows = await exec
+    .select({
+      milestoneId: tasks.milestoneId,
+      total: count(tasks.id),
+      done: sql<number>`count(case when ${taskStatuses.type} = 'done' then 1 end)`,
+    })
+    .from(tasks)
+    .innerJoin(taskStatuses, eq(taskStatuses.id, tasks.statusId))
+    .where(eq(tasks.projectId, projectId))
+    .groupBy(tasks.milestoneId);
+
+  const result = new Map<string, { total: number; done: number; completionPct: number }>();
+  for (const row of rows) {
+    if (!row.milestoneId) continue;
+    const total = Number(row.total);
+    const done = Number(row.done);
+    result.set(row.milestoneId, {
+      total,
+      done,
+      completionPct: total > 0 ? Math.round((done / total) * 100) : 0,
+    });
+  }
+  return result;
 }

@@ -1,9 +1,11 @@
 """
 schedule.py
-Async functions backing the three Celery Beat rhythms:
-  - morning_briefing  (07:30 UTC+7 = 00:30 UTC)
-  - midday_health_scan (12:00 UTC+7 = 05:00 UTC)
-  - eod_report        (17:30 UTC+7 = 10:30 UTC)
+Async functions backing the five Celery Beat rhythms:
+  - morning_briefing       (07:30 UTC+7 = 00:30 UTC)
+  - midday_health_scan     (12:00 UTC+7 = 05:00 UTC)
+  - eod_report             (17:30 UTC+7 = 10:30 UTC)
+  - escalation_scan        (09:00 UTC+7 = 02:00 UTC)
+  - daily_update_reminder  (17:00 UTC+7 = 10:00 UTC)
 
 Each function processes a single project. The beat Celery tasks iterate
 over all active projects and call these functions per project, isolating
@@ -74,3 +76,45 @@ async def run_eod_report(project_id: str, workspace_id: str) -> dict:
         return {"ok": False, "reason": "empty_report"}
     saved = await _post_report(project_id, report)
     return {"ok": True, "reportId": saved.get("id")}
+
+
+async def run_escalation_scan(project_id: str, workspace_id: str) -> dict:
+    """09:00 UTC+7 — upgrade stale blockers + high-risk risks, notify lead/owner."""
+    logger.info("escalation_scan: project=%s workspace=%s", project_id, workspace_id)
+    headers = {"Authorization": f"Bearer {settings.vieroc_api_key}"}
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(
+            f"{settings.vieroc_api_url}/api/agent/run-escalation-scan",
+            json={"projectId": project_id},
+            headers=headers,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+    escalated = len(data.get("escalated", []))
+    escalated_risks = len(data.get("escalatedRisks", []))
+    logger.info(
+        "escalation_scan: project=%s escalated_blockers=%d escalated_risks=%d",
+        project_id, escalated, escalated_risks,
+    )
+    return {"ok": True, "escalatedBlockers": escalated, "escalatedRisks": escalated_risks}
+
+
+async def run_daily_update_reminder(project_id: str, workspace_id: str) -> dict:
+    """17:00 UTC+7 — remind members who haven't submitted today's daily update."""
+    logger.info("daily_update_reminder: project=%s workspace=%s", project_id, workspace_id)
+    headers = {"Authorization": f"Bearer {settings.vieroc_api_key}"}
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(
+            f"{settings.vieroc_api_url}/api/agent/run-daily-update-reminder",
+            json={"projectId": project_id},
+            headers=headers,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+    reminded = data.get("reminded", 0)
+    logger.info("daily_update_reminder: project=%s reminded=%d", project_id, reminded)
+    return {"ok": True, "reminded": reminded}

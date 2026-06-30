@@ -1,6 +1,6 @@
 import "server-only";
-import { and, asc, desc, eq } from "drizzle-orm";
-import { db, dailyUpdates, type Executor } from "@vieroc/db";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { db, dailyUpdates, projectMembers, type Executor } from "@vieroc/db";
 
 export type DailyUpdateInsert = typeof dailyUpdates.$inferInsert;
 export type DailyUpdateRow = typeof dailyUpdates.$inferSelect;
@@ -69,4 +69,30 @@ export async function upsert(
     })
     .returning();
   return row!;
+}
+
+/**
+ * Return workspace member IDs of project members who haven't submitted a daily-update
+ * for the given workDate. Uses LEFT JOIN: any member with no row for that date is included.
+ */
+export async function listMembersWithNoUpdateForDate(
+  projectId: string,
+  workDate: string,
+  exec: Executor = db
+): Promise<string[]> {
+  const rows = await exec
+    .select({ workspaceMemberId: projectMembers.workspaceMemberId })
+    .from(projectMembers)
+    .leftJoin(
+      dailyUpdates,
+      and(
+        eq(dailyUpdates.memberId, projectMembers.workspaceMemberId),
+        eq(dailyUpdates.projectId, projectId),
+        eq(dailyUpdates.workDate, workDate)
+      )
+    )
+    .where(
+      and(eq(projectMembers.projectId, projectId), isNull(dailyUpdates.id))
+    );
+  return rows.map((r) => r.workspaceMemberId);
 }

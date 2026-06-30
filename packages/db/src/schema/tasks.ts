@@ -9,8 +9,10 @@ import {
   numeric,
   jsonb,
   unique,
+  uniqueIndex,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { timestamptz } from "./_helpers";
 import { users } from "./users";
 import { workspaceMembers } from "./workspaces";
@@ -49,41 +51,50 @@ export const taskStatuses = pgTable(
   (t) => [unique().on(t.projectId, t.name)]
 );
 
-export const tasks = pgTable("tasks", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  projectId: uuid("project_id")
-    .notNull()
-    .references(() => projects.id, { onDelete: "cascade" }),
-  parentTaskId: uuid("parent_task_id").references((): AnyPgColumn => tasks.id, {
-    onDelete: "cascade",
-  }),
-  statusId: uuid("status_id")
-    .notNull()
-    .references(() => taskStatuses.id),
-  title: text("title").notNull(),
-  description: text("description"),
-  priority: taskPriorityEnum("priority").notNull().default("medium"),
-  assigneeMemberId: uuid("assignee_member_id").references(() => workspaceMembers.id),
-  reporterMemberId: uuid("reporter_member_id").references(() => workspaceMembers.id),
-  startDate: date("start_date"),
-  dueDate: date("due_date"),
-  estimateHours: numeric("estimate_hours", { precision: 6, scale: 2 }),
-  actualHours: numeric("actual_hours", { precision: 6, scale: 2 }),
-  acceptanceCriteria: jsonb("acceptance_criteria")
-    .$type<AcceptanceCriterion[]>()
-    .notNull()
-    .default([]),
-  labels: jsonb("labels").$type<string[]>().notNull().default([]),
-  position: integer("position").notNull().default(0),
-  isMilestone: boolean("is_milestone").notNull().default(false),
-  createdBy: uuid("created_by")
-    .notNull()
-    .references(() => users.id),
-  completedAt: timestamptz("completed_at"),
-  createdAt: timestamptz("created_at").notNull().defaultNow(),
-  updatedAt: timestamptz("updated_at").notNull().defaultNow(),
-  planRef: text("plan_ref"),
-});
+export const tasks = pgTable(
+  "tasks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    parentTaskId: uuid("parent_task_id").references((): AnyPgColumn => tasks.id, {
+      onDelete: "cascade",
+    }),
+    statusId: uuid("status_id")
+      .notNull()
+      .references(() => taskStatuses.id),
+    title: text("title").notNull(),
+    description: text("description"),
+    priority: taskPriorityEnum("priority").notNull().default("medium"),
+    assigneeMemberId: uuid("assignee_member_id").references(() => workspaceMembers.id),
+    reporterMemberId: uuid("reporter_member_id").references(() => workspaceMembers.id),
+    startDate: date("start_date"),
+    dueDate: date("due_date"),
+    estimateHours: numeric("estimate_hours", { precision: 6, scale: 2 }),
+    actualHours: numeric("actual_hours", { precision: 6, scale: 2 }),
+    acceptanceCriteria: jsonb("acceptance_criteria")
+      .$type<AcceptanceCriterion[]>()
+      .notNull()
+      .default([]),
+    labels: jsonb("labels").$type<string[]>().notNull().default([]),
+    position: integer("position").notNull().default(0),
+    milestoneId: uuid("milestone_id"), // FK to milestones(id) — omit .references() to avoid circular import (planning.ts → tasks.ts)
+    isMilestone: boolean("is_milestone").notNull().default(false),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id),
+    completedAt: timestamptz("completed_at"),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+    updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+    planRef: text("plan_ref"),
+  },
+  (t) => [
+    uniqueIndex("tasks_project_plan_ref_idx")
+      .on(t.projectId, t.planRef)
+      .where(sql`plan_ref IS NOT NULL`),
+  ]
+);
 
 export const taskDependencies = pgTable(
   "task_dependencies",

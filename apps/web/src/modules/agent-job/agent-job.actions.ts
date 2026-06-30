@@ -6,6 +6,7 @@ import * as service from "./agent-job.service";
 import { db, agentJobs, agentSuggestions, tasks, blockers, projectRisks, workspaceMembers, users } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
 import { eq, and, isNull } from "drizzle-orm";
+import { computeHealthScore } from "@/modules/project/project.service";
 
 interface BaseArgs {
   workspaceId: string;
@@ -186,8 +187,9 @@ export async function generateAiSuggestionsAction(args: {
     } else {
       title = "AI Observer Project Health Check Scan";
       body = "A complete project structure review has been processed. The observer recommends auditing acceptance criteria on core tasks and ensuring no blocker conflicts are open.";
+      const healthScore = await computeHealthScore(args.projectId);
       payload = {
-        healthScore: 88,
+        healthScore,
         issues: [
           { severity: "medium", text: "Multiple core tasks do not contain written Acceptance Criteria. Add validation criteria to prevent done-status validation errors." }
         ]

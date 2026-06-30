@@ -82,6 +82,10 @@ uvicorn app.main:app --reload --port 8000
 # run celery worker
 celery -A app.workers.celery_app worker --loglevel=info
 
+# Windows only: Celery uses spawn pool by default on Windows, which causes
+# "ValueError: not enough values to unpack" in fast_trace_task. Use --pool=solo:
+# celery -A app.workers.celery_app worker --loglevel=info --pool=solo
+
 # lint
 ruff check .
 

@@ -89,3 +89,35 @@ def run_scheduled_eod_report(self: Any) -> dict[str, Any]:
         except Exception as e:
             results.append({"project": proj["id"], "ok": False, "error": str(e)})
     return {"total": len(projects), "results": results}
+
+
+@celery_app.task(name="app.workers.tasks.run_scheduled_escalation_scan", bind=True,
+                 max_retries=2, default_retry_delay=300)
+def run_scheduled_escalation_scan(self: Any) -> dict[str, Any]:
+    """09:00 UTC+7 — escalate stale blockers and high-risk risks for all active projects."""
+    from app.workers import schedule
+    projects = run_async(queries.get_all_active_projects())
+    results = []
+    for proj in projects:
+        try:
+            run_async(schedule.run_escalation_scan(proj["id"], proj["workspace_id"]))
+            results.append({"project": proj["id"], "ok": True})
+        except Exception as e:
+            results.append({"project": proj["id"], "ok": False, "error": str(e)})
+    return {"total": len(projects), "results": results}
+
+
+@celery_app.task(name="app.workers.tasks.run_scheduled_daily_update_reminder", bind=True,
+                 max_retries=2, default_retry_delay=300)
+def run_scheduled_daily_update_reminder(self: Any) -> dict[str, Any]:
+    """17:00 UTC+7 — remind members with no daily-update for today."""
+    from app.workers import schedule
+    projects = run_async(queries.get_all_active_projects())
+    results = []
+    for proj in projects:
+        try:
+            run_async(schedule.run_daily_update_reminder(proj["id"], proj["workspace_id"]))
+            results.append({"project": proj["id"], "ok": True})
+        except Exception as e:
+            results.append({"project": proj["id"], "ok": False, "error": str(e)})
+    return {"total": len(projects), "results": results}
