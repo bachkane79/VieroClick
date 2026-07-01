@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Textarea } from "@vieroc/ui";
 import { toast } from "sonner";
-import { Sparkles, MessageSquare, Send, CheckCircle, XCircle, AlertTriangle, Compass, ShieldAlert, Cpu, RefreshCw, Eye } from "lucide-react";
+import { Sparkles, MessageSquare, Send, CheckCircle, XCircle, AlertTriangle, Compass, ShieldAlert, Cpu, RefreshCw, Eye, Activity, Clock, ShieldX } from "lucide-react";
 import { reviewSuggestionAction } from "@/modules/agent-suggestion/agent-suggestion.actions";
 import { askAiQuestionAction, generateAiSuggestionsAction } from "@/modules/agent-job/agent-job.actions";
 import { triggerReplanAction, runObserverAction } from "@/modules/project/project.actions";
@@ -49,6 +49,20 @@ export function AiViewClient({
 
   const pendingSuggestions = initialSuggestions.filter((s) => s.status === "pending");
   const reviewedSuggestions = initialSuggestions.filter((s) => s.status !== "pending");
+
+  const latestRiskScan = [...initialSuggestions]
+    .filter((s) => s.suggestionType === "risk_scan")
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+
+  type HealthIssues = {
+    overdueTaskCount: number;
+    openBlockerCount: number;
+    highRiskCount: number;
+    completionPct: number;
+    totalTasks: number;
+    doneTasks: number;
+  };
+  const healthPayload = latestRiskScan?.payload as { healthScore?: number; issues?: HealthIssues } | undefined;
 
   async function handleAsk(e: React.FormEvent) {
     e.preventDefault();
@@ -394,6 +408,108 @@ export function AiViewClient({
 
           {/* History / Reviewed Proposals */}
           <div className="space-y-4">
+            {/* Health Score Panel */}
+            <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground border-b pb-3 border-neutral-100 dark:border-neutral-800 flex items-center gap-2">
+                <Activity className="w-3.5 h-3.5" />
+                Project Health Score
+              </h3>
+
+              {!healthPayload?.healthScore ? (
+                <div className="p-6 text-center text-muted-foreground">
+                  <ShieldAlert className="w-7 h-7 mx-auto mb-2 opacity-30" />
+                  <p className="text-xs font-semibold">No scan yet</p>
+                  <p className="text-[10px] mt-0.5 font-normal">Run &quot;AI Project Health Check&quot; to see score.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Score display */}
+                  <div className="flex items-end gap-2 justify-center py-2">
+                    <span
+                      className={`text-5xl font-black tabular-nums ${
+                        healthPayload.healthScore >= 80
+                          ? "text-green-500"
+                          : healthPayload.healthScore >= 60
+                          ? "text-amber-500"
+                          : "text-red-500"
+                      }`}
+                    >
+                      {healthPayload.healthScore}
+                    </span>
+                    <span className="text-lg text-muted-foreground font-semibold mb-1">/100</span>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="w-full h-2 rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        healthPayload.healthScore >= 80
+                          ? "bg-green-500"
+                          : healthPayload.healthScore >= 60
+                          ? "bg-amber-500"
+                          : "bg-red-500"
+                      }`}
+                      style={{ width: `${healthPayload.healthScore}%` }}
+                    />
+                  </div>
+
+                  <p className={`text-center text-[10px] font-bold uppercase tracking-wider ${
+                    healthPayload.healthScore >= 80 ? "text-green-500" : healthPayload.healthScore >= 60 ? "text-amber-500" : "text-red-500"
+                  }`}>
+                    {healthPayload.healthScore >= 80 ? "Good" : healthPayload.healthScore >= 60 ? "Fair" : "At Risk"}
+                  </p>
+
+                  {/* Breakdown */}
+                  {healthPayload.issues && (
+                    <div className="space-y-1.5 pt-1 border-t border-neutral-100 dark:border-neutral-800">
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="flex items-center gap-1.5 text-muted-foreground">
+                          <Clock className="w-3 h-3 text-amber-500" />
+                          {healthPayload.issues.overdueTaskCount} overdue tasks
+                        </span>
+                        <span className="font-bold text-red-500">
+                          -{Math.min(healthPayload.issues.overdueTaskCount * 5, 30)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="flex items-center gap-1.5 text-muted-foreground">
+                          <ShieldX className="w-3 h-3 text-red-500" />
+                          {healthPayload.issues.openBlockerCount} open blocker{healthPayload.issues.openBlockerCount !== 1 ? "s" : ""}
+                        </span>
+                        <span className="font-bold text-red-500">
+                          -{Math.min(healthPayload.issues.openBlockerCount * 8, 24)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="flex items-center gap-1.5 text-muted-foreground">
+                          <AlertTriangle className="w-3 h-3 text-orange-500" />
+                          {healthPayload.issues.highRiskCount} high risk{healthPayload.issues.highRiskCount !== 1 ? "s" : ""}
+                        </span>
+                        <span className="font-bold text-red-500">
+                          -{Math.min(healthPayload.issues.highRiskCount * 5, 20)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="flex items-center gap-1.5 text-muted-foreground">
+                          <CheckCircle className="w-3 h-3 text-green-500" />
+                          {healthPayload.issues.doneTasks}/{healthPayload.issues.totalTasks} tasks done ({Math.round(healthPayload.issues.completionPct * 100)}%)
+                        </span>
+                        <span className="font-bold text-green-500">
+                          +{Math.round(healthPayload.issues.completionPct * 26)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Last scan time */}
+                  {latestRiskScan && (
+                    <p className="text-[9px] text-muted-foreground text-right pt-1">
+                      Last scan: {new Date(latestRiskScan.createdAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
             <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
               <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground border-b pb-3 border-neutral-100 dark:border-neutral-800">
                 Decision History

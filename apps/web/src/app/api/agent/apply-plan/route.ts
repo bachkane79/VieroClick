@@ -31,6 +31,8 @@ type PlanTask = {
   wbsTitle?: unknown;
   wbs?: unknown;
   planRef?: unknown;
+  milestoneId?: unknown;
+  action?: unknown;
 };
 
 type PlanItem = {
