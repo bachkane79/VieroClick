@@ -6,7 +6,7 @@ import { requireActor } from "@/server/lib/context";
 import { NotFoundError, ValidationError } from "@/server/lib/errors";
 import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
 import { enqueueNotifications } from "@/server/lib/notifications";
-import { dispatchBandAgent } from "@/server/lib/band-dispatch";
+import { dispatchAgent } from "@/server/lib/agent-dispatch";
 import { createProjectSchema, updateProjectSchema } from "./project.schema";
 import { assertCanCreateProject, assertCanManageProject } from "./project.policy";
 import * as repo from "./project.repo";
@@ -110,7 +110,7 @@ export async function createProject(workspaceId: string, input: unknown) {
     return project;
   });
 
-  void dispatchBandAgent({
+  void dispatchAgent({
     targetRole: "planning",
     senderRole: "assignment",
     projectId: project.id,
@@ -294,7 +294,7 @@ export async function triggerReplan(workspaceId: string, projectId: string, reas
   const ctx = await requireActor(workspaceId, projectId);
   assertCanManageProject(ctx);
 
-  return dispatchBandAgent({
+  return dispatchAgent({
     targetRole: "planning",
     projectId,
     message: `Replan requested: ${reason}`,
@@ -313,7 +313,7 @@ export async function triggerObserver(workspaceId: string, projectId: string) {
   // Run deterministic deviation checks first so LLM doesn't re-compute what code already knows
   const deviations = await detectPlanDeviations(workspaceId, projectId);
 
-  return dispatchBandAgent({
+  return dispatchAgent({
     targetRole: "observer",
     projectId,
     message: "Run observer scan with pre-computed deviations.",

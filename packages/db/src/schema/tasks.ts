@@ -73,6 +73,8 @@ export const tasks = pgTable(
     dueDate: date("due_date"),
     estimateHours: numeric("estimate_hours", { precision: 6, scale: 2 }),
     actualHours: numeric("actual_hours", { precision: 6, scale: 2 }),
+    // Number of times this task was sent back for rework during review (feeds quality score).
+    reworkCount: integer("rework_count").notNull().default(0),
     acceptanceCriteria: jsonb("acceptance_criteria")
       .$type<AcceptanceCriterion[]>()
       .notNull()
@@ -120,6 +122,10 @@ export const taskComments = pgTable("task_comments", {
   taskId: uuid("task_id")
     .notNull()
     .references(() => tasks.id, { onDelete: "cascade" }),
+  // Self-reference for threaded replies (null = top-level comment).
+  parentCommentId: uuid("parent_comment_id").references((): AnyPgColumn => taskComments.id, {
+    onDelete: "cascade",
+  }),
   authorMemberId: uuid("author_member_id")
     .notNull()
     .references(() => workspaceMembers.id),

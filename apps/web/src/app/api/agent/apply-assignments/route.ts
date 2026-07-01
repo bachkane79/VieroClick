@@ -12,6 +12,7 @@ import {
 } from "@vieroc/db";
 import { and, eq } from "drizzle-orm";
 import { isAgentRequest } from "@/server/lib/agent-auth";
+import { recordDeadLetter } from "@/server/lib/dead-letter";
 import { invalidateCache } from "@/server/lib/cache";
 
 function text(value: unknown, fallback = "") {
@@ -41,11 +42,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Hoisted so the catch block can dead-letter the failed apply with context.
+  let capturedProjectId: string | null = null;
+  let capturedPayload: Record<string, unknown> = {};
+
   try {
     const body = await request.json();
     const projectId = text(body.projectId);
     const payload = body.assignments ? body : body.payload;
     const assignments = Array.isArray(payload?.assignments) ? payload.assignments : [];
+    capturedProjectId = projectId || null;
+    capturedPayload = (payload as Record<string, unknown>) ?? {};
 
     if (!projectId || assignments.length === 0) {
       return NextResponse.json(
@@ -127,9 +134,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
     console.error("Error applying agent assignments:", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unknown error" },
-      { status: 500 }
-    );
+    const message = err instanceof Error ? err.message : "Unknown error";
+
+    if (capturedProjectId) {
+      try {
+        await db.insert(agentJobs).values({
+          projectId: capturedProjectId,
+          jobType: "assignment_suggestion",
+          status: "failed",
+          input: capturedPayload,
+          error: message,
+          startedAt: new Date(),
+          finishedAt: new Date(),
+        });
+      } catch (logErr) {
+        console.error("Failed to log failed agent job:", logErr);
+      }
+    }
+    await recordDeadLetter({
+      source: "apply-assignments",
+      jobType: "assignment_suggestion",
+      projectId: capturedProjectId,
+      payload: capturedPayload,
+      error: message,
+    });
+
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

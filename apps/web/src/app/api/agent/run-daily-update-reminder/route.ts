@@ -2,11 +2,16 @@ import { NextResponse } from "next/server";
 import { db, notifications, projects } from "@vieroc/db";
 import { and, eq, sql } from "drizzle-orm";
 import { isAgentRequest } from "@/server/lib/agent-auth";
-import { listMembersWithNoUpdateForDate } from "@/modules/daily-update/daily-update.repo";
+import {
+  listMembersWithNoUpdateForDate,
+  listUpdatesForDate,
+} from "@/modules/daily-update/daily-update.repo";
 
-async function getProjectMeta(projectId: string): Promise<{ workspaceId: string } | null> {
+async function getProjectMeta(
+  projectId: string
+): Promise<{ workspaceId: string; leadMemberId: string | null } | null> {
   const [row] = await db
-    .select({ workspaceId: projects.workspaceId })
+    .select({ workspaceId: projects.workspaceId, leadMemberId: projects.leadMemberId })
     .from(projects)
     .where(eq(projects.id, projectId))
     .limit(1);
@@ -17,7 +22,8 @@ async function hasReminderAlreadySent(
   workspaceId: string,
   projectId: string,
   recipientMemberId: string,
-  today: string
+  today: string,
+  type: string = "daily_update.reminder"
 ): Promise<boolean> {
   const [row] = await db
     .select({ id: notifications.id })
@@ -27,7 +33,7 @@ async function hasReminderAlreadySent(
         eq(notifications.workspaceId, workspaceId),
         eq(notifications.projectId, projectId),
         eq(notifications.recipientMemberId, recipientMemberId),
-        eq(notifications.type, "daily_update.reminder"),
+        eq(notifications.type, type),
         sql`${notifications.createdAt}::date = ${today}::date`
       )
     )
@@ -68,7 +74,40 @@ export async function POST(request: Request) {
       reminded.push(memberId);
     }
 
-    return NextResponse.json({ ok: true, reminded: reminded.length, memberIds: reminded });
+    // 4.6: give the lead a rolled-up view of today's updates (once per day).
+    let summarySent = false;
+    if (meta.leadMemberId) {
+      const alreadySummarized = await hasReminderAlreadySent(
+        meta.workspaceId,
+        projectId,
+        meta.leadMemberId,
+        today,
+        "daily_update.summary"
+      );
+      if (!alreadySummarized) {
+        const submitted = await listUpdatesForDate(projectId, today);
+        const withBlockers = submitted.filter((u) => (u.blockersText ?? "").trim().length > 0);
+        const lowConfidence = submitted.filter((u) => (u.confidenceLevel ?? 5) <= 2);
+        await db.insert(notifications).values({
+          workspaceId: meta.workspaceId,
+          recipientMemberId: meta.leadMemberId,
+          projectId,
+          type: "daily_update.summary",
+          title: `Daily update summary — ${today}`,
+          body:
+            `${submitted.length} submitted, ${memberIds.length} missing. ` +
+            `${withBlockers.length} reported blockers, ${lowConfidence.length} low-confidence.`,
+        });
+        summarySent = true;
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
+      reminded: reminded.length,
+      memberIds: reminded,
+      summarySent,
+    });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Unknown error" },

@@ -82,7 +82,16 @@ export const createTaskSchema = z.object({
   allowBlockedOverride: z.boolean().default(false),
 });
 
-export const updateTaskSchema = createTaskSchema.partial();
+export const updateTaskSchema = createTaskSchema.partial().extend({
+  // Actual hours logged (assignee or manager can set; feeds speed score + accuracy).
+  actualHours: z.number().min(0).max(100000).nullable().optional(),
+});
+
+export const reviewTaskSchema = z.object({
+  decision: z.enum(["approve", "rework"]),
+  feedback: z.string().max(2000).optional(),
+  actualHours: z.number().min(0).max(100000).nullable().optional(),
+});
 
 export const moveTaskSchema = z.object({
   statusId: z.string().uuid(),
@@ -125,6 +134,8 @@ export const commentMetadataSchema = z
 
 export const createCommentSchema = z.object({
   body: z.string().min(1),
+  // Threaded reply target (null/omitted = top-level comment).
+  parentCommentId: z.string().uuid().nullable().optional(),
   metadata: commentMetadataSchema.default({ links: [] }),
 });
 
@@ -209,6 +220,47 @@ export const updateMemberProfileSchema = z.object({
   profileNotes: z.string().optional(),
 });
 
+// ─── Agent jobs, roles & suggestions ───────────────────────────────────────────
+// Single source of truth for the agent enums shared between web and agent-api.
+// The DB columns (agent_jobs.job_type, agent_suggestions.suggestion_type) are plain
+// text; these schemas are what web validates against, and their literal sets must
+// stay in sync with the Python side (see the notes on each).
+
+// Async job types dispatched to agent-api's Celery queue via POST /api/jobs/.
+// MUST match the task_map keys in apps/agent-api/app/api/routes/jobs.py.
+export const agentJobTypeSchema = z.enum([
+  "daily_report",
+  "task_assignment",
+  "risk_scan",
+  "qa",
+]);
+
+// Interactive agent roles dispatched synchronously via POST /api/agents/{role}.
+// MUST match AGENT_RUNNERS in apps/agent-api/app/agents/roles/__init__.py.
+export const agentRoleSchema = z.enum([
+  "planning",
+  "assignment",
+  "observer",
+  "daily_report",
+  "morning_briefing",
+  "project_qa",
+]);
+
+// suggestion_type values persisted on agent_suggestions. Produced by the web
+// apply-* routes (planning_package / assignment_suggestion / risk_scan) and by
+// the observer + Q&A roles (the rest).
+export const agentSuggestionTypeSchema = z.enum([
+  "planning_package",
+  "assignment_suggestion",
+  "risk_scan",
+  "risk_detected",
+  "blocker_escalation",
+  "plan_deviation",
+  "clarification_needed",
+  "silent_member",
+  "project_hole",
+]);
+
 // ─── Pagination ───────────────────────────────────────────────────────────────
 
 export const paginationSchema = z.object({
@@ -229,3 +281,6 @@ export type CreateDecisionLogInput = z.infer<typeof createDecisionLogSchema>;
 export type CreateRiskInput = z.infer<typeof createRiskSchema>;
 export type UpdateMemberProfileInput = z.infer<typeof updateMemberProfileSchema>;
 export type PaginationInput = z.infer<typeof paginationSchema>;
+export type AgentJobType = z.infer<typeof agentJobTypeSchema>;
+export type AgentRole = z.infer<typeof agentRoleSchema>;
+export type AgentSuggestionType = z.infer<typeof agentSuggestionTypeSchema>;

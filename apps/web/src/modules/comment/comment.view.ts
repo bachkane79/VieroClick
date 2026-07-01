@@ -7,6 +7,7 @@ export interface CommentLinkView {
 export interface CommentView {
   id: string;
   taskId: string;
+  parentCommentId: string | null;
   authorMemberId: string;
   body: string;
   links: CommentLinkView[];
@@ -40,6 +41,7 @@ function normalizeLinks(metadata: Record<string, unknown>): CommentLinkView[] {
 export function toCommentView(comment: {
   id: string;
   taskId: string;
+  parentCommentId?: string | null;
   authorMemberId: string;
   body: string;
   metadata: Record<string, unknown>;
@@ -49,6 +51,7 @@ export function toCommentView(comment: {
   return {
     id: comment.id,
     taskId: comment.taskId,
+    parentCommentId: comment.parentCommentId ?? null,
     authorMemberId: comment.authorMemberId,
     body: comment.body,
     links: normalizeLinks(comment.metadata),

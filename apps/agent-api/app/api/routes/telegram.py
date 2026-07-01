@@ -35,11 +35,11 @@ def _verify_telegram_secret(request: Request) -> None:
 
 
 async def _lookup_bot(bot_id: str) -> dict[str, Any] | None:
-    """Return {id, workspace_id, default_chat_id} for the bot, or None."""
+    """Return {id, workspace_id, default_chat_id, token} for the bot, or None."""
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             text(
-                "SELECT id, workspace_id, default_chat_id FROM telegram_bots "
+                "SELECT id, workspace_id, default_chat_id, bot_token FROM telegram_bots "
                 "WHERE id = :id AND is_active = true LIMIT 1"
             ),
             {"id": bot_id},
@@ -51,6 +51,7 @@ async def _lookup_bot(bot_id: str) -> dict[str, Any] | None:
             "id": str(row[0]),
             "workspace_id": str(row[1]),
             "default_chat_id": row[2],
+            "token": row[3],
         }
 
 
@@ -94,7 +95,7 @@ async def telegram_webhook(bot_id: str, request: Request) -> dict[str, str]:
             await _set_default_chat_id(bot_id, str(chat["id"]))
             logger.info("telegram_webhook.chat_id_detected", bot_id=bot_id, chat_id=chat["id"])
 
-    await handle_telegram_update(update)
+    await handle_telegram_update(update, bot)
     return {"ok": "true"}
 
 

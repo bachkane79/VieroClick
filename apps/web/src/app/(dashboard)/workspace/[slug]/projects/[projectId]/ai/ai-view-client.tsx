@@ -107,7 +107,13 @@ export function AiViewClient({
       return;
     }
 
-    toast.success("AI job executed successfully. New suggestion generated!");
+    const msg =
+      jobType === "risk_scan"
+        ? "Health check complete — project health score updated."
+        : jobType === "planning_package"
+          ? "Roadmap agent dispatched — plan generated and applied."
+          : "Allocation agent dispatched — assignments applied.";
+    toast.success(msg);
     setActivePanel("suggestions");
     router.refresh();
   }

@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { db, notifications, projects, tasks } from "@vieroc/db";
 import { eq } from "drizzle-orm";
 import { isAgentRequest } from "@/server/lib/agent-auth";
-import { dispatchBandAgent } from "@/server/lib/band-dispatch";
+import { dispatchAgent } from "@/server/lib/agent-dispatch";
+import { recordDeadLetter } from "@/server/lib/dead-letter";
 
 type Deviation = {
   type: "milestone_at_risk" | "task_delayed" | "dependency_conflict";
@@ -67,9 +68,10 @@ export async function POST(request: Request) {
     for (const dev of deviations) {
       const actions: string[] = [];
 
-      switch (dev.type) {
+      try {
+        switch (dev.type) {
         case "milestone_at_risk": {
-          void dispatchBandAgent({
+          void dispatchAgent({
             targetRole: "planning",
             projectId,
             message: `Milestone at risk — auto-replan triggered`,
@@ -108,6 +110,18 @@ export async function POST(request: Request) {
           }
           break;
         }
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("Failed to apply deviation:", msg);
+        actions.push("failed");
+        await recordDeadLetter({
+          source: "apply-deviations",
+          jobType: "risk_scan",
+          projectId,
+          payload: dev as unknown as Record<string, unknown>,
+          error: msg,
+        });
       }
 
       results.push({ type: dev.type, taskId: dev.taskId, actions });

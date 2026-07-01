@@ -3,10 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { runAction } from "@/server/lib/action";
 import * as service from "./agent-job.service";
-import { db, agentJobs, agentSuggestions, tasks, blockers, projectRisks, workspaceMembers, users } from "@vieroc/db";
+import { db, agentJobs, agentSuggestions, tasks, blockers, projectRisks } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { computeHealthDetails } from "@/modules/project/project.service";
+import { assertCanManageProject } from "@/modules/project/project.policy";
+import { dispatchAgent } from "@/server/lib/agent-dispatch";
 
 interface BaseArgs {
   workspaceId: string;
@@ -108,114 +110,77 @@ export async function generateAiSuggestionsAction(args: {
 }) {
   return runAction(async () => {
     const ctx = await requireActor(args.workspaceId, args.projectId);
+    assertCanManageProject(ctx);
 
-    // Create Job
-    const job = (await db
-      .insert(agentJobs)
-      .values({
-        projectId: args.projectId,
-        jobType: args.jobType,
-        status: "succeeded",
-        requestedByUserId: ctx.userId,
-        startedAt: new Date(),
-        finishedAt: new Date(),
-      })
-      .returning())[0]!;
-
-    let title = "";
-    let body = "";
-    let payload: Record<string, any> = {};
-
-    if (args.jobType === "planning_package") {
-      title = "AI-Scaffolded Project Implementation Roadmap";
-      body = "AI-generated backlog suggestions based on the project deliverables and goals. Review and approve to automatically create these items.";
-      payload = {
-        tasks: [
-          { title: "Define Core Database Migration Schemas", description: "Establish projects, tasks, comments and workspaces tables with clean FK indices.", priority: "high", estimateHours: 8 },
-          { title: "Implement NextAuth credentials sandbox developer bypass", description: "AddCredentials provider with edge-safe JWT strategy.", priority: "medium", estimateHours: 6 },
-          { title: "Design glassmorphic workspace selector dialogue overlay", description: "Realtime slug regex validation for lowercase alphanumeric characters.", priority: "medium", estimateHours: 4 },
-          { title: "Build notification layer and comments tagged mention alerts", description: "Configure comments scanner to queue notifications on @user matches.", priority: "high", estimateHours: 8 }
-        ],
-        milestones: [
-          { title: "Workspace Security Scaffolding Locked", targetDate: new Date(Date.now() + 86400000 * 7).toISOString().split("T")[0] }
-        ],
-        risks: [
-          { title: "Neon Postgres Connection Pooling Limit", probability: 3, impact: 4, mitigation: "Set neon config websocket construct overrides to prevent driver socket leaks." }
-        ]
-      };
-    } else if (args.jobType === "assignment_suggestion") {
-      // Find unassigned tasks
-      const unassigned = await db
-        .select()
-        .from(tasks)
-        .where(and(eq(tasks.projectId, args.projectId), isNull(tasks.assigneeMemberId)));
-
-      // Find project members with user join to get fullName
-      const members = await db
-        .select({
-          id: workspaceMembers.id,
-          fullName: users.fullName,
-        })
-        .from(workspaceMembers)
-        .innerJoin(users, eq(users.id, workspaceMembers.userId))
-        .where(eq(workspaceMembers.workspaceId, args.workspaceId));
-
-      const assignCandidate = members[0]?.id;
-
-      title = "AI Task Allocation Recommendation";
-      body = "Matching unassigned backlog items with available workspace developers based on skills, timezone compatibility, and load balance metrics.";
-      
-      const suggestedAssignments = unassigned.slice(0, 3).map((t) => ({
-        taskId: t.id,
-        memberId: assignCandidate,
-        taskTitle: t.title,
-        memberName: members[0]?.fullName || "Workspace developer"
-      })).filter((x) => x.memberId);
-
-      payload = {
-        assignments: suggestedAssignments.map((a) => ({
-          taskId: a.taskId,
-          memberId: a.memberId
-        }))
-      };
-
-      body += "\n\n" + suggestedAssignments.map(a => `- **${a.taskTitle}** recommended for assignment to **${a.memberName}** (94% confidence match)`).join("\n");
-      
-      if (suggestedAssignments.length === 0) {
-        body = "All project tasks are currently assigned to team members. No allocation changes needed.";
-      }
-    } else {
-      title = "AI Observer Project Health Check Scan";
-      body = "A complete project structure review has been processed. The observer recommends auditing acceptance criteria on core tasks and ensuring no blocker conflicts are open.";
+    // Health check is a deterministic, code-computed scan (no LLM) — persist it as
+    // a risk_scan suggestion that powers the Health Score panel.
+    if (args.jobType === "risk_scan") {
       const health = await computeHealthDetails(args.projectId);
-      payload = {
-        healthScore: health.score,
-        issues: {
-          overdueTaskCount: health.overdueTaskCount,
-          openBlockerCount: health.openBlockerCount,
-          highRiskCount: health.highRiskCount,
-          completionPct: health.completionPct,
-          totalTasks: health.totalTasks,
-          doneTasks: health.doneTasks,
-        },
-      };
+      const [job] = await db
+        .insert(agentJobs)
+        .values({
+          projectId: args.projectId,
+          jobType: "risk_scan",
+          status: "succeeded",
+          requestedByUserId: ctx.userId,
+          startedAt: new Date(),
+          finishedAt: new Date(),
+        })
+        .returning();
+
+      const [suggestion] = await db
+        .insert(agentSuggestions)
+        .values({
+          projectId: args.projectId,
+          jobId: job!.id,
+          suggestionType: "risk_scan",
+          title: "AI Project Health Check Scan",
+          body:
+            `Health score ${health.score}/100 — ${health.overdueTaskCount} overdue task(s), ` +
+            `${health.openBlockerCount} open blocker(s), ${health.highRiskCount} high risk(s), ` +
+            `${health.completionPct}% complete (${health.doneTasks}/${health.totalTasks} tasks).`,
+          payload: {
+            healthScore: health.score,
+            issues: {
+              overdueTaskCount: health.overdueTaskCount,
+              openBlockerCount: health.openBlockerCount,
+              highRiskCount: health.highRiskCount,
+              completionPct: health.completionPct,
+              totalTasks: health.totalTasks,
+              doneTasks: health.doneTasks,
+            },
+          },
+          status: "accepted",
+          reviewedAt: new Date(),
+        })
+        .returning();
+
+      revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}/ai`);
+      return { kind: "health" as const, suggestion };
     }
 
-    // Insert Suggestion
-    const [suggestion] = await db
-      .insert(agentSuggestions)
-      .values({
-        projectId: args.projectId,
-        jobId: job.id,
-        suggestionType: args.jobType,
-        title,
-        body,
-        payload,
-        status: "pending",
-      })
-      .returning();
+    // Roadmap + allocation are real LLM agents. Dispatch to agent-api; each agent
+    // reads live project state, generates its plan/assignments, and applies them
+    // through the apply-* routes (which log their own accepted suggestions).
+    const targetRole = args.jobType === "planning_package" ? "planning" : "assignment";
+    const result = await dispatchAgent({
+      targetRole,
+      senderRole: "planning",
+      projectId: args.projectId,
+      message:
+        targetRole === "planning"
+          ? "Manual roadmap generation requested from the AI panel."
+          : "Manual task-allocation requested from the AI panel.",
+      payload: targetRole === "planning" ? { mode: "initial" } : {},
+    });
+
+    if (result && "skipped" in result && result.skipped) {
+      throw new Error(
+        "Agent service is unreachable. Start agent-api (AGENT_API_URL) and try again."
+      );
+    }
 
     revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}/ai`);
-    return suggestion;
-  } );
+    return { kind: "dispatch" as const, targetRole, result };
+  });
 }

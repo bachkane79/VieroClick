@@ -102,6 +102,19 @@ export async function changeTaskStatusAction(
   });
 }
 
+export async function reviewTaskAction(args: BaseArgs & { taskId: string; data: unknown }) {
+  return runAction(async () => {
+    const task = await service.reviewTask({
+      workspaceId: args.workspaceId,
+      projectId: args.projectId,
+      taskId: args.taskId,
+      input: args.data,
+    });
+    revalidateBoard(args.slug, args.projectId);
+    return task;
+  });
+}
+
 export async function createSubtaskAction(
   args: BaseArgs & { parentTaskId: string; data: unknown }
 ) {

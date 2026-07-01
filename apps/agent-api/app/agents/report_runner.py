@@ -19,16 +19,32 @@ MAX_TELEGRAM_MESSAGE = 4000
 
 
 async def _fetch_project_data(project_id: str) -> dict:
-    """Fetch live project state from the Next.js API."""
+    """Fetch live project state from the Next.js API (4.5: real /api/project-data).
+
+    Normalizes the project-data payload into the legacy shape the reporter prompt
+    expects (projects[] list, snake_case `daily_updates`).
+    """
     headers = {"Authorization": f"Bearer {settings.vieroc_api_key}"}
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.get(
-            f"{settings.vieroc_api_url}/api/test-db",
+            f"{settings.vieroc_api_url}/api/project-data",
             params={"projectId": project_id},
             headers=headers,
         )
         resp.raise_for_status()
-        return resp.json()
+        data = resp.json()
+
+    project = data.get("project")
+    return {
+        "projects": [project] if project else [],
+        "members": data.get("members", []),
+        "tasks": data.get("tasks", []),
+        "blockers": data.get("blockers", []),
+        "daily_updates": data.get("dailyUpdates", []),
+        "risks": data.get("risks", []),
+        "milestones": data.get("milestones", []),
+        "recent_events": [],
+    }
 
 
 async def _post_report(project_id: str, report: dict) -> dict:

@@ -25,6 +25,7 @@ import {
   createTaskAction,
   deleteTaskAction,
   removeTaskDependencyFromTaskAction,
+  reviewTaskAction,
   updateTaskAction,
 } from "../task.actions";
 import {
@@ -127,6 +128,9 @@ export function TaskDetailDrawer({
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [estimateHours, setEstimateHours] = useState("");
+  const [actualHours, setActualHours] = useState("");
+  const [reviewFeedback, setReviewFeedback] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [labels, setLabels] = useState("");
   const [isMilestone, setIsMilestone] = useState(false);
   const [criteria, setCriteria] = useState<AcceptanceCriterionView[]>([]);
@@ -148,6 +152,7 @@ export function TaskDetailDrawer({
   const [comments, setComments] = useState<any[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const [newCommentBody, setNewCommentBody] = useState("");
+  const [replyTo, setReplyTo] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -160,6 +165,8 @@ export function TaskDetailDrawer({
     setStartDate(task?.startDate ?? "");
     setDueDate(task?.dueDate ?? "");
     setEstimateHours(task?.estimateHours ?? "");
+    setActualHours(task?.actualHours ?? "");
+    setReviewFeedback("");
     setLabels(task?.labels.join(", ") ?? "");
     setIsMilestone(task?.isMilestone ?? false);
     setCriteria(task?.acceptanceCriteria.length ? task.acceptanceCriteria : []);
@@ -200,13 +207,15 @@ export function TaskDetailDrawer({
   async function submitComment() {
     if (!task || !newCommentBody.trim()) return;
     const body = newCommentBody.trim();
+    const parentCommentId = replyTo;
     setNewCommentBody("");
+    setReplyTo(null);
     const result = await addCommentAction({
       workspaceId,
       projectId,
       slug: workspaceSlug,
       taskId: task.id,
-      data: { body },
+      data: { body, parentCommentId: parentCommentId ?? undefined },
     });
     if (!result.ok) {
       toast.error(result.error);
@@ -220,7 +229,36 @@ export function TaskDetailDrawer({
     if (res.ok) {
       setComments(res.data);
     }
-    toast.success("Comment posted");
+    toast.success(parentCommentId ? "Reply posted" : "Comment posted");
+  }
+
+  async function handleReview(decision: "approve" | "rework") {
+    if (!task) return;
+    if (decision === "rework" && !reviewFeedback.trim()) {
+      toast.error("Add feedback so the assignee knows what to change.");
+      return;
+    }
+    setReviewSubmitting(true);
+    const actual = actualHours.trim() ? Number(actualHours) : undefined;
+    const result = await reviewTaskAction({
+      workspaceId,
+      projectId,
+      slug: workspaceSlug,
+      taskId: task.id,
+      data: {
+        decision,
+        feedback: reviewFeedback.trim() || undefined,
+        actualHours: actual !== undefined && Number.isFinite(actual) ? actual : undefined,
+      },
+    });
+    setReviewSubmitting(false);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(decision === "approve" ? "Task approved and closed" : "Sent back for rework");
+    onOpenChange(false);
+    router.refresh();
   }
 
   async function deleteComment(commentId: string) {
@@ -261,6 +299,7 @@ export function TaskDetailDrawer({
 
     setSubmitting(true);
     const estimate = estimateHours ? Number(estimateHours) : undefined;
+    const actual = actualHours.trim() ? Number(actualHours) : undefined;
     const payload = {
       title: title.trim(),
       description: description.trim() || undefined,
@@ -271,6 +310,7 @@ export function TaskDetailDrawer({
       startDate: startDate || undefined,
       dueDate: dueDate || undefined,
       estimateHours: Number.isFinite(estimate) ? estimate : undefined,
+      actualHours: actual !== undefined && Number.isFinite(actual) ? actual : undefined,
       labels: splitLabels(labels),
       isMilestone,
       acceptanceCriteria: criteria
@@ -633,7 +673,7 @@ export function TaskDetailDrawer({
                   />
                 </Field>
 
-                <Field label="Estimate" htmlFor="task-estimate">
+                <Field label="Estimate (h)" htmlFor="task-estimate">
                   <Input
                     id="task-estimate"
                     type="number"
@@ -641,6 +681,18 @@ export function TaskDetailDrawer({
                     step="0.25"
                     value={estimateHours}
                     onChange={(e) => setEstimateHours(e.target.value)}
+                  />
+                </Field>
+
+                <Field label="Actual (h)" htmlFor="task-actual">
+                  <Input
+                    id="task-actual"
+                    type="number"
+                    min="0"
+                    step="0.25"
+                    placeholder="Log real time"
+                    value={actualHours}
+                    onChange={(e) => setActualHours(e.target.value)}
                   />
                 </Field>
 
@@ -666,6 +718,40 @@ export function TaskDetailDrawer({
                     onChange={(e) => setBlockerReason(e.target.value)}
                     className="border-amber-200 bg-white"
                   />
+                </section>
+              )}
+
+              {task && selectedStatus?.type === "in_review" && (
+                <section className="grid gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
+                  <div className="text-sm font-semibold">Review</div>
+                  <p className="text-xs text-muted-foreground">
+                    Approve to close the task, or request changes with feedback. Only a reviewer or lead
+                    can decide.
+                  </p>
+                  <Textarea
+                    value={reviewFeedback}
+                    onChange={(e) => setReviewFeedback(e.target.value)}
+                    placeholder="Feedback for the assignee (required to request changes)"
+                    className="min-h-[64px] text-sm"
+                  />
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      onClick={() => handleReview("approve")}
+                      disabled={reviewSubmitting}
+                      className="bg-green-600 text-white hover:bg-green-700"
+                    >
+                      Approve &amp; close
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleReview("rework")}
+                      disabled={reviewSubmitting}
+                    >
+                      Request changes
+                    </Button>
+                  </div>
                 </section>
               )}
 
@@ -1090,42 +1176,77 @@ export function TaskDetailDrawer({
                     ) : comments.length === 0 ? (
                       <p className="text-xs text-muted-foreground">No comments yet. Start the conversation!</p>
                     ) : (
-                      comments.map((comment) => {
-                        const author = members.find((m) => m.id === comment.authorMemberId);
-                        const authorName = author?.fullName ?? "Unknown Member";
-                        return (
-                          <div
-                            key={comment.id}
-                            className="rounded-lg bg-neutral-50 dark:bg-neutral-900 border p-3 text-sm flex items-start justify-between gap-3 group"
-                          >
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="font-bold text-xs">{authorName}</span>
-                                <span className="text-[10px] text-muted-foreground">
-                                  {new Date(comment.createdAt).toLocaleString()}
-                                </span>
-                              </div>
-                              <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
-                                {comment.body}
-                              </p>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                              onClick={() => deleteComment(comment.id)}
+                      (() => {
+                        const top = comments.filter((c: any) => !c.parentCommentId);
+                        const repliesByParent: Record<string, any[]> = {};
+                        for (const c of comments) {
+                          if (c.parentCommentId) (repliesByParent[c.parentCommentId] ??= []).push(c);
+                        }
+                        const rows: { comment: any; depth: number }[] = [];
+                        for (const t of top) {
+                          rows.push({ comment: t, depth: 0 });
+                          for (const r of repliesByParent[t.id] ?? []) rows.push({ comment: r, depth: 1 });
+                        }
+                        const placed = new Set(rows.map((r) => r.comment.id));
+                        for (const c of comments) if (!placed.has(c.id)) rows.push({ comment: c, depth: 0 });
+                        return rows.map(({ comment, depth }) => {
+                          const author = members.find((m) => m.id === comment.authorMemberId);
+                          const authorName = author?.fullName ?? "Unknown Member";
+                          return (
+                            <div
+                              key={comment.id}
+                              style={{ marginLeft: depth ? 20 : 0 }}
+                              className="rounded-lg bg-neutral-50 dark:bg-neutral-900 border p-3 text-sm flex items-start justify-between gap-3 group"
                             >
-                              <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                            </Button>
-                          </div>
-                        );
-                      })
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  {depth > 0 && <span className="text-[10px] font-bold text-primary">↳</span>}
+                                  <span className="font-bold text-xs">{authorName}</span>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {new Date(comment.createdAt).toLocaleString()}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                  {comment.body}
+                                </p>
+                                <button
+                                  type="button"
+                                  className="mt-1 text-[10px] font-semibold text-primary hover:underline"
+                                  onClick={() => setReplyTo(comment.id)}
+                                >
+                                  Reply
+                                </button>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                onClick={() => deleteComment(comment.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                              </Button>
+                            </div>
+                          );
+                        });
+                      })()
                     )}
                   </div>
+                  {replyTo && (
+                    <div className="mt-2 flex items-center justify-between rounded-md bg-primary/5 px-2 py-1 text-[10px] text-primary">
+                      <span>Replying to a comment</span>
+                      <button
+                        type="button"
+                        className="font-semibold hover:underline"
+                        onClick={() => setReplyTo(null)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
                   <div className="flex gap-2 items-end mt-2">
                     <Textarea
-                      placeholder="Add a comment... Use @name to mention"
+                      placeholder={replyTo ? "Write a reply..." : "Add a comment... Use @name to mention"}
                       value={newCommentBody}
                       onChange={(e) => setNewCommentBody(e.target.value)}
                       className="min-h-16 flex-1 text-xs"
@@ -1136,7 +1257,7 @@ export function TaskDetailDrawer({
                       disabled={!newCommentBody.trim()}
                       onClick={submitComment}
                     >
-                      Post
+                      {replyTo ? "Reply" : "Post"}
                     </Button>
                   </div>
                 </section>

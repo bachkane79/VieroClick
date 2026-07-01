@@ -13,7 +13,8 @@ import {
 } from "@vieroc/db";
 import { eq } from "drizzle-orm";
 import { isAgentRequest } from "@/server/lib/agent-auth";
-import { dispatchBandAgent } from "@/server/lib/band-dispatch";
+import { dispatchAgent } from "@/server/lib/agent-dispatch";
+import { recordDeadLetter } from "@/server/lib/dead-letter";
 import { invalidateCache } from "@/server/lib/cache";
 
 function text(value: unknown, fallback = "") {
@@ -94,6 +95,14 @@ export async function POST(request: Request) {
 
     const results: Array<{ type: string; title: string; ok: boolean; note?: string }> = [];
 
+    const KNOWN_ACTIONS = new Set([
+      "create_risk",
+      "escalate_blocker",
+      "trigger_replan",
+      "notify_lead",
+      "notify_member",
+    ]);
+
     for (const sug of suggestions) {
       const actionType = text(sug.action_type);
       const suggestionType = text(sug.suggestion_type, "risk_detected");
@@ -101,122 +110,142 @@ export async function POST(request: Request) {
       const body = text(sug.body);
       const sugPayload = sug.payload ?? {};
       const severity = text(sugPayload.severity, "medium");
+      const memberIds = Array.isArray(sugPayload.affected_member_ids)
+        ? sugPayload.affected_member_ids.filter((id): id is string => typeof id === "string")
+        : [];
 
-      // Always record the suggestion for audit trail
-      const [job] = await db
-        .insert(agentJobs)
-        .values({
-          projectId,
-          jobType: "risk_scan",
-          status: "succeeded",
-          startedAt: new Date(),
-          finishedAt: new Date(),
-        })
-        .returning();
-
-      if (job) {
-        await db.insert(agentSuggestions).values({
-          projectId,
-          jobId: job.id,
-          suggestionType,
-          title,
-          body,
-          payload: sug as Record<string, unknown>,
-          status: "accepted",
-          reviewedAt: new Date(),
-        });
-      }
-
-      // Execute the action
-      switch (actionType) {
-        case "create_risk": {
-          await db.insert(projectRisks).values({
-            projectId,
-            title,
-            description: body || null,
-            probability: severityToProb(severity),
-            impact: severityToProb(severity),
-            status: "open",
-          });
-          results.push({ type: actionType, title, ok: true });
-          break;
-        }
-
-        case "escalate_blocker": {
-          const blockerId = typeof sugPayload.blocker_id === "string" ? sugPayload.blocker_id : null;
-          if (blockerId) {
-            await db
-              .update(blockers)
-              .set({ status: "in_review", updatedAt: new Date() })
-              .where(eq(blockers.id, blockerId));
-          }
-          const leadId = await getLeadMemberId(projectId);
-          if (leadId) {
-            await db.insert(notifications).values({
-              workspaceId: project.workspaceId,
-              recipientMemberId: leadId,
+      try {
+        // Audit record + action commit atomically per suggestion, so a mid-action
+        // failure can't leave a suggestion logged but its action half-applied.
+        await db.transaction(async (tx) => {
+          const [job] = await tx
+            .insert(agentJobs)
+            .values({
               projectId,
-              type: "agent.blocker_escalation",
+              jobType: "risk_scan",
+              status: "succeeded",
+              startedAt: new Date(),
+              finishedAt: new Date(),
+            })
+            .returning();
+
+          if (job) {
+            await tx.insert(agentSuggestions).values({
+              projectId,
+              jobId: job.id,
+              suggestionType,
               title,
-              body: body || null,
-              entityType: "blocker",
-              entityId: blockerId ?? undefined,
+              body,
+              payload: sug as Record<string, unknown>,
+              status: "accepted",
+              reviewedAt: new Date(),
             });
           }
-          results.push({ type: actionType, title, ok: true });
-          break;
-        }
 
-        case "trigger_replan": {
-          void dispatchBandAgent({
+          switch (actionType) {
+            case "create_risk": {
+              await tx.insert(projectRisks).values({
+                projectId,
+                title,
+                description: body || null,
+                probability: severityToProb(severity),
+                impact: severityToProb(severity),
+                status: "open",
+              });
+              break;
+            }
+
+            case "escalate_blocker": {
+              const blockerId = typeof sugPayload.blocker_id === "string" ? sugPayload.blocker_id : null;
+              if (blockerId) {
+                await tx
+                  .update(blockers)
+                  .set({ status: "in_review", updatedAt: new Date() })
+                  .where(eq(blockers.id, blockerId));
+              }
+              const leadId = await getLeadMemberId(projectId);
+              if (leadId) {
+                await tx.insert(notifications).values({
+                  workspaceId: project.workspaceId,
+                  recipientMemberId: leadId,
+                  projectId,
+                  type: "agent.blocker_escalation",
+                  title,
+                  body: body || null,
+                  entityType: "blocker",
+                  entityId: blockerId ?? undefined,
+                });
+              }
+              break;
+            }
+
+            case "notify_lead": {
+              const leadId = await getLeadMemberId(projectId);
+              if (leadId) {
+                await tx.insert(notifications).values({
+                  workspaceId: project.workspaceId,
+                  recipientMemberId: leadId,
+                  projectId,
+                  type: "agent.observer_alert",
+                  title,
+                  body: body || null,
+                });
+              }
+              break;
+            }
+
+            case "notify_member": {
+              for (const memberId of memberIds) {
+                await tx.insert(notifications).values({
+                  workspaceId: project.workspaceId,
+                  recipientMemberId: memberId,
+                  projectId,
+                  type: "agent.observer_alert",
+                  title,
+                  body: body || null,
+                });
+              }
+              break;
+            }
+
+            // trigger_replan / unknown: only the audit record above is written in-tx;
+            // the replan dispatch is an external call fired after commit.
+            default:
+              break;
+          }
+        });
+
+        // External side effect fired only after the audit commit succeeds.
+        if (actionType === "trigger_replan") {
+          void dispatchAgent({
             targetRole: "planning",
             projectId,
             message: title,
             payload: { mode: "replan", reason: body },
           }).catch((err) => console.error("Observer-triggered replan dispatch failed:", err));
-          results.push({ type: actionType, title, ok: true });
-          break;
         }
 
-        case "notify_lead": {
-          const leadId = await getLeadMemberId(projectId);
-          if (leadId) {
-            await db.insert(notifications).values({
-              workspaceId: project.workspaceId,
-              recipientMemberId: leadId,
-              projectId,
-              type: "agent.observer_alert",
-              title,
-              body: body || null,
-            });
-          }
-          results.push({ type: actionType, title, ok: true });
-          break;
-        }
-
-        case "notify_member": {
-          const memberIds = Array.isArray(sugPayload.affected_member_ids)
-            ? sugPayload.affected_member_ids.filter((id): id is string => typeof id === "string")
-            : [];
-          for (const memberId of memberIds) {
-            await db.insert(notifications).values({
-              workspaceId: project.workspaceId,
-              recipientMemberId: memberId,
-              projectId,
-              type: "agent.observer_alert",
-              title,
-              body: body || null,
-            });
-          }
-          results.push({ type: actionType, title, ok: true, note: `Notified ${memberIds.length} member(s)` });
-          break;
-        }
-
-        default: {
-          // Unknown action type — log and continue
+        if (KNOWN_ACTIONS.has(actionType)) {
+          results.push({
+            type: actionType,
+            title,
+            ok: true,
+            note: actionType === "notify_member" ? `Notified ${memberIds.length} member(s)` : undefined,
+          });
+        } else {
           results.push({ type: actionType || "unknown", title, ok: false, note: "Unrecognized action_type" });
-          break;
         }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("Failed to apply observer suggestion:", msg);
+        results.push({ type: actionType || "unknown", title, ok: false, note: msg });
+        await recordDeadLetter({
+          source: "apply-observer-suggestions",
+          jobType: "risk_scan",
+          projectId,
+          payload: sug as Record<string, unknown>,
+          error: msg,
+        });
       }
     }
 

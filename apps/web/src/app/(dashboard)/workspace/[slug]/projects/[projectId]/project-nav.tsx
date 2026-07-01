@@ -14,6 +14,8 @@ import {
   AlertTriangle,
   FileText,
   TrendingUp,
+  BarChart3,
+  Users,
   Sparkles,
 } from "lucide-react";
 
@@ -85,6 +87,16 @@ export function ProjectNav({ slug, projectId }: Props) {
       name: "Reports",
       href: `/workspace/${slug}/projects/${projectId}/reports`,
       icon: TrendingUp,
+    },
+    {
+      name: "Analytics",
+      href: `/workspace/${slug}/projects/${projectId}/analytics`,
+      icon: BarChart3,
+    },
+    {
+      name: "Team",
+      href: `/workspace/${slug}/projects/${projectId}/team`,
+      icon: Users,
     },
     {
       name: "AI Assistant",

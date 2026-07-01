@@ -18,46 +18,22 @@ class Settings(BaseSettings):
     gemini_planner_model: str = "gemini-2.5-pro"
     gemini_embedding_model: str = "text-embedding-004"
 
-    # Local agent service (replaces Band.ai dispatch)
-    agent_service_url: str = "http://localhost:8001"
-    agent_service_secret: str = ""
-
     # Redis
     redis_url: str = "redis://localhost:6379"
 
     # Telegram
     telegram_bot_token: str = ""
     telegram_webhook_secret: str = ""
+    # Optional chat id for best-effort broadcasts (e.g. morning briefing overview).
+    telegram_broadcast_chat_id: str = ""
     # Public HTTPS base URL that Telegram can reach (ngrok in dev, real domain in prod).
     # When set, all active bots get their webhook auto-registered on app startup.
     public_base_url: str = ""
     telegram_webhook_path: str = "/api/telegram/webhook"
 
-    # VieroClick web API (used by report_runner)
+    # VieroClick web API (used by agent roles + report_runner)
     vieroc_api_url: str = "http://localhost:3000"
     vieroc_api_key: str = ""
-
-    # Band AI external agents
-    band_api_base_url: str = ""
-    band_room_id: str = ""
-    planning_handle: str = "@planning"
-    planning_agent_id: str = ""
-    planning_api_key: str = ""
-    assignment_handle: str = "@assignment"
-    assignment_agent_id: str = ""
-    assignment_api_key: str = ""
-    observer_handle: str = "@observer"
-    observer_agent_id: str = ""
-    observer_api_key: str = ""
-    daily_report_handle: str = "@daily-report"
-    daily_report_agent_id: str = ""
-    daily_report_api_key: str = ""
-    morning_briefing_handle: str = "@morning-briefing"
-    morning_briefing_agent_id: str = ""
-    morning_briefing_api_key: str = ""
-    project_qa_handle: str = "@project-qa"
-    project_qa_agent_id: str = ""
-    project_qa_api_key: str = ""
 
     # Celery
     celery_broker_url: str = "redis://localhost:6379/0"
@@ -69,3 +45,15 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def check_required_settings() -> list[str]:
+    """Names of critical secrets that are missing or still at a placeholder value."""
+    missing: list[str] = []
+    if not settings.gemini_api_key:
+        missing.append("GEMINI_API_KEY")
+    if not settings.vieroc_api_key:
+        missing.append("VIEROC_API_KEY")
+    if not settings.agent_api_secret or settings.agent_api_secret == "change-me":
+        missing.append("AGENT_API_SECRET")
+    return missing

@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import structlog
 
-from app.settings import settings
+from app.settings import settings, check_required_settings
 from app.api.router import api_router
 from app.telegram_webhook import register_all_webhooks
 
@@ -13,6 +13,14 @@ logger = structlog.get_logger()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # 4.5: fail fast on missing critical secrets in production; warn in debug.
+    missing = check_required_settings()
+    if missing:
+        detail = f"Missing/placeholder critical settings: {', '.join(missing)}"
+        if settings.debug:
+            logger.warning("startup.missing_settings", detail=detail)
+        else:
+            raise RuntimeError(detail)
     await register_all_webhooks()
     yield
 

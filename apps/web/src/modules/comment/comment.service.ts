@@ -75,10 +75,19 @@ export async function addComment(p: {
   const task = await getTaskInProject(p.taskId, p.projectId);
   await assertLinksBelongToProject(data.metadata.links, p.projectId);
 
+  // Threaded reply: parent must be a comment on the same task.
+  if (data.parentCommentId) {
+    const parent = await repo.findByIdInProject(data.parentCommentId, p.projectId);
+    if (!parent || parent.taskId !== p.taskId) {
+      throw new ValidationError("Reply target must be a comment on this task");
+    }
+  }
+
   return db.transaction(async (tx) => {
     const comment = await repo.create(
       {
         taskId: p.taskId,
+        parentCommentId: data.parentCommentId ?? null,
         authorMemberId: ctx.workspaceMemberId,
         body: data.body.trim(),
         metadata: {

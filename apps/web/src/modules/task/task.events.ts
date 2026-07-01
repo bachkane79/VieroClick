@@ -68,6 +68,42 @@ export function taskDeleted(exec: Executor, ctx: ActorContext, task: TaskLike) {
   });
 }
 
+export function taskSubmittedForReview(exec: Executor, ctx: ActorContext, task: TaskLike) {
+  return recordEvent(exec, {
+    ...actorFields(ctx),
+    entityType: "task",
+    entityId: task.id,
+    eventType: "task.submitted_for_review",
+    after: { statusId: task.statusId },
+  });
+}
+
+export function taskApproved(exec: Executor, ctx: ActorContext, task: TaskLike) {
+  return recordEvent(exec, {
+    ...actorFields(ctx),
+    entityType: "task",
+    entityId: task.id,
+    eventType: "task.approved",
+    after: { statusId: task.statusId },
+  });
+}
+
+export function taskReworkRequested(
+  exec: Executor,
+  ctx: ActorContext,
+  task: TaskLike,
+  feedback?: string
+) {
+  return recordEvent(exec, {
+    ...actorFields(ctx),
+    entityType: "task",
+    entityId: task.id,
+    eventType: "task.rework_requested",
+    after: { statusId: task.statusId },
+    metadata: feedback ? { feedback } : undefined,
+  });
+}
+
 export function taskPlanDeviation(
   exec: Executor,
   ctx: ActorContext,
