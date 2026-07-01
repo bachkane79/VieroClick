@@ -12,8 +12,8 @@ Given live project data (tasks, blockers, risks, members, daily_updates), produc
 
 CRITICAL — progressSummary construction rules:
 1. The primary source for progressSummary is `daily_updates[]`. For each entry, use:
-   - `completed` field: what the member finished today
-   - `in_progress` field: what they are currently working on
+   - `completedText` field: what the member finished today
+   - `inProgressText` field: what they are currently working on
    Synthesize these into a coherent paragraph, attributing work to members by name when possible.
 2. If `daily_updates` is empty or missing, fall back to summarising completed/in-progress tasks from `tasks[]`.
 3. For any project member who has NO entry in `daily_updates` for today, explicitly state:

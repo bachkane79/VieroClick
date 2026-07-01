@@ -282,6 +282,9 @@ export async function POST(request: Request) {
         if (task.acceptanceCriteria !== undefined) updateSet.acceptanceCriteria = criteria(task.acceptanceCriteria);
         if (task.labels !== undefined) updateSet.labels = labelsList(task.labels);
 
+        const milestoneIdVal = typeof task.milestoneId === "string" && task.milestoneId.trim()
+          ? task.milestoneId.trim()
+          : null;
         const definitionFields = {
           title,
           description: nullableText(task.description),
@@ -291,6 +294,7 @@ export async function POST(request: Request) {
           estimateHours: numberString(task.estimateHours ?? task.estimatedHours),
           acceptanceCriteria: criteria(task.acceptanceCriteria),
           labels: labelsList(task.labels),
+          milestoneId: milestoneIdVal,
           updatedAt: new Date(),
         };
 
@@ -500,7 +504,7 @@ export async function POST(request: Request) {
                            THEN labels ELSE labels || '["plan-review"]'::jsonb END,
                   updated_at = NOW()
               WHERE project_id = ${projectId}
-                AND id = ANY(ARRAY[${sql.join(orphanTaskIds.map((id) => sql`${id}::uuid`))}])`
+                AND id::text = ANY(ARRAY[${sql.join(orphanTaskIds.map((id) => sql`${id}`), sql`, `)}]::text[])`
         );
         counts.flagged += orphanTaskIds.length;
       }
