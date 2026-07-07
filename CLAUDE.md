@@ -186,6 +186,12 @@ Band.ai is gone: the 6 roles (planning, assignment, observer, daily_report, morn
 
 The web app's `apps/web/src/server/lib/agent-dispatch.ts` (`dispatchAgent`) POSTs directly to `{AGENT_API_URL}/api/agents/{role}` with the `X-Api-Secret` header. This is separate from the async Celery job path (`POST /api/jobs/` → poll `GET /api/jobs/{id}`) used by `agent-job.service.ts`.
 
+### Telegram bot (§2.8)
+
+`app/agents/telegram_agent.py` handles inbound Telegram updates in three channels: **slash commands** (`/help`, `/status`, `/health`, `/report`, `/member`, `/tasks`, `/blockers`, `/risks`, `/milestones`, `/updates`, `/ask`, `/blocker`, `/update` — formatters in `telegram_commands.py`), **Y/N approval replies**, and **free-text** classified into the fixed intent set `{daily_update, blocker_report, task_question, status_query, general_message}`. Questions route to `project_qa`; a suspected blocker/daily-update opens a **write-approval flow** (propose → `Y` commits / `N <reason>` cancels); chit-chat and stray out-of-flow Y/N are ignored (never acted on).
+
+Reads use `GET /api/agent/project-summary` (resolved health-score + team-metrics + task/blocker/risk/milestone/update lists). Approved writes commit via `POST /api/agent/telegram-action`, attributed to the **project lead** (Telegram carries no per-message member identity). Pending proposals live in the `telegram_pending_actions` table (migration `0006`) — one pending row per chat; the agent-api reads/writes it via raw SQLAlchemy in `app/db/queries.py`, the same way it handles `telegram_bots`.
+
 ### Auth
 
 Auth.js v5 (`next-auth`) with GitHub + Google, **JWT sessions** (no database adapter). The config is split so middleware stays edge-safe:

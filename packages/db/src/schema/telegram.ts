@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, boolean, jsonb, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, boolean, jsonb, unique, index } from "drizzle-orm/pg-core";
 import { timestamptz } from "./_helpers";
 import { users } from "./users";
 import { workspaces, workspaceMembers } from "./workspaces";
@@ -56,6 +56,42 @@ export const telegramUsers = pgTable(
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
   (t) => [unique().on(t.workspaceId, t.telegramUserId)]
+);
+
+/**
+ * Pending Telegram write actions awaiting Y/N confirmation (§2.8).
+ *
+ * When a member's message is classified as an actionable intent (blocker /
+ * daily-update) or sent via a write command, the bot proposes the action and
+ * stores it here as `pending`. The user's next reply — `Y` to approve or
+ * `N <reason>` to reject — resolves the row. Only one row per chat is ever
+ * pending at a time (the router expires the previous one before proposing a
+ * new action), so the reply is unambiguous. Attribution: the committed
+ * blocker/daily-update is owned by the project lead (Telegram carries no
+ * per-message member identity).
+ */
+export const telegramPendingActions = pgTable(
+  "telegram_pending_actions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
+    chatId: text("chat_id").notNull(),
+    // "blocker" | "daily_update"
+    actionType: text("action_type").notNull(),
+    // Proposed payload: for blocker → {title, description, severity};
+    // for daily_update → {workDate, completedText, inProgressText, blockersText}.
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+    // "pending" | "approved" | "rejected" | "expired"
+    status: text("status").notNull().default("pending"),
+    // Reason captured from an `N <reason>` rejection.
+    rejectionReason: text("rejection_reason"),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+    resolvedAt: timestamptz("resolved_at"),
+  },
+  (t) => [index("telegram_pending_actions_chat_status_idx").on(t.chatId, t.status)]
 );
 
 export const telegramMessages = pgTable(

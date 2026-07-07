@@ -101,6 +101,43 @@ class VieroClickClient:
             logger.error("Failed to fetch project data from VieroClick: %s", e)
             return {}
 
+    async def fetch_project_summary(self, project_id: str) -> dict:
+        """Fetch the resolved read model used by Telegram query commands (§2.8).
+
+        Returns health details, team metrics, and resolved task/blocker/risk/
+        milestone/daily-update lists. Returns {} on failure (best-effort).
+        """
+        try:
+            return await _request_json(
+                "GET",
+                f"{self.base_url}/api/agent/project-summary",
+                headers=self._headers,
+                params={"projectId": project_id},
+            )
+        except Exception as e:
+            logger.error("Failed to fetch project summary from VieroClick: %s", e)
+            return {}
+
+    async def commit_telegram_action(
+        self, project_id: str, action_type: str, payload: dict
+    ) -> dict:
+        """Commit a Telegram-approved write (blocker / daily_update) owned by the
+        project lead. Returns the API response, or {} on failure."""
+        try:
+            return await _request_json(
+                "POST",
+                f"{self.base_url}/api/agent/telegram-action",
+                headers=self._headers,
+                json={
+                    "projectId": project_id,
+                    "actionType": action_type,
+                    "payload": payload,
+                },
+            )
+        except Exception as e:
+            logger.error("Failed to commit telegram action in VieroClick: %s", e)
+            return {}
+
     async def create_suggestion(
         self,
         suggestion_type: str,
