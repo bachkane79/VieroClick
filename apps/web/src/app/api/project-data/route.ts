@@ -16,6 +16,7 @@ import {
   projectDocs,
   wbsNodes,
   memberProfiles,
+  taskAssignees,
 } from "@vieroc/db";
 import { eq, and } from "drizzle-orm";
 import { getUserId } from "@/server/lib/context";
@@ -80,19 +81,34 @@ export async function GET(request: Request) {
     const allDocs = await db.select().from(projectDocs).where(eq(projectDocs.projectId, projectId));
     const allWbs = await db.select().from(wbsNodes).where(eq(wbsNodes.projectId, projectId));
 
-    // Fetch comments for all tasks
+    // Fetch comments + multi-assignees for all tasks
     const taskIds = allTasks.map((t) => t.id);
     let allComments: any[] = [];
+    const assigneesByTask = new Map<string, string[]>();
     if (taskIds.length > 0) {
       const { inArray } = await import("drizzle-orm");
       allComments = await db.select().from(taskComments).where(inArray(taskComments.taskId, taskIds));
+      const assigneeRows = await db
+        .select({ taskId: taskAssignees.taskId, workspaceMemberId: taskAssignees.workspaceMemberId })
+        .from(taskAssignees)
+        .where(inArray(taskAssignees.taskId, taskIds));
+      for (const r of assigneeRows) {
+        const list = assigneesByTask.get(r.taskId) ?? [];
+        list.push(r.workspaceMemberId);
+        assigneesByTask.set(r.taskId, list);
+      }
     }
+    // Expose the full assignee set per task (agents split capacity across them).
+    const tasksWithAssignees = allTasks.map((t) => ({
+      ...t,
+      assignees: assigneesByTask.get(t.id) ?? (t.assigneeMemberId ? [t.assigneeMemberId] : []),
+    }));
 
     return NextResponse.json({
       project,
       members,
       projectMembers: pMembers,
-      tasks: allTasks,
+      tasks: tasksWithAssignees,
       blockers: allBlockers,
       risks: allRisks,
       milestones: allMilestones,

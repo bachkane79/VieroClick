@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Sparkles, MessageSquare, Send, CheckCircle, XCircle, AlertTriangle, Compass, ShieldAlert, Cpu, RefreshCw, Eye, Activity, Clock, ShieldX } from "lucide-react";
 import { reviewSuggestionAction } from "@/modules/agent-suggestion/agent-suggestion.actions";
 import { askAiQuestionAction, generateAiSuggestionsAction } from "@/modules/agent-job/agent-job.actions";
-import { triggerReplanAction, runObserverAction } from "@/modules/project/project.actions";
+import { triggerReplanAction, runObserverAction, updateProjectAction } from "@/modules/project/project.actions";
 
 interface SuggestionRow {
   id: string;
@@ -27,6 +27,8 @@ interface Props {
   projectId: string;
   workspaceSlug: string;
   initialSuggestions: SuggestionRow[];
+  agentAutonomy: "full_auto" | "review_required";
+  agentConfidenceThreshold: number;
 }
 
 export function AiViewClient({
@@ -34,9 +36,13 @@ export function AiViewClient({
   projectId,
   workspaceSlug,
   initialSuggestions,
+  agentAutonomy,
+  agentConfidenceThreshold,
 }: Props) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [autonomy, setAutonomy] = useState<"full_auto" | "review_required">(agentAutonomy);
+  const [threshold, setThreshold] = useState(agentConfidenceThreshold);
   const [activePanel, setActivePanel] = useState<"assistant" | "suggestions">("assistant");
   const [replanReason, setReplanReason] = useState("");
   const [showReplanInput, setShowReplanInput] = useState(false);
@@ -148,6 +154,45 @@ export function AiViewClient({
     router.refresh();
   }
 
+  async function handleAutonomyChange(next: "full_auto" | "review_required") {
+    const previous = autonomy;
+    setAutonomy(next);
+    const res = await updateProjectAction({
+      workspaceId,
+      projectId,
+      slug: workspaceSlug,
+      data: { agentAutonomy: next },
+    });
+    if (!res.ok) {
+      setAutonomy(previous);
+      toast.error(res.error);
+      return;
+    }
+    toast.success(
+      next === "full_auto"
+        ? "Agent autonomy set to full auto — plans and assignments apply immediately."
+        : "Agent autonomy set to review required — agent output waits for your approval."
+    );
+  }
+
+  async function handleThresholdSave() {
+    if (!(threshold >= 0 && threshold <= 1)) {
+      toast.error("Confidence threshold must be between 0 and 1.");
+      return;
+    }
+    const res = await updateProjectAction({
+      workspaceId,
+      projectId,
+      slug: workspaceSlug,
+      data: { agentConfidenceThreshold: threshold },
+    });
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success(`Assignments below ${threshold} confidence will now wait for review.`);
+  }
+
   async function handleReview(suggestionId: string, status: "accepted" | "rejected") {
     setSubmitting(true);
     const res = await reviewSuggestionAction({
@@ -181,6 +226,42 @@ export function AiViewClient({
 
   return (
     <div className="space-y-6">
+      {/* Agent autonomy settings */}
+      <div className="flex flex-wrap items-center gap-4 rounded-lg border border-border bg-muted/30 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <ShieldAlert className="w-4 h-4 text-muted-foreground" />
+          <span className="text-xs font-bold">Agent autonomy</span>
+        </div>
+        <select
+          value={autonomy}
+          onChange={(e) => handleAutonomyChange(e.target.value as "full_auto" | "review_required")}
+          disabled={submitting}
+          className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+        >
+          <option value="full_auto">Full auto — apply immediately</option>
+          <option value="review_required">Review required — wait for approval</option>
+        </select>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Assignment confidence ≥</span>
+          <Input
+            type="number"
+            min={0}
+            max={1}
+            step={0.05}
+            value={threshold}
+            onChange={(e) => setThreshold(Number(e.target.value))}
+            onBlur={handleThresholdSave}
+            disabled={submitting || autonomy === "review_required"}
+            className="h-8 w-20 text-xs"
+          />
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          {autonomy === "review_required"
+            ? "Plans, assignments, and observer actions land as pending suggestions below."
+            : "Assignments below the threshold wait for review; the rest auto-apply."}
+        </p>
+      </div>
+
       {/* Tab selection */}
       <div className="flex border-b border-border">
         <button
@@ -510,7 +591,7 @@ export function AiViewClient({
                   {/* Last scan time */}
                   {latestRiskScan && (
                     <p className="text-[9px] text-muted-foreground text-right pt-1">
-                      Last scan: {new Date(latestRiskScan.createdAt).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" })}
+                      Last scan: {new Date(latestRiskScan.createdAt).toLocaleString("en", { dateStyle: "short", timeStyle: "short" })}
                     </p>
                   )}
                 </div>

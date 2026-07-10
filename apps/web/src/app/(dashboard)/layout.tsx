@@ -1,19 +1,22 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/server/auth";
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { CommandPalette } from "@/components/layout/command-palette";
 import { listMyWorkspaces } from "@/modules/workspace/workspace.service";
+import { listMyOrganizations } from "@/modules/organization/organization.service";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   let session;
   let workspaces;
+  let organizations;
   try {
     session = await auth();
     if (!session?.user?.id) {
       redirect("/login");
     }
-    workspaces = await listMyWorkspaces();
+    [workspaces, organizations] = await Promise.all([listMyWorkspaces(), listMyOrganizations()]);
   } catch (err) {
     // Rethrow Next.js internal redirect exceptions
     if (
@@ -30,8 +33,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <AppSidebar user={session.user} workspaces={workspaces} />
+      <AppSidebar user={session.user} workspaces={workspaces} organizations={organizations} />
       <main className="flex-1 overflow-y-auto">{children}</main>
+      <CommandPalette workspaces={workspaces} />
     </div>
   );
 }

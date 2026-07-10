@@ -1,4 +1,13 @@
 import { z } from "zod";
+import {
+  acceptanceCriterionSchema,
+  taskAcceptanceCriteriaSchema,
+  taskPrioritySchema,
+} from "./task-core";
+import { agentAutonomySchema } from "./agent-payloads";
+
+export * from "./task-core";
+export * from "./agent-payloads";
 
 // ─── Workspace ───────────────────────────────────────────────────────────────
 
@@ -30,37 +39,20 @@ export const createProjectSchema = z.object({
   expectedDeliverables: z.array(z.string()).default([]),
   memberIds: z.array(z.string().uuid()).default([]),
   initialContext: z.string().optional(),
+  // AI Leader master switch chosen at creation. When false, the project is
+  // created for manual work and no planning agent is dispatched.
+  aiEnabled: z.boolean().default(true),
 });
 
-export const updateProjectSchema = createProjectSchema.partial();
+export const updateProjectSchema = createProjectSchema.partial().extend({
+  agentAutonomy: agentAutonomySchema.optional(),
+  agentConfidenceThreshold: z.number().min(0).max(1).optional(),
+  aiEnabled: z.boolean().optional(),
+});
 
 // ─── Task ─────────────────────────────────────────────────────────────────────
-
-export const taskPrioritySchema = z.enum(["low", "medium", "high", "urgent"]);
-
-export const acceptanceCriterionSchema = z.object({
-  id: z.string().optional(),
-  text: z.string().min(1).max(500),
-  required: z.boolean().default(true),
-  checked: z.boolean().default(false),
-});
-
-export const taskAcceptanceCriteriaSchema = z
-  .array(
-    z.union([
-      acceptanceCriterionSchema,
-      z
-        .string()
-        .min(1)
-        .max(500)
-        .transform((text) => ({
-          text,
-          required: true,
-          checked: false,
-        })),
-    ])
-  )
-  .default([]);
+// taskPrioritySchema / acceptanceCriterionSchema / taskAcceptanceCriteriaSchema
+// live in ./task-core (shared with ./agent-payloads) and are re-exported above.
 
 export const createTaskSchema = z.object({
   title: z.string().min(1).max(500),
@@ -129,6 +121,9 @@ export const linkedEntitySchema = z.object({
 export const commentMetadataSchema = z
   .object({
     links: z.array(linkedEntitySchema).max(20).default([]),
+    // Assigned comment (ClickUp-style): the member who must act on/resolve it.
+    assignedMemberId: z.string().uuid().nullable().optional(),
+    resolved: z.boolean().optional(),
   })
   .passthrough();
 

@@ -80,6 +80,21 @@ export async function assignTaskAction(args: BaseArgs & { taskId: string; member
   });
 }
 
+export async function setTaskAssigneesAction(
+  args: BaseArgs & { taskId: string; memberIds: string[] }
+) {
+  return runAction(async () => {
+    const task = await service.setTaskAssignees({
+      workspaceId: args.workspaceId,
+      projectId: args.projectId,
+      taskId: args.taskId,
+      memberIds: args.memberIds,
+    });
+    revalidateBoard(args.slug, args.projectId);
+    return task;
+  });
+}
+
 export async function changeTaskStatusAction(
   args: BaseArgs & {
     taskId: string;

@@ -31,6 +31,9 @@ class AgentRequest(BaseModel):
     question: str | None = None
     senderRole: str | None = None
     targetRole: str | None = None
+    # Single-use dispatch record id minted by the web dispatcher; callback roles
+    # must present it to the apply-* routes (validated + consumed there).
+    dispatchId: str | None = None
 
 
 @router.get("/")
@@ -50,6 +53,8 @@ async def run_agent(role: str, body: AgentRequest) -> dict:
         payload["message"] = body.message
     if body.question and "question" not in payload:
         payload["question"] = body.question
+    if body.dispatchId:
+        payload["dispatch_id"] = body.dispatchId
 
     logger.info("Dispatching agent '%s' for project=%s", role, body.projectId)
     try:

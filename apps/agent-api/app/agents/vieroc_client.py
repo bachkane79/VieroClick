@@ -165,34 +165,53 @@ class VieroClickClient:
             logger.error("Failed to create suggestion in VieroClick: %s", e)
             return {}
 
-    async def post_observer_suggestions(self, project_id: str, suggestions: list) -> dict:
+    async def post_observer_suggestions(
+        self, project_id: str, suggestions: list, dispatch_id: Optional[str] = None
+    ) -> dict:
         """Post observer suggestions to apply-observer-suggestions — executes actions immediately."""
         try:
             return await _request_json(
                 "POST",
                 f"{self.base_url}/api/agent/apply-observer-suggestions",
                 headers=self._headers,
-                json={"projectId": project_id, "suggestions": suggestions},
+                json={
+                    "projectId": project_id,
+                    "suggestions": suggestions,
+                    "dispatchId": dispatch_id,
+                },
             )
+        except httpx.HTTPStatusError as e:
+            return self._apply_error("post observer suggestions", e)
         except Exception as e:
             logger.error("Failed to post observer suggestions: %s", e)
-            return {}
+            return {"ok": False, "error": str(e)}
 
-    async def apply_plan(self, project_id: str, plan: dict, mode: str = "initial") -> dict:
+    async def apply_plan(
+        self, project_id: str, plan: dict, mode: str = "initial", dispatch_id: Optional[str] = None
+    ) -> dict:
         """Apply an agent-generated plan to VieroClick DB-backed objects."""
         try:
             return await _request_json(
                 "POST",
                 f"{self.base_url}/api/agent/apply-plan",
                 headers=self._headers,
-                json={"projectId": project_id, "plan": plan, "mode": mode},
+                json={
+                    "projectId": project_id,
+                    "plan": plan,
+                    "mode": mode,
+                    "dispatchId": dispatch_id,
+                },
                 timeout=60.0,
             )
+        except httpx.HTTPStatusError as e:
+            return self._apply_error("apply plan", e)
         except Exception as e:
             logger.error("Failed to apply plan in VieroClick: %s", e)
-            return {}
+            return {"ok": False, "error": str(e)}
 
-    async def apply_assignments(self, project_id: str, assignments: dict) -> dict:
+    async def apply_assignments(
+        self, project_id: str, assignments: dict, dispatch_id: Optional[str] = None
+    ) -> dict:
         """Apply task assignments to VieroClick DB-backed tasks."""
         try:
             return await _request_json(
@@ -202,12 +221,32 @@ class VieroClickClient:
                 json={
                     "projectId": project_id,
                     "assignments": assignments.get("assignments", []),
+                    "dispatchId": dispatch_id,
                 },
                 timeout=60.0,
             )
+        except httpx.HTTPStatusError as e:
+            return self._apply_error("apply assignments", e)
         except Exception as e:
             logger.error("Failed to apply assignments in VieroClick: %s", e)
-            return {}
+            return {"ok": False, "error": str(e)}
+
+    @staticmethod
+    def _apply_error(action: str, e: httpx.HTTPStatusError) -> dict:
+        """Surface a 4xx/5xx apply failure (validation detail, dispatch rejection)
+        back to the role result instead of swallowing it as {}."""
+        status = e.response.status_code
+        try:
+            detail = e.response.json()
+        except Exception:
+            detail = {"error": e.response.text[:500] or str(e)}
+        error = detail.get("error") if isinstance(detail, dict) else None
+        issues = detail.get("issues") if isinstance(detail, dict) else None
+        message = error or str(e)
+        if issues:
+            message = f"{message} ({'; '.join(str(i) for i in issues[:5])})"
+        logger.error("Failed to %s in VieroClick (%s): %s", action, status, message)
+        return {"ok": False, "status": status, "error": message}
 
     async def create_report(
         self,

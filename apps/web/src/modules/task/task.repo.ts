@@ -4,6 +4,7 @@ import {
   db,
   projects,
   tasks,
+  taskAssignees,
   taskDependencies,
   taskStatuses,
   type Executor,
@@ -145,6 +146,45 @@ export async function findDependencyPair(
     )
     .limit(1);
   return row ?? null;
+}
+
+// ── Multi-assignee (task_assignees join) ─────────────────────────────────────
+
+export async function listAssigneesByProject(
+  projectId: string,
+  exec: Executor = db
+): Promise<{ taskId: string; workspaceMemberId: string }[]> {
+  return exec
+    .select({
+      taskId: taskAssignees.taskId,
+      workspaceMemberId: taskAssignees.workspaceMemberId,
+    })
+    .from(taskAssignees)
+    .innerJoin(tasks, eq(tasks.id, taskAssignees.taskId))
+    .where(eq(tasks.projectId, projectId));
+}
+
+export async function listAssigneeIds(taskId: string, exec: Executor = db): Promise<string[]> {
+  const rows = await exec
+    .select({ workspaceMemberId: taskAssignees.workspaceMemberId })
+    .from(taskAssignees)
+    .where(eq(taskAssignees.taskId, taskId));
+  return rows.map((r) => r.workspaceMemberId);
+}
+
+/** Replace the full assignee set for a task (delete-then-insert in one tx). */
+export async function setAssignees(
+  taskId: string,
+  memberIds: string[],
+  exec: Executor = db
+): Promise<void> {
+  await exec.delete(taskAssignees).where(eq(taskAssignees.taskId, taskId));
+  if (memberIds.length > 0) {
+    await exec
+      .insert(taskAssignees)
+      .values(memberIds.map((workspaceMemberId) => ({ taskId, workspaceMemberId })))
+      .onConflictDoNothing();
+  }
 }
 
 export async function listByAssigneeWithProject(

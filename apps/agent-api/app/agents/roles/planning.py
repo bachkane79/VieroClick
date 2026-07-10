@@ -23,7 +23,14 @@ logger = logging.getLogger(__name__)
 PLANNING_SYSTEM_PROMPT = """You are an expert AI Planning Agent.
 Analyze the project intake details, constraints, deliverables, docs, and members to generate a structured project plan.
 Return WBS nodes, tasks, milestones, dependencies, risks, assumptions, and acceptance criteria.
-Tasks must include a wbsTitle matching one of the WBS phase titles when possible.
+
+HIERARCHY IS MANDATORY. The WBS phases form the project's navigable hierarchy (Project → Phase → Task),
+so grouping must be complete:
+- Always output at least one WBS phase.
+- EVERY task MUST include a "wbsTitle" that EXACTLY matches (case-insensitive) the title of one of the
+  WBS phases you return. Never emit a task without a wbsTitle.
+- If a task does not fit a specific phase, put it under a phase titled "General" (add that phase to the WBS list).
+
 Tasks should include ISO date-only startDate and dueDate values when a reasonable timeline can be inferred.
 Do not assign tasks to members yet.
 
@@ -76,6 +83,8 @@ Rules:
 5. Elements with action "keep" must still include their planRef so the system can detect orphans.
 6. Include a "reason" field on each changed element explaining why it changed.
 7. Return only elements you are adding or changing, plus keep entries for existing unchanged elements.
+8. Every task you add or update MUST carry a "wbsTitle" matching one of the WBS phase titles
+   (use "General" if none fits, adding that phase if needed) — tasks must never be left without a phase.
 
 Output format: same JSON schema as initial planner but every element has "action" and "reason" fields.
 {
@@ -116,6 +125,7 @@ Return the minimal change set as structured JSON. Every element must have "actio
 async def run(project_id: str | None = None, payload: dict | None = None) -> dict:
     mode = (payload or {}).get("mode", "initial")
     reason = (payload or {}).get("reason", "")
+    dispatch_id = (payload or {}).get("dispatch_id")
 
     vieroc = VieroClickClient()
     project_id = project_id or vieroc.default_project_id
@@ -155,8 +165,20 @@ async def run(project_id: str | None = None, payload: dict | None = None) -> dic
     if not plan:
         return {"ok": False, "error": "LLM response was not valid JSON."}
 
-    resp = await vieroc.apply_plan(project_id, plan, mode=mode)
+    resp = await vieroc.apply_plan(project_id, plan, mode=mode, dispatch_id=dispatch_id)
     if resp and resp.get("ok"):
+        if resp.get("gated"):
+            # Project requires review — the plan was stored as a pending
+            # suggestion instead of being applied. That is a successful run.
+            logger.info("Planning gated for review (mode=%s): %s", mode, resp.get("suggestionId"))
+            return {
+                "ok": True,
+                "gated": True,
+                "projectId": project_id,
+                "mode": mode,
+                "suggestionId": resp.get("suggestionId"),
+                "warnings": resp.get("warnings", []),
+            }
         summary = resp.get("summary", {
             "created": resp.get("tasksCreated", 0),
             "updated": 0,
@@ -164,6 +186,14 @@ async def run(project_id: str | None = None, payload: dict | None = None) -> dic
             "flagged": 0,
         })
         logger.info("Planning applied (mode=%s): %s", mode, summary)
-        return {"ok": True, "projectId": project_id, "mode": mode, "summary": summary, "plan": plan}
+        return {
+            "ok": True,
+            "projectId": project_id,
+            "mode": mode,
+            "summary": summary,
+            "warnings": resp.get("warnings", []),
+            "plan": plan,
+        }
 
-    return {"ok": False, "error": "Generated a roadmap, but applying it to VieroClick failed.", "plan": plan}
+    error = (resp or {}).get("error") or "Generated a roadmap, but applying it to VieroClick failed."
+    return {"ok": False, "error": error, "status": (resp or {}).get("status"), "plan": plan}

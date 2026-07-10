@@ -41,6 +41,21 @@ export async function deleteCommentAction(args: BaseArgs & { commentId: string }
   });
 }
 
+export async function resolveCommentAction(
+  args: BaseArgs & { commentId: string; resolved: boolean }
+) {
+  return runAction(async () => {
+    const result = await service.resolveComment({
+      workspaceId: args.workspaceId,
+      projectId: args.projectId,
+      commentId: args.commentId,
+      resolved: args.resolved,
+    });
+    revalidateProject(args.slug, args.projectId);
+    return result;
+  });
+}
+
 export async function listCommentsAction(args: { workspaceId: string; projectId: string; taskId: string }) {
   return runAction(async () => {
     return service.listComments(args.workspaceId, args.projectId, args.taskId);

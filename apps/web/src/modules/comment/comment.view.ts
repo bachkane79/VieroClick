@@ -11,6 +11,8 @@ export interface CommentView {
   authorMemberId: string;
   body: string;
   links: CommentLinkView[];
+  assignedMemberId: string | null;
+  resolved: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -55,6 +57,11 @@ export function toCommentView(comment: {
     authorMemberId: comment.authorMemberId,
     body: comment.body,
     links: normalizeLinks(comment.metadata),
+    assignedMemberId:
+      typeof comment.metadata.assignedMemberId === "string"
+        ? comment.metadata.assignedMemberId
+        : null,
+    resolved: comment.metadata.resolved === true,
     createdAt: comment.createdAt.toISOString(),
     updatedAt: comment.updatedAt.toISOString(),
   };

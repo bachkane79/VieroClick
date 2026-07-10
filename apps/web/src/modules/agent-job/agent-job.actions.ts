@@ -167,6 +167,7 @@ export async function generateAiSuggestionsAction(args: {
       targetRole,
       senderRole: "planning",
       projectId: args.projectId,
+      actorUserId: ctx.userId,
       message:
         targetRole === "planning"
           ? "Manual roadmap generation requested from the AI panel."

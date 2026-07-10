@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getWorkspace } from "@/modules/workspace/workspace.service";
 import { getProject } from "@/modules/project/project.service";
@@ -25,34 +26,36 @@ export default async function ProjectLayout({ children, params }: Props) {
 
   return (
     <div className="flex flex-col h-full min-h-screen bg-background text-foreground">
-      {/* Project Header Banner */}
-      <div className="px-6 py-5 border-b border-border bg-card/25">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              <span>{workspace.name}</span>
-              <span>/</span>
-              <span>Projects</span>
-            </div>
-            <h1 className="text-xl font-bold tracking-tight text-foreground truncate mt-1">
-              {project.name}
-            </h1>
-            {project.description && (
-              <p className="text-sm text-muted-foreground truncate mt-1 max-w-2xl">
-                {project.description}
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-muted-foreground">Status:</span>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20 capitalize">
-              {project.status}
-            </span>
-          </div>
-        </div>
+      {/* Compact ClickUp-style breadcrumb row: Workspace / Projects / Name + status */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card/25 px-6 py-2.5">
+        <nav className="flex min-w-0 items-center gap-1.5 text-[13px]">
+          <Link
+            href={`/workspace/${slug}/projects`}
+            className="shrink-0 font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {workspace.name}
+          </Link>
+          <span className="text-muted-foreground/50">/</span>
+          <Link
+            href={`/workspace/${slug}/projects`}
+            className="shrink-0 font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Projects
+          </Link>
+          <span className="text-muted-foreground/50">/</span>
+          <span className="truncate font-semibold text-foreground">{project.name}</span>
+          <span className="ml-2 inline-flex shrink-0 items-center rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold capitalize text-primary">
+            {project.status}
+          </span>
+        </nav>
+        {project.description && (
+          <p className="hidden max-w-md truncate text-xs text-muted-foreground lg:block">
+            {project.description}
+          </p>
+        )}
       </div>
 
-      {/* Tabs Menu */}
+      {/* View tabs */}
       <ProjectNav slug={slug} projectId={projectId} />
 
       {/* Content Area */}

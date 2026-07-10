@@ -163,12 +163,27 @@ async function createBlockerForTask(
 export const listBoard = cache(async function listBoard(workspaceId: string, projectId: string) {
   await requireActor(workspaceId, projectId);
   return getOrSetCache(`board:${projectId}`, async () => {
-    const [tasks, statuses, dependencies] = await Promise.all([
+    const [tasks, statuses, dependencies, assignees] = await Promise.all([
       repo.listByProject(projectId),
       repo.listStatuses(projectId),
       repo.listDependenciesByProject(projectId),
+      repo.listAssigneesByProject(projectId),
     ]);
-    return { tasks, statuses, dependencies };
+    // Attach the full assignee set per task, primary (assigneeMemberId) first.
+    const byTask = new Map<string, string[]>();
+    for (const a of assignees) {
+      const list = byTask.get(a.taskId) ?? [];
+      list.push(a.workspaceMemberId);
+      byTask.set(a.taskId, list);
+    }
+    const enriched = tasks.map((t) => {
+      const ids = byTask.get(t.id) ?? [];
+      const ordered = t.assigneeMemberId
+        ? [t.assigneeMemberId, ...ids.filter((id) => id !== t.assigneeMemberId)]
+        : ids;
+      return { ...t, assigneeMemberIds: ordered };
+    });
+    return { tasks: enriched, statuses, dependencies };
   });
 });
 
@@ -479,6 +494,53 @@ export async function assignTask(p: {
     projectId: p.projectId,
     taskId: p.taskId,
     input: { assigneeMemberId: p.memberId },
+  });
+}
+
+/**
+ * Multi-assignee: replace the full assignee set. The first entry becomes the
+ * primary (`assigneeMemberId`) so all single-assignee code paths keep working.
+ * Follows the §4.3 flow; notifies members newly added to the task.
+ */
+export async function setTaskAssignees(p: {
+  workspaceId: string;
+  projectId: string;
+  taskId: string;
+  memberIds: string[];
+}) {
+  const ctx = await requireActor(p.workspaceId, p.projectId);
+  assertCanManageTasks(ctx);
+
+  const existing = await getTaskInProject(p.taskId, p.projectId);
+  const memberIds = [...new Set(p.memberIds)].slice(0, 20);
+  const primary = memberIds[0] ?? null;
+  const previous = new Set(await repo.listAssigneeIds(p.taskId));
+
+  return db.transaction(async (tx) => {
+    await repo.setAssignees(p.taskId, memberIds, tx);
+    const updated = await repo.update(p.taskId, { assigneeMemberId: primary }, tx);
+    if (!updated) throw new NotFoundError("Task");
+
+    await events.taskAssigned(tx, ctx, updated);
+
+    const added = memberIds.filter((id) => !previous.has(id) && id !== ctx.workspaceMemberId);
+    if (added.length > 0) {
+      await enqueueNotifications(
+        tx,
+        added.map((memberId) => ({
+          workspaceId: ctx.workspaceId,
+          recipientMemberId: memberId,
+          projectId: p.projectId,
+          type: "task.assigned",
+          title: `You were assigned: ${updated.title}`,
+          entityType: "task",
+          entityId: updated.id,
+        }))
+      );
+    }
+
+    invalidateCache(`board:${p.projectId}`);
+    return { ...updated, assigneeMemberIds: memberIds };
   });
 }
 

@@ -85,6 +85,7 @@ async def run(project_id: str | None = None, payload: dict | None = None) -> dic
         return {"ok": False, "error": "Failed to retrieve project state for observer scan."}
 
     plan_deviations = (payload or {}).get("plan_deviations", [])
+    dispatch_id = (payload or {}).get("dispatch_id")
 
     user_prompt = OBSERVER_WITH_DEVIATIONS_TEMPLATE.format(
         current_date=date.today().isoformat(),
@@ -111,14 +112,28 @@ async def run(project_id: str | None = None, payload: dict | None = None) -> dic
         logger.info("Observer: no qualitative issues found for project %s", project_id)
         return {"ok": True, "projectId": project_id, "savedCount": 0, "note": "No qualitative issues detected."}
 
-    resp = await vieroc.post_observer_suggestions(project_id=project_id, suggestions=suggestions)
+    resp = await vieroc.post_observer_suggestions(
+        project_id=project_id, suggestions=suggestions, dispatch_id=dispatch_id
+    )
+
+    if resp and resp.get("ok") is False:
+        return {
+            "ok": False,
+            "error": resp.get("error") or "Posting observer suggestions failed.",
+            "status": resp.get("status"),
+        }
 
     saved_count = resp.get("processed", 0) if resp else 0
-    logger.info("Observer scan complete: %s suggestions processed for project %s", saved_count, project_id)
+    pending_count = resp.get("pendingCount", 0) if resp else 0
+    logger.info(
+        "Observer scan complete: %s suggestions processed (%s pending review) for project %s",
+        saved_count, pending_count, project_id,
+    )
     return {
         "ok": True,
         "projectId": project_id,
         "savedCount": saved_count,
+        "pendingCount": pending_count,
         "suggestions": [
             {"title": s.get("title"), "type": s.get("suggestion_type"), "action": s.get("action_type")}
             for s in suggestions

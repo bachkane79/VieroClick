@@ -22,3 +22,9 @@ export async function markAllReadAction(args: { workspaceId: string }) {
     return result;
   });
 }
+
+export async function unreadCountAction(args: { workspaceId: string }) {
+  return runAction(async () => {
+    return service.unreadCount(args.workspaceId);
+  });
+}

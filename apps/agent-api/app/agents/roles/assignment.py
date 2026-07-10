@@ -131,6 +131,7 @@ async def run(project_id: str | None = None, payload: dict | None = None) -> dic
 
     # Per-project weight overrides (4.1) merged over defaults.
     weights = {**DEFAULT_WEIGHTS, **((payload or {}).get("weights") or {})}
+    dispatch_id = (payload or {}).get("dispatch_id")
 
     logger.info("Assignment agent: calculating assignments for %s", project_id)
 
@@ -150,11 +151,18 @@ async def run(project_id: str | None = None, payload: dict | None = None) -> dic
             alloc_by_member[wm_id] = int(pm.get("allocationPercent") or 100)
 
     # Running committed hours per member from their existing active tasks.
+    # Multi-assignee: a task's estimate is split evenly across all its assignees
+    # (falling back to the primary assigneeMemberId when the set is absent).
     committed: dict[str, float] = {}
     for t in tasks_list:
-        aid = t.get("assigneeMemberId")
-        if aid and _is_active(t):
-            committed[aid] = committed.get(aid, 0.0) + _est_hours(t)
+        if not _is_active(t):
+            continue
+        assignees = t.get("assignees") or ([t["assigneeMemberId"]] if t.get("assigneeMemberId") else [])
+        if not assignees:
+            continue
+        share = _est_hours(t) / len(assignees)
+        for aid in assignees:
+            committed[aid] = committed.get(aid, 0.0) + share
 
     capacity = {m.get("id"): _capacity_hours(m, alloc_by_member) for m in members_list}
 
@@ -237,16 +245,28 @@ async def run(project_id: str | None = None, payload: dict | None = None) -> dic
     if not result or "assignments" not in result:
         return {"ok": False, "error": "LLM response was not valid JSON."}
 
-    resp = await vieroc.apply_assignments(project_id, result)
+    resp = await vieroc.apply_assignments(project_id, result, dispatch_id=dispatch_id)
     if resp and resp.get("ok"):
         applied = resp.get("assignmentsApplied", 0)
-        logger.info("Assignment applied: %s assignments (%s over-capacity fallbacks)", applied, overflow_count)
+        pending = resp.get("pendingCount", 0)
+        logger.info(
+            "Assignment applied: %s applied, %s pending review (%s over-capacity fallbacks)",
+            applied, pending, overflow_count,
+        )
         return {
             "ok": True,
             "projectId": project_id,
             "assignmentsApplied": applied,
+            "pendingCount": pending,
             "overCapacityFallbacks": overflow_count,
+            "warnings": resp.get("warnings", []),
             "assignments": result["assignments"],
         }
 
-    return {"ok": False, "error": "Recommendations generated, but applying them failed.", "assignments": result["assignments"]}
+    error = (resp or {}).get("error") or "Recommendations generated, but applying them failed."
+    return {
+        "ok": False,
+        "error": error,
+        "status": (resp or {}).get("status"),
+        "assignments": result["assignments"],
+    }

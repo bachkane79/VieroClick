@@ -17,6 +17,10 @@ export const workspaces = pgTable("workspaces", {
   ownerId: uuid("owner_id")
     .notNull()
     .references(() => users.id),
+  // Optional umbrella org (see schema/organizations.ts). Null = standalone team.
+  // No FK reference here to avoid a circular import (organizations imports users
+  // only); the column is a plain uuid enforced at the DB level by the migration.
+  organizationId: uuid("organization_id"),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
   updatedAt: timestamptz("updated_at").notNull().defaultNow(),
 });

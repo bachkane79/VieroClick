@@ -1,133 +1,33 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { agentSuggestions, db, notifications, projects } from "@vieroc/db";
+import { eq } from "drizzle-orm";
 import {
-  agentJobs,
-  agentSuggestions,
-  db,
-  milestones,
-  projectRisks,
-  projects,
-  taskDependencies,
-  tasks,
-  taskStatuses,
-  workspaces,
-  wbsNodes,
-} from "@vieroc/db";
-import { and, eq, sql } from "drizzle-orm";
+  applyPlanRequestSchema,
+  planDependencySchema,
+  planMilestoneSchema,
+  planMilestoneStrictSchema,
+  planRiskSchema,
+  planRiskStrictSchema,
+  planTaskSchema,
+  planTaskStrictSchema,
+  planWbsSchema,
+  type PlanTaskInput,
+} from "@vieroc/validators";
 import { isAgentRequest } from "@/server/lib/agent-auth";
-import { dispatchAgent } from "@/server/lib/agent-dispatch";
+import {
+  DispatchRejectedError,
+  consumeDispatch,
+  failDispatch,
+  validateDispatch,
+} from "@/server/lib/agent-dispatch";
+import { parseItems, type RejectedItem } from "@/server/lib/agent-payload";
 import { recordDeadLetter } from "@/server/lib/dead-letter";
-import { invalidateCache } from "@/server/lib/cache";
-
-type PlanTask = {
-  title?: unknown;
-  description?: unknown;
-  priority?: unknown;
-  estimateHours?: unknown;
-  estimatedHours?: unknown;
-  startDate?: unknown;
-  dueDate?: unknown;
-  acceptanceCriteria?: unknown;
-  labels?: unknown;
-  wbsTitle?: unknown;
-  wbs?: unknown;
-  planRef?: unknown;
-  milestoneId?: unknown;
-  action?: unknown;
-};
-
-type PlanItem = {
-  title?: unknown;
-  description?: unknown;
-  planRef?: unknown;
-  [key: string]: unknown;
-};
-
-type AcceptanceCriterion = {
-  text: string;
-  required: boolean;
-  checked: boolean;
-};
-
-function text(value: unknown, fallback = "") {
-  return typeof value === "string" && value.trim() ? value.trim() : fallback;
-}
-
-function nullableText(value: unknown) {
-  const v = text(value);
-  return v || null;
-}
-
-function dateText(value: unknown) {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : null;
-}
-
-function priority(value: unknown) {
-  const v = text(value, "medium").toLowerCase();
-  return v === "low" || v === "medium" || v === "high" || v === "urgent" ? v : "medium";
-}
-
-function numberString(value: unknown) {
-  const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
-  return Number.isFinite(n) && n > 0 ? String(n) : null;
-}
-
-function criteria(value: unknown): AcceptanceCriterion[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => {
-      if (typeof item === "string" && item.trim()) {
-        return { text: item.trim(), required: true, checked: false };
-      }
-      if (item && typeof item === "object") {
-        const record = item as Record<string, unknown>;
-        const criterion = text(record.text);
-        if (criterion) return { text: criterion, required: record.required !== false, checked: false };
-      }
-      return null;
-    })
-    .filter((item): item is AcceptanceCriterion => item !== null);
-}
-
-function labelsList(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
-}
-
-async function invalidateProjectViews(projectId: string, workspaceId: string) {
-  for (const key of [
-    `board:${projectId}`,
-    `wbs:${projectId}`,
-    `milestones:${projectId}`,
-    `risks:${projectId}`,
-    `project:${projectId}`,
-    `project_members:${projectId}`,
-  ]) {
-    invalidateCache(key);
-  }
-
-  const [workspace] = await db
-    .select({ slug: workspaces.slug })
-    .from(workspaces)
-    .where(eq(workspaces.id, workspaceId))
-    .limit(1);
-
-  if (!workspace) return;
-
-  for (const view of [
-    "overview",
-    "tasks",
-    "board",
-    "timeline",
-    "wbs",
-    "risks-milestones",
-    "ai",
-  ]) {
-    revalidatePath(`/workspace/${workspace.slug}/projects/${projectId}/${view}`);
-  }
-}
+import {
+  applyPlanPackage,
+  invalidateProjectViews,
+  postApplySideEffects,
+  snapshotProjectPlan,
+} from "@/modules/agent-suggestion/agent-suggestion.apply";
 
 export async function POST(request: Request) {
   if (!isAgentRequest(request)) {
@@ -136,499 +36,251 @@ export async function POST(request: Request) {
 
   // Hoisted so the catch block can dead-letter the failed apply with context.
   let capturedProjectId: string | null = null;
+  let capturedDispatchId: string | null = null;
   let capturedPayload: Record<string, unknown> = {};
 
   try {
-    const body = await request.json();
-    const projectId = text(body.projectId);
-    const plan = body.plan && typeof body.plan === "object" ? body.plan : body.payload;
-    const mode: "initial" | "replan" = body.mode === "replan" ? "replan" : "initial";
+    const body: unknown = await request.json().catch(() => null);
 
-    if (!projectId || !plan || typeof plan !== "object") {
-      return NextResponse.json({ error: "projectId and plan are required" }, { status: 400 });
+    // ── Structural validation — a malformed envelope is a hard 400 ────────────
+    const structural = applyPlanRequestSchema.safeParse(body);
+    if (!structural.success) {
+      const issues = structural.error.issues.map(
+        (i) => `${i.path.join(".") || "(root)"}: ${i.message}`
+      );
+      const raw = (body ?? {}) as Record<string, unknown>;
+      const rawDispatchId = typeof raw.dispatchId === "string" ? raw.dispatchId : null;
+      const rawProjectId = typeof raw.projectId === "string" ? raw.projectId : null;
+      await failDispatch(rawDispatchId, `Invalid apply-plan payload: ${issues.join("; ")}`);
+      await recordDeadLetter({
+        source: "apply-plan:invalid-request",
+        jobType: "planning_package",
+        projectId: rawProjectId,
+        payload: raw,
+        error: issues.join("; "),
+      });
+      return NextResponse.json({ error: "Invalid payload", issues }, { status: 400 });
     }
 
-    const payload = plan as Record<string, unknown>;
+    const { projectId, dispatchId, mode, plan } = structural.data;
     capturedProjectId = projectId;
-    capturedPayload = payload;
-    const planTasks = Array.isArray(payload.tasks) ? (payload.tasks as PlanTask[]) : [];
-    const planWbs = Array.isArray(payload.wbs) ? (payload.wbs as PlanItem[]) : [];
-    const planMilestones = Array.isArray(payload.milestones) ? (payload.milestones as PlanItem[]) : [];
-    const planRisks = Array.isArray(payload.risks) ? (payload.risks as PlanItem[]) : [];
-    const planDependencies = Array.isArray(payload.dependencies) ? payload.dependencies : [];
+    capturedDispatchId = dispatchId;
+    capturedPayload = plan as Record<string, unknown>;
+
+    // ── Dispatch authorization — the callback must present a live record ──────
+    let dispatch;
+    try {
+      dispatch = await validateDispatch(dispatchId, projectId, ["planning_package"]);
+    } catch (err) {
+      const message = err instanceof DispatchRejectedError ? err.message : "Dispatch rejected";
+      await recordDeadLetter({
+        source: "apply-plan:dispatch-rejected",
+        jobType: "planning_package",
+        projectId,
+        payload: { dispatchId, mode },
+        error: message,
+      });
+      return NextResponse.json({ error: message }, { status: 403 });
+    }
 
     const [project] = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
-    if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    if (!project) {
+      await failDispatch(dispatchId, "Project not found");
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
 
-    // Pre-load existing rows for this project to build lookup maps
-    const [existingTasks, existingMilestones, existingRisks, existingWbs] = await Promise.all([
-      db
-        .select({
-          id: tasks.id,
-          planRef: tasks.planRef,
-          assigneeMemberId: tasks.assigneeMemberId,
-          statusId: tasks.statusId,
-        })
-        .from(tasks)
-        .where(eq(tasks.projectId, projectId)),
-      db
-        .select({ id: milestones.id, planRef: milestones.planRef, status: milestones.status })
-        .from(milestones)
-        .where(eq(milestones.projectId, projectId)),
-      db
-        .select({ id: projectRisks.id, planRef: projectRisks.planRef, status: projectRisks.status })
-        .from(projectRisks)
-        .where(eq(projectRisks.projectId, projectId)),
-      db
-        .select({ id: wbsNodes.id, planRef: wbsNodes.planRef })
-        .from(wbsNodes)
-        .where(eq(wbsNodes.projectId, projectId)),
-    ]);
+    // ── Per-item validation: salvage valid items, report the rest ─────────────
+    const requireTitleForNewItems = (task: PlanTaskInput): string | null => {
+      if (task.title) return null;
+      if (mode === "replan" && task.planRef && (task.action ?? "add") !== "add") return null;
+      return "title is required";
+    };
 
-    const existingTasksByRef = new Map(
-      existingTasks.filter((t) => t.planRef).map((t) => [t.planRef!, t])
-    );
-    const existingMilestonesByRef = new Map(
-      existingMilestones.filter((m) => m.planRef).map((m) => [m.planRef!, m])
-    );
-    const existingRisksByRef = new Map(
-      existingRisks.filter((r) => r.planRef).map((r) => [r.planRef!, r])
-    );
-    const existingWbsByRef = new Map(
-      existingWbs.filter((w) => w.planRef).map((w) => [w.planRef!, w])
-    );
-
-    // Collect plan_refs mentioned in the incoming plan to detect orphans
-    const mentionedTaskRefs = new Set(
-      planTasks.map((t) => text(t.planRef)).filter(Boolean)
-    );
-    const mentionedMilestoneRefs = new Set(
-      planMilestones.map((m) => text((m as PlanItem).planRef)).filter(Boolean)
-    );
-    const mentionedRiskRefs = new Set(
-      planRisks.map((r) => text((r as PlanItem).planRef)).filter(Boolean)
-    );
-    const mentionedWbsRefs = new Set(
-      planWbs.map((w) => text((w as PlanItem).planRef)).filter(Boolean)
-    );
-
-    const counts = { created: 0, updated: 0, skipped: 0, flagged: 0 };
-    const newTaskIds: string[] = [];
-
-    const result = await db.transaction(async (tx) => {
-      const [todoStatus] = await tx
-        .select()
-        .from(taskStatuses)
-        .where(and(eq(taskStatuses.projectId, projectId), eq(taskStatuses.type, "todo")))
-        .limit(1);
-
-      if (!todoStatus) throw new Error("No todo status found for project");
-
-      // ── WBS phase nodes ─────────────────────────────────────────────────────
-      const wbsByTitle = new Map<string, string>();
-      let position = 0;
-
-      for (const node of planWbs) {
-        if (!node || typeof node !== "object") continue;
-        const record = node as Record<string, unknown>;
-        const title = text(record.title);
-        if (!title) continue;
-
-        const ref = text(record.planRef);
-        const nodeValues = {
-          projectId,
-          title,
-          description: nullableText(record.description),
-          nodeType: text(record.node_type ?? record.nodeType, "phase"),
-          position: position++,
-          planRef: ref || null,
-        };
-
-        if (ref && existingWbsByRef.has(ref)) {
-          // Update existing wbs phase
-          await tx
-            .update(wbsNodes)
-            .set({ title: nodeValues.title, description: nodeValues.description, position: nodeValues.position })
-            .where(and(eq(wbsNodes.projectId, projectId), eq(wbsNodes.planRef, ref)));
-          const existing = existingWbsByRef.get(ref)!;
-          wbsByTitle.set(title.toLowerCase(), existing.id);
-        } else if (!wbsByTitle.has(title.toLowerCase())) {
-          // Insert new (deduplicate by title within this run)
-          const [created] = await tx
-            .insert(wbsNodes)
-            .values(nodeValues)
-            .returning();
-          if (created) wbsByTitle.set(title.toLowerCase(), created.id);
-        }
-      }
-
-      // ── Tasks ────────────────────────────────────────────────────────────────
-      let taskPosition = 0;
-      const taskRefToId = new Map<string, string>();
-
-      for (const task of planTasks) {
-        const rawTitle = task.title !== undefined ? text(task.title) : null;
-        const title = rawTitle || "Untitled Task";
-        const ref = text(task.planRef);
-        const action = text((task as Record<string, unknown>).action, "add");
-
-        // In replan mode, skip tasks with action "keep" — nothing to update
-        if (mode === "replan" && action === "keep" && existingTasksByRef.has(ref)) {
-          taskRefToId.set(ref, existingTasksByRef.get(ref)!.id);
-          counts.skipped++;
-          continue;
-        }
-
-        // Build update set: only include fields the LLM explicitly provided
-        const updateSet: Record<string, unknown> = { updatedAt: new Date() };
-        if (rawTitle) updateSet.title = rawTitle;
-        if (task.description !== undefined) updateSet.description = nullableText(task.description);
-        if (task.priority !== undefined) updateSet.priority = priority(task.priority);
-        if (task.startDate !== undefined) updateSet.startDate = dateText(task.startDate);
-        if (task.dueDate !== undefined) updateSet.dueDate = dateText(task.dueDate);
-        if (task.estimateHours !== undefined || task.estimatedHours !== undefined)
-          updateSet.estimateHours = numberString(task.estimateHours ?? task.estimatedHours);
-        if (task.acceptanceCriteria !== undefined) updateSet.acceptanceCriteria = criteria(task.acceptanceCriteria);
-        if (task.labels !== undefined) updateSet.labels = labelsList(task.labels);
-
-        const milestoneIdVal = typeof task.milestoneId === "string" && task.milestoneId.trim()
-          ? task.milestoneId.trim()
-          : null;
-        const definitionFields = {
-          title,
-          description: nullableText(task.description),
-          priority: priority(task.priority) as "low" | "medium" | "high" | "urgent",
-          startDate: dateText(task.startDate),
-          dueDate: dateText(task.dueDate),
-          estimateHours: numberString(task.estimateHours ?? task.estimatedHours),
-          acceptanceCriteria: criteria(task.acceptanceCriteria),
-          labels: labelsList(task.labels),
-          milestoneId: milestoneIdVal,
-          updatedAt: new Date(),
-        };
-
-        if (ref) {
-          const insertValues = {
-            projectId,
-            planRef: ref,
-            statusId: todoStatus.id,
-            createdBy: project.createdBy,
-            position: taskPosition++,
-            ...definitionFields,
-          };
-          // Upsert: on conflict (project_id, plan_ref) update only definition fields
-          // updateSet only contains fields explicitly provided by LLM (avoids overwriting title with "Untitled Task")
-          const [row] = await tx
-            .insert(tasks)
-            .values(insertValues)
-            .onConflictDoUpdate({
-              target: [tasks.projectId, tasks.planRef],
-              targetWhere: sql`plan_ref IS NOT NULL`,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              set: updateSet as any,
-            })
-            .returning({ id: tasks.id, planRef: tasks.planRef });
-
-          if (row) {
-            taskRefToId.set(ref, row.id);
-            if (!existingTasksByRef.has(ref)) {
-              counts.created++;
-              newTaskIds.push(row.id);
-            } else {
-              counts.updated++;
-            }
-          }
-        } else if (mode === "initial") {
-          // No planRef: only INSERT in initial mode
-          const [row] = await tx
-            .insert(tasks)
-            .values({
-              projectId,
-              statusId: todoStatus.id,
-              createdBy: project.createdBy,
-              position: taskPosition++,
-              ...definitionFields,
-            })
-            .returning({ id: tasks.id });
-
-          if (row) {
-            counts.created++;
-            newTaskIds.push(row.id);
-            // Add WBS leaf node for this task
-            const wbsTitle = text(task.wbsTitle ?? task.wbs);
-            const parentId = wbsTitle ? (wbsByTitle.get(wbsTitle.toLowerCase()) ?? null) : null;
-            await tx.insert(wbsNodes).values({
-              projectId,
-              parentId,
-              title,
-              description: nullableText(task.description),
-              nodeType: "task",
-              linkedTaskId: row.id,
-              position: position++,
-            });
-          }
-        } else {
-          // replan mode, no planRef → skip
-          counts.skipped++;
-        }
-
-        // Add WBS leaf node for tasks inserted with planRef (if new)
-        if (ref && taskRefToId.has(ref) && !existingTasksByRef.has(ref)) {
-          const wbsTitle = text(task.wbsTitle ?? task.wbs);
-          const parentId = wbsTitle ? (wbsByTitle.get(wbsTitle.toLowerCase()) ?? null) : null;
-          await tx.insert(wbsNodes).values({
-            projectId,
-            parentId,
-            planRef: `wbs-task:${ref}`,
-            title,
-            description: nullableText(task.description),
-            nodeType: "task",
-            linkedTaskId: taskRefToId.get(ref)!,
-            position: position++,
-          });
-        }
-      }
-
-      // ── Milestones ────────────────────────────────────────────────────────────
-      for (const item of planMilestones) {
-        if (!item || typeof item !== "object") continue;
-        const record = item as Record<string, unknown>;
-        const ref = text(record.planRef);
-        const milestoneValues = {
-          projectId,
-          title: text(record.title, "Untitled Milestone"),
-          description: nullableText(record.description),
-          targetDate: dateText(record.targetDate),
-          planRef: ref || null,
-        };
-
-        if (ref) {
-          await tx
-            .insert(milestones)
-            .values({ ...milestoneValues, status: text(record.status, "planned") })
-            .onConflictDoUpdate({
-              target: [milestones.projectId, milestones.planRef],
-              targetWhere: sql`plan_ref IS NOT NULL`,
-              set: {
-                title: milestoneValues.title,
-                description: milestoneValues.description,
-                targetDate: milestoneValues.targetDate,
-                // status intentionally NOT updated — preserves operational state
-              },
-            });
-          if (!existingMilestonesByRef.has(ref)) counts.created++;
-          else counts.updated++;
-        } else if (mode === "initial") {
-          await tx.insert(milestones).values({
-            ...milestoneValues,
-            status: text(record.status, "planned"),
-          });
-          counts.created++;
-        } else {
-          counts.skipped++;
-        }
-      }
-
-      // ── Risks ────────────────────────────────────────────────────────────────
-      for (const item of planRisks) {
-        if (!item || typeof item !== "object") continue;
-        const record = item as Record<string, unknown>;
-        const ref = text(record.planRef);
-        const riskValues = {
-          projectId,
-          title: text(record.title, "Untitled Risk"),
-          description: nullableText(record.description),
-          probability: Math.min(5, Math.max(1, Number(record.probability) || 3)),
-          impact: Math.min(5, Math.max(1, Number(record.impact) || 3)),
-          mitigation: nullableText(record.mitigation),
-          planRef: ref || null,
-        };
-
-        if (ref) {
-          await tx
-            .insert(projectRisks)
-            .values({ ...riskValues, status: "open" })
-            .onConflictDoUpdate({
-              target: [projectRisks.projectId, projectRisks.planRef],
-              targetWhere: sql`plan_ref IS NOT NULL`,
-              set: {
-                title: riskValues.title,
-                description: riskValues.description,
-                probability: riskValues.probability,
-                impact: riskValues.impact,
-                mitigation: riskValues.mitigation,
-                updatedAt: new Date(),
-                // status, ownerMemberId intentionally NOT updated
-              },
-            });
-          if (!existingRisksByRef.has(ref)) counts.created++;
-          else counts.updated++;
-        } else if (mode === "initial") {
-          await tx.insert(projectRisks).values({ ...riskValues, status: "open" });
-          counts.created++;
-        } else {
-          counts.skipped++;
-        }
-      }
-
-      // ── Dependencies ─────────────────────────────────────────────────────────
-      for (const item of planDependencies) {
-        if (!item || typeof item !== "object") continue;
-        const record = item as Record<string, unknown>;
-        const blockerTitle = text(record.blockerTaskTitle ?? record.blocker);
-        const blockedTitle = text(record.blockedTaskTitle ?? record.blocked);
-
-        const blockerPlanRef = text(record.blockerPlanRef);
-        const blockedPlanRef = text(record.blockedPlanRef);
-
-        const blockerTaskId: string | undefined =
-          (blockerPlanRef ? taskRefToId.get(blockerPlanRef) : undefined) ??
-          taskRefToId.get(blockerTitle.toLowerCase());
-        const blockedTaskId: string | undefined =
-          (blockedPlanRef ? taskRefToId.get(blockedPlanRef) : undefined) ??
-          taskRefToId.get(blockedTitle.toLowerCase());
-
-        if (!blockerTaskId || !blockedTaskId || blockerTaskId === blockedTaskId) continue;
-
-        await tx
-          .insert(taskDependencies)
-          .values({
-            projectId,
-            blockerTaskId,
-            blockedTaskId,
-            dependencyType: text(record.dependencyType, "finish_to_start"),
-          })
-          .onConflictDoNothing();
-      }
-
-      // ── Flag orphan tasks (exist in DB but not mentioned in plan) ────────────
-      const orphanTaskIds = [...existingTasksByRef.entries()]
-        .filter(([ref]) => !mentionedTaskRefs.has(ref))
-        .map(([, row]) => row.id);
-
-      if (orphanTaskIds.length > 0) {
-        await tx.execute(
-          sql`UPDATE tasks
-              SET labels = CASE WHEN labels @> '["plan-review"]'::jsonb
-                           THEN labels ELSE labels || '["plan-review"]'::jsonb END,
-                  updated_at = NOW()
-              WHERE project_id = ${projectId}
-                AND id::text = ANY(ARRAY[${sql.join(orphanTaskIds.map((id) => sql`${id}`), sql`, `)}]::text[])`
-        );
-        counts.flagged += orphanTaskIds.length;
-      }
-
-      // Flag orphan milestones
-      const orphanMilestoneIds = [...existingMilestonesByRef.entries()]
-        .filter(([ref]) => !mentionedMilestoneRefs.has(ref))
-        .map(([, row]) => row.id);
-
-      if (orphanMilestoneIds.length > 0) {
-        for (const id of orphanMilestoneIds) {
-          await tx
-            .update(milestones)
-            .set({ status: "needs-review" })
-            .where(and(eq(milestones.id, id), eq(milestones.status, "planned")));
-        }
-        counts.flagged += orphanMilestoneIds.length;
-      }
-
-      // Flag orphan risks
-      const orphanRiskIds = [...existingRisksByRef.entries()]
-        .filter(([ref]) => !mentionedRiskRefs.has(ref))
-        .map(([, row]) => row.id);
-
-      if (orphanRiskIds.length > 0) {
-        for (const id of orphanRiskIds) {
-          await tx
-            .update(projectRisks)
-            .set({ status: "needs-review", updatedAt: new Date() })
-            .where(and(eq(projectRisks.id, id), eq(projectRisks.status, "open")));
-        }
-        counts.flagged += orphanRiskIds.length;
-      }
-
-      // ── Agent job + suggestion log ────────────────────────────────────────────
-      const [job] = await tx
-        .insert(agentJobs)
-        .values({
-          projectId,
-          jobType: "planning_package",
-          status: "succeeded",
-          startedAt: new Date(),
-          finishedAt: new Date(),
-        })
-        .returning();
-
-      if (job) {
-        await tx.insert(agentSuggestions).values({
-          projectId,
-          jobId: job.id,
-          suggestionType: "planning_package",
-          title: mode === "replan" ? "AI replan applied" : "AI plan auto-applied",
-          body:
-            mode === "replan"
-              ? `Replan applied: ${counts.created} created, ${counts.updated} updated, ${counts.skipped} skipped, ${counts.flagged} flagged.`
-              : "Planning agent generated and applied WBS, tasks, milestones, risks, and dependencies.",
-          payload: { ...payload, mode, summary: counts },
-          status: "accepted",
-          reviewedAt: new Date(),
-        });
-      }
-
-      return { counts, newTaskIds };
+    const tasksParsed = parseItems(plan.tasks, planTaskSchema, {
+      strictSchema: planTaskStrictSchema,
+      validate: requireTitleForNewItems,
     });
-
-    // ── Dispatch assignment only for genuinely new unassigned tasks ────────────
-    const newUnassignedTaskIds = result.newTaskIds.filter((id) => {
-      const existing = existingTasks.find((t) => t.id === id);
-      return !existing || !existing.assigneeMemberId;
+    const wbsParsed = parseItems(plan.wbs, planWbsSchema);
+    const milestonesParsed = parseItems(plan.milestones, planMilestoneSchema, {
+      strictSchema: planMilestoneStrictSchema,
     });
+    const risksParsed = parseItems(plan.risks, planRiskSchema, {
+      strictSchema: planRiskStrictSchema,
+    });
+    const depsParsed = parseItems(plan.dependencies, planDependencySchema);
 
-    if (newUnassignedTaskIds.length > 0) {
-      await dispatchAgent({
-        targetRole: "assignment",
-        senderRole: "planning",
+    const rejectedByEntity: Record<string, RejectedItem[]> = {};
+    for (const [entity, parsed] of [
+      ["tasks", tasksParsed],
+      ["wbs", wbsParsed],
+      ["milestones", milestonesParsed],
+      ["risks", risksParsed],
+      ["dependencies", depsParsed],
+    ] as const) {
+      if (parsed.rejected.length > 0) rejectedByEntity[entity] = parsed.rejected;
+    }
+    const dropped = Object.values(rejectedByEntity).reduce((sum, r) => sum + r.length, 0);
+    const coerced =
+      tasksParsed.coerced + milestonesParsed.coerced + risksParsed.coerced;
+
+    const warnings: string[] = [];
+    for (const [entity, rejected] of Object.entries(rejectedByEntity)) {
+      warnings.push(`Dropped ${rejected.length} invalid ${entity} item(s)`);
+    }
+    if (coerced > 0) {
+      warnings.push(`Coerced invalid fields on ${coerced} item(s) to safe defaults`);
+    }
+
+    if (dropped > 0) {
+      // Dropped items are never silent: one dead-letter row records exactly
+      // what was thrown away and why.
+      await recordDeadLetter({
+        source: "apply-plan:invalid-items",
+        jobType: "planning_package",
         projectId,
-        message: "New unassigned tasks added. Please assign them to members.",
-        payload: { source: "apply-plan", newTaskIds: newUnassignedTaskIds, ...result.counts },
+        payload: { mode, rejected: rejectedByEntity },
+        error: warnings.join("; "),
       });
     }
 
-    await invalidateProjectViews(projectId, project.workspaceId);
+    // Nothing salvageable from a non-empty plan → the whole payload is garbage.
+    if (plan.tasks.length > 0 && tasksParsed.valid.length === 0) {
+      const message = "All plan tasks failed validation";
+      await failDispatch(dispatchId, message);
+      return NextResponse.json(
+        { error: message, warnings, rejected: rejectedByEntity },
+        { status: 400 }
+      );
+    }
+
+    const validatedPlan = {
+      tasks: tasksParsed.valid,
+      wbs: wbsParsed.valid,
+      milestones: milestonesParsed.valid,
+      risks: risksParsed.valid,
+      dependencies: depsParsed.valid,
+    };
+
+    // Replans always capture a before-image so a bad plan can be recovered from
+    // the suggestion payload (restore is manual).
+    const snapshot = mode === "replan" ? await snapshotProjectPlan(projectId) : null;
+
+    const summaryBase = { dropped, coerced };
+
+    // ── Gate: review_required projects get a pending suggestion, no mutation ──
+    if (project.agentAutonomy === "review_required") {
+      const [suggestion] = await db.transaction(async (tx) => {
+        await consumeDispatch(tx, dispatch.id, {
+          status: "succeeded",
+          output: { gated: true, ...summaryBase },
+        });
+        const inserted = await tx
+          .insert(agentSuggestions)
+          .values({
+            projectId,
+            jobId: dispatch.id,
+            suggestionType: "planning_package",
+            title: mode === "replan" ? "AI replan awaiting review" : "AI plan awaiting review",
+            body:
+              `Planning agent generated a ${mode} plan with ${validatedPlan.tasks.length} task(s). ` +
+              `Review and accept to apply.`,
+            payload: { plan: validatedPlan, mode, snapshot, warnings, ...summaryBase },
+            status: "pending",
+          })
+          .returning();
+
+        if (project.leadMemberId) {
+          await tx.insert(notifications).values({
+            workspaceId: project.workspaceId,
+            recipientMemberId: project.leadMemberId,
+            projectId,
+            type: "agent.plan_pending_review",
+            title: mode === "replan" ? "AI replan awaiting your review" : "AI plan awaiting your review",
+            entityType: "agent_suggestion",
+            entityId: inserted[0]?.id,
+          });
+        }
+        return inserted;
+      });
+
+      await invalidateProjectViews(projectId, project.workspaceId);
+      return NextResponse.json({
+        ok: true,
+        gated: true,
+        mode,
+        suggestionId: suggestion?.id,
+        warnings,
+        ...summaryBase,
+      });
+    }
+
+    // ── Full auto: apply + consume dispatch + audit record in one transaction ──
+    const result = await db.transaction(async (tx) => {
+      const applyResult = await applyPlanPackage(tx, {
+        projectId,
+        mode,
+        createdBy: dispatch.requestedByUserId ?? project.createdBy,
+        plan: validatedPlan,
+      });
+
+      await consumeDispatch(tx, dispatch.id, {
+        status: "succeeded",
+        output: { summary: applyResult.counts, warnings, ...summaryBase },
+      });
+
+      await tx.insert(agentSuggestions).values({
+        projectId,
+        jobId: dispatch.id,
+        suggestionType: "planning_package",
+        title: mode === "replan" ? "AI replan applied" : "AI plan auto-applied",
+        body:
+          mode === "replan"
+            ? `Replan applied: ${applyResult.counts.created} created, ${applyResult.counts.updated} updated, ` +
+              `${applyResult.counts.skipped} skipped, ${applyResult.counts.flagged} flagged.`
+            : "Planning agent generated and applied WBS, tasks, milestones, risks, and dependencies.",
+        payload: {
+          plan: validatedPlan,
+          mode,
+          summary: applyResult.counts,
+          snapshot,
+          warnings,
+          rejected: rejectedByEntity,
+          ...summaryBase,
+        },
+        status: "accepted",
+        reviewedAt: new Date(),
+      });
+
+      return applyResult;
+    });
+
+    // Fresh task rows are unassigned by construction — chain the assignment agent.
+    await postApplySideEffects({
+      projectId,
+      workspaceId: project.workspaceId,
+      newUnassignedTaskIds: result.newTaskIds,
+      actorUserId: dispatch.requestedByUserId,
+      summary: result.counts,
+    });
 
     return NextResponse.json({
       ok: true,
       mode,
-      summary: result.counts,
-      newUnassignedTaskIds,
+      summary: { ...result.counts, ...summaryBase },
+      newUnassignedTaskIds: result.newTaskIds,
+      warnings,
       // legacy fields for backward compat
       tasksCreated: result.counts.created,
       wbsCreated: result.counts.created,
-      milestonesCreated: planMilestones.length,
-      risksCreated: planRisks.length,
+      milestonesCreated: validatedPlan.milestones.length,
+      risksCreated: validatedPlan.risks.length,
     });
   } catch (err) {
     console.error("Error applying agent plan:", err);
     const message = err instanceof Error ? err.message : "Unknown error";
 
-    // Record the terminal failure so it isn't lost: a failed agent_jobs row for
-    // the audit trail + a dead_letter entry for inspection / manual retry.
-    if (capturedProjectId) {
-      try {
-        await db.insert(agentJobs).values({
-          projectId: capturedProjectId,
-          jobType: "planning_package",
-          status: "failed",
-          input: capturedPayload,
-          error: message,
-          startedAt: new Date(),
-          finishedAt: new Date(),
-        });
-      } catch (logErr) {
-        console.error("Failed to log failed agent job:", logErr);
-      }
-    }
+    // Close the dispatch record (audit trail) + dead-letter for inspection.
+    await failDispatch(capturedDispatchId, message);
     await recordDeadLetter({
       source: "apply-plan",
       jobType: "planning_package",
