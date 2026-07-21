@@ -52,3 +52,4 @@ coverage/
 .codex/
 band-agents/agent_config.yaml
 band-agents/agent_config.yaml copy
+docs_local/
