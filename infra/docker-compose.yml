@@ -1,3 +1,5 @@
+name: vieroclick
+
 services:
   web:
     build:
@@ -5,6 +7,10 @@ services:
       dockerfile: apps/web/Dockerfile
     env_file:
       - ../.env
+    environment:
+      # Re-enable the passwordless dev-bypass login on this deployment.
+      # WARNING: anyone reaching the site can sign in as any email.
+      ALLOW_DEV_BYPASS: "true"
     depends_on:
       - redis
 
@@ -17,7 +23,7 @@ services:
       - redis
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-  celery-worker:
+  worker:
     build:
       context: ../apps/agent-api
     env_file:
@@ -26,7 +32,7 @@ services:
       - redis
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=4
 
-  celery-beat:
+  scheduler:
     build:
       context: ../apps/agent-api
     env_file:
