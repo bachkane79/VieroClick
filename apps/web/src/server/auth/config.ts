@@ -22,7 +22,7 @@ const providers: any[] = [];
 if (devBypassEnabled) {
   providers.push(
     Credentials({
-      name: "Developer Bypass",
+      name: "Email",
       credentials: {
         email: { label: "Email", type: "email", placeholder: "dev@example.com" },
         name: { label: "Name", type: "text", placeholder: "Developer" },

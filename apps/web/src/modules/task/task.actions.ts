@@ -17,6 +17,29 @@ function revalidateBoard(slug: string, projectId: string) {
   revalidatePath(`/workspace/${slug}/my-tasks`);
 }
 
+export async function quickCreateTaskAction(
+  args: BaseArgs & {
+    title: string;
+    dueDate?: string;
+    priority?: "low" | "medium" | "high" | "urgent";
+    assigneeQuery?: string;
+  }
+) {
+  return runAction(async () => {
+    const result = await service.quickCreateTask({
+      workspaceId: args.workspaceId,
+      projectId: args.projectId,
+      title: args.title,
+      dueDate: args.dueDate,
+      priority: args.priority,
+      assigneeQuery: args.assigneeQuery,
+    });
+    revalidateBoard(args.slug, args.projectId);
+    revalidatePath(`/workspace/${args.slug}`);
+    return result;
+  });
+}
+
 export async function createTaskAction(args: BaseArgs & { data: unknown }) {
   return runAction(async () => {
     const task = await service.createTask({

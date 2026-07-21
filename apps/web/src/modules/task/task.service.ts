@@ -3,7 +3,8 @@ import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { db, projects, type Executor } from "@vieroc/db";
 import { requireActor, type ActorContext } from "@/server/lib/context";
-import { isProjectManager, isReviewer } from "@/server/lib/permissions";
+import { isProjectManager, isReviewer, meetsLevel } from "@/server/lib/permissions";
+import { resolveGrantLevel } from "@/modules/permission/permission.access";
 import { NotFoundError, ValidationError } from "@/server/lib/errors";
 import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
 import { enqueueNotifications } from "@/server/lib/notifications";
@@ -263,11 +264,24 @@ export async function updateTask(p: {
   const ctx = await requireActor(p.workspaceId, p.projectId);
 
   const existing = await getTaskInProject(p.taskId, p.projectId);
-  assertCanUpdateTask(ctx, existing.assigneeMemberId);
 
-  const manager = isProjectManager(ctx);
+  // §4.2 per-item grant: the creator or an explicit edit/full share elevates a
+  // non-manager to full-field editing; a comment-level share (like the assignee)
+  // may still change status. With no grant this reduces to the original role
+  // check, so baseline behavior is unchanged.
+  const grantLevel = await resolveGrantLevel(ctx, {
+    type: "task",
+    id: existing.id,
+    createdBy: existing.createdBy,
+    projectId: p.projectId,
+  });
   const isAssignee =
     !!existing.assigneeMemberId && existing.assigneeMemberId === ctx.workspaceMemberId;
+  if (!isProjectManager(ctx) && !isAssignee && !meetsLevel(grantLevel, "comment")) {
+    assertCanUpdateTask(ctx, existing.assigneeMemberId);
+  }
+
+  const manager = isProjectManager(ctx) || meetsLevel(grantLevel, "edit");
   const values: Partial<repo.TaskInsert> = {};
 
   if (manager) {
@@ -677,4 +691,71 @@ export async function deleteTask(p: { workspaceId: string; projectId: string; ta
     invalidateCache(`board:${p.projectId}`);
     return { id: p.taskId };
   });
+}
+
+/** Diacritic/case-insensitive normalize for fuzzy assignee matching. */
+function normalizeName(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/g, "d");
+}
+
+/**
+ * One-line task creation for the global quick-create surface (B2C spec §5.6).
+ * Resolves the project's default/todo status and fuzzy-matches the assignee by
+ * (diacritic-insensitive) name so the client only sends what the user typed.
+ * Delegates to createTask — full §4.3 flow (policy, events, notifications).
+ */
+export async function quickCreateTask(p: {
+  workspaceId: string;
+  projectId: string;
+  title: string;
+  dueDate?: string;
+  priority?: "low" | "medium" | "high" | "urgent";
+  assigneeQuery?: string;
+}) {
+  const statuses = await repo.listStatuses(p.projectId);
+  const status =
+    statuses.find((s) => s.isDefault) ?? statuses.find((s) => s.type === "todo") ?? statuses[0];
+  if (!status) throw new ValidationError("Project has no task statuses");
+
+  let assigneeMemberId: string | null = null;
+  let assigneeName: string | null = null;
+  if (p.assigneeQuery?.trim()) {
+    const { listMembers } = await import("@/modules/workspace/workspace.repo");
+    const members = await listMembers(p.workspaceId);
+    const q = normalizeName(p.assigneeQuery);
+    const hit =
+      members.find((m) => normalizeName(m.fullName).split(/\s+/).includes(q)) ??
+      members.find((m) => normalizeName(m.fullName).includes(q));
+    if (hit) {
+      assigneeMemberId = hit.id;
+      assigneeName = hit.fullName;
+    }
+  }
+
+  const task = await createTask({
+    workspaceId: p.workspaceId,
+    projectId: p.projectId,
+    input: {
+      title: p.title,
+      statusId: status.id,
+      priority: p.priority ?? "medium",
+      assigneeMemberId,
+      dueDate: p.dueDate,
+    },
+  });
+
+  // Funnel: quick-create is the A1/A2 activation surface (spec §4).
+  const { track } = await import("@/server/lib/analytics");
+  track("task_quick_created", {
+    projectId: p.projectId,
+    hasDue: !!p.dueDate,
+    hasAssignee: !!assigneeMemberId,
+    priority: p.priority ?? "medium",
+  });
+
+  return { task, assigneeName };
 }

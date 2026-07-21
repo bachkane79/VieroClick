@@ -1,12 +1,19 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { cn } from "@vieroc/ui";
+import { useLocale } from "@/lib/i18n/client";
+import { t, type MessageKey } from "@/lib/i18n/dict";
 import {
   Info,
   ListTodo,
+  Kanban,
+  CalendarDays,
   CalendarRange,
+  Table2,
   Network,
   ClipboardList,
   AlertOctagon,
@@ -14,9 +21,14 @@ import {
   FileText,
   TrendingUp,
   BarChart3,
+  LayoutDashboard,
   Gauge,
   Users,
   Sparkles,
+  Plus,
+  Pin,
+  Check,
+  type LucideIcon,
 } from "lucide-react";
 
 interface Props {
@@ -24,119 +36,197 @@ interface Props {
   projectId: string;
 }
 
+type ViewDef = {
+  key: string;
+  name: string;
+  nameKey?: MessageKey;
+  path: string; // segment after /projects/{id}/
+  icon: LucideIcon;
+  match?: string[]; // extra pathname fragments that count as active
+  highlight?: boolean;
+};
+
+/**
+ * Progressive-disclosure project nav (B2C spec §3.1): only the everyday views
+ * live on the bar — everything else sits behind "Thêm view", where it can be
+ * opened once or pinned onto the bar (persisted per project). Stable tab
+ * dimensions keep navigation from shifting during repeated use.
+ */
+// Essential names are message keys (localized); extra views keep their
+// product names (identical in both locales).
+const ESSENTIAL: ViewDef[] = [
+  { key: "overview", name: "", nameKey: "nav.overview", path: "overview", icon: Info },
+  { key: "tasks", name: "", nameKey: "nav.list", path: "tasks", icon: ListTodo },
+  { key: "board", name: "", nameKey: "nav.board", path: "board", icon: Kanban },
+  { key: "calendar", name: "", nameKey: "nav.calendar", path: "calendar", icon: CalendarDays },
+  { key: "timeline", name: "Gantt", path: "timeline", icon: CalendarRange },
+  { key: "table", name: "Table", path: "table", icon: Table2 },
+];
+
+const EXTRA: ViewDef[] = [
+  { key: "dashboard", name: "Dashboard", path: "dashboard", icon: LayoutDashboard },
+  { key: "wbs", name: "WBS", path: "wbs", icon: Network },
+  { key: "workload", name: "Workload", path: "workload", icon: Gauge },
+  { key: "daily", name: "Daily Updates", path: "daily", icon: ClipboardList },
+  { key: "blockers", name: "Blockers", path: "blockers", icon: AlertOctagon },
+  { key: "risks", name: "Risks & Milestones", path: "risks-milestones", icon: AlertTriangle },
+  { key: "docs", name: "Docs & Decisions", path: "docs-decisions", icon: FileText },
+  { key: "reports", name: "Reports", path: "reports", icon: TrendingUp },
+  { key: "analytics", name: "Analytics", path: "analytics", icon: BarChart3 },
+  { key: "team", name: "Team", path: "team", icon: Users },
+];
+
+const AI_VIEW: ViewDef = {
+  key: "ai",
+  name: "AI Assistant",
+  path: "ai",
+  icon: Sparkles,
+  highlight: true,
+};
+
+function storageKey(projectId: string) {
+  return `vc-pinned-views:${projectId}`;
+}
+
 export function ProjectNav({ slug, projectId }: Props) {
   const pathname = usePathname();
+  const locale = useLocale();
+  const [pinned, setPinned] = useState<string[]>([]);
+  const [hydrated, setHydrated] = useState(false);
 
-  // No global polling here: a 3s router.refresh() re-rendered every tab and
-  // stole focus mid-typing (audit 2.2). Mutations revalidate their own paths,
-  // and the agent-activity tray polls adaptively for agent-driven changes.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageKey(projectId));
+      if (raw) setPinned(JSON.parse(raw));
+    } catch {
+      /* ignore */
+    }
+    setHydrated(true);
+  }, [projectId]);
 
-  const tabs = [
-    {
-      name: "Overview",
-      href: `/workspace/${slug}/projects/${projectId}/overview`,
-      icon: Info,
-    },
-    {
-      name: "Tasks",
-      href: `/workspace/${slug}/projects/${projectId}/tasks`,
-      icon: ListTodo,
-      // Active if matching tasks or board
-      active: pathname.includes("/tasks") || pathname.includes("/board"),
-    },
-    {
-      name: "Timeline",
-      href: `/workspace/${slug}/projects/${projectId}/timeline`,
-      icon: CalendarRange,
-    },
-    {
-      name: "Workload",
-      href: `/workspace/${slug}/projects/${projectId}/workload`,
-      icon: Gauge,
-    },
-    {
-      name: "WBS",
-      href: `/workspace/${slug}/projects/${projectId}/wbs`,
-      icon: Network,
-    },
-    {
-      name: "Daily Updates",
-      href: `/workspace/${slug}/projects/${projectId}/daily`,
-      icon: ClipboardList,
-    },
-    {
-      name: "Blockers",
-      href: `/workspace/${slug}/projects/${projectId}/blockers`,
-      icon: AlertOctagon,
-    },
-    {
-      name: "Risks & Milestones",
-      href: `/workspace/${slug}/projects/[projectId]/risks-milestones`
-        .replace("[projectId]", projectId),
-      icon: AlertTriangle,
-      active: pathname.includes("/risks-milestones"),
-    },
-    {
-      name: "Docs & Decisions",
-      href: `/workspace/${slug}/projects/[projectId]/docs-decisions`
-        .replace("[projectId]", projectId),
-      icon: FileText,
-      active: pathname.includes("/docs-decisions"),
-    },
-    {
-      name: "Reports",
-      href: `/workspace/${slug}/projects/${projectId}/reports`,
-      icon: TrendingUp,
-    },
-    {
-      name: "Analytics",
-      href: `/workspace/${slug}/projects/${projectId}/analytics`,
-      icon: BarChart3,
-    },
-    {
-      name: "Team",
-      href: `/workspace/${slug}/projects/${projectId}/team`,
-      icon: Users,
-    },
-    {
-      name: "AI Assistant",
-      href: `/workspace/${slug}/projects/${projectId}/ai`,
-      icon: Sparkles,
-      highlight: true,
-    },
-  ];
+  function togglePin(key: string) {
+    setPinned((prev) => {
+      const next = prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
+      try {
+        localStorage.setItem(storageKey(projectId), JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
+
+  const base = `/workspace/${slug}/projects/${projectId}`;
+
+  const isActive = (v: ViewDef) => {
+    if (pathname === `${base}/${v.path}`) return true;
+    return (v.match ?? []).some((m) => pathname.includes(m));
+  };
+
+  // The active extra view surfaces on the bar even when not pinned, so the
+  // current location is never hidden inside the dropdown.
+  const activeExtraKey = EXTRA.find((v) => isActive(v))?.key ?? null;
+  const barViews = useMemo(() => {
+    const pinnedViews = EXTRA.filter((v) => pinned.includes(v.key) || v.key === activeExtraKey);
+    return [...ESSENTIAL, ...pinnedViews, AI_VIEW];
+  }, [pinned, activeExtraKey]);
 
   return (
-    <div className="border-b border-border bg-card/70 backdrop-blur-md sticky top-0 z-30 px-6">
-      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar scroll-smooth">
-        {tabs.map((tab) => {
+    <div className="sticky top-0 z-30 border-b border-border bg-card/70 px-6 backdrop-blur-md">
+      <div className="no-scrollbar flex items-center gap-0.5 overflow-x-auto scroll-smooth py-0.5">
+        {barViews.map((tab) => {
           const Icon = tab.icon;
-          const isActive = tab.active ?? pathname === tab.href;
+          const active = isActive(tab);
           return (
             <Link
-              key={tab.name}
-              href={tab.href}
+              key={tab.key}
+              href={`${base}/${tab.path}`}
               prefetch={true}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-3 text-[13px] font-medium border-b-2 border-transparent transition-colors whitespace-nowrap -mb-px",
-                isActive
-                  ? "border-primary text-foreground font-semibold"
+                "group relative flex h-10 items-center gap-1.5 whitespace-nowrap rounded-md px-3 text-[13px] font-medium transition-colors",
+                "hover:bg-secondary hover:text-foreground",
+                active
+                  ? "font-semibold text-foreground"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
               <Icon
                 className={cn(
-                  "w-3.5 h-3.5 shrink-0",
-                  isActive ? "text-primary" : tab.highlight && "text-primary/70"
+                  "h-3.5 w-3.5 shrink-0",
+                  active ? "text-primary" : tab.highlight && "text-lavender"
                 )}
               />
-              <span>{tab.name}</span>
-              {tab.highlight && (
-                <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-primary" />
+              <span>
+                {"nameKey" in tab && tab.nameKey ? t(locale, tab.nameKey as MessageKey) : tab.name}
+              </span>
+              {tab.highlight && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-lavender" />}
+              {active && (
+                <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-primary" />
               )}
             </Link>
           );
         })}
+
+        {/* Thêm view */}
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger asChild>
+            <button
+              className={cn(
+                "flex h-10 items-center gap-1.5 whitespace-nowrap rounded-md px-3 text-[13px] font-medium text-muted-foreground transition-colors",
+                "hover:bg-secondary hover:text-foreground"
+              )}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {t(locale, "nav.addView")}
+            </button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content
+              align="start"
+              sideOffset={6}
+              className="z-50 w-64 rounded-lg border border-border bg-card p-1.5 shadow-elevated"
+            >
+              <p className="px-2.5 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {t(locale, "nav.pinHint")}
+              </p>
+              {hydrated &&
+                EXTRA.map((v) => {
+                  const Icon = v.icon;
+                  const isPinned = pinned.includes(v.key);
+                  return (
+                    <div
+                      key={v.key}
+                      className="flex items-center rounded-md text-[13px] hover:bg-secondary"
+                    >
+                      <Link
+                        href={`${base}/${v.path}`}
+                        className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-2 text-foreground/90"
+                      >
+                        <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        <span className="truncate">{v.name}</span>
+                        {isActive(v) && <Check className="ml-auto h-3.5 w-3.5 text-primary" />}
+                      </Link>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          togglePin(v.key);
+                        }}
+                        title={isPinned ? t(locale, "nav.unpin") : t(locale, "nav.pin")}
+                        className={cn(
+                          "mr-1 grid h-7 w-7 shrink-0 place-items-center rounded-md transition-colors",
+                          isPinned
+                            ? "text-primary hover:bg-primary/10"
+                            : "text-muted-foreground/50 hover:bg-secondary hover:text-foreground"
+                        )}
+                      >
+                        <Pin className={cn("h-3.5 w-3.5", isPinned && "fill-current")} />
+                      </button>
+                    </div>
+                  );
+                })}
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
       </div>
     </div>
   );

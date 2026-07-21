@@ -39,6 +39,10 @@ export const projects = pgTable("projects", {
     .notNull()
     .default("full_auto"),
   agentConfidenceThreshold: real("agent_confidence_threshold").notNull().default(0.7),
+  // NOTE: `is_private` (Space-level privacy, §4.2) is intentionally NOT added
+  // here yet — `listByWorkspace`/`findById` use `.select()` (all columns), so
+  // adding the column before its migration is applied breaks project reads
+  // against the live DB. Add it together with the permission-grants migration.
   // AI Leader master switch: when false the project is managed manually and no
   // agents are dispatched (planning/assignment/observer). Toggled from the
   // overview banner (on) or project settings (off).

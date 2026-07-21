@@ -15,8 +15,10 @@
 
 @layer base {
   :root {
-    /* Surfaces — warm paper canvas, pure-white cards */
-    --background: 40 13% 96%; /* #f6f5f3 warm paper */
+    /* Surfaces — warm near-white canvas (#faf9f7), pure-white cards.
+       (Redesign: lifted off the old milky grey so surfaces read cleaner and
+       the pastel accents below have room to breathe — B2C spec §3.3.) */
+    --background: 40 22% 98%; /* #faf9f7 warm near-white */
     --foreground: 30 8% 11%; /* near-black warm ink */
 
     --card: 0 0% 100%;
@@ -25,8 +27,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 30 8% 11%;
 
-    /* The single structural accent — Claude orange */
-    --primary: 14 63% 59%; /* #d97757 */
+    /* The single structural accent — brand orange #dd5b00 */
+    --primary: 25 100% 43%; /* #dd5b00 */
     --primary-foreground: 0 0% 100%;
 
     /* Quiet neutrals */
@@ -45,14 +47,23 @@
     /* Hairlines */
     --border: 38 11% 88%;
     --input: 38 11% 85%;
-    --ring: 14 63% 59%;
+    --ring: 25 100% 43%;
 
     /* Brand alias (decorative emphasis) */
-    --brand: 14 63% 59%;
+    --brand: 25 100% 43%;
     --brand-foreground: 0 0% 100%;
-    --brand-soft: 22 90% 96%;
+    --brand-soft: 28 100% 95%;
 
-    --radius: 0.75rem;
+    /* Pastel accent family (redesign §3.4) — for dashboards, empty states,
+       categories and status illustration. NOT the action colour; orange stays
+       the only CTA/active signal. Each has a soft (surface-tint) partner. */
+    --coral: 4 100% 69%;      --coral-soft: 6 100% 95%;
+    --peach: 27 90% 61%;      --peach-soft: 33 100% 94%;
+    --lavender: 254 62% 68%;  --lavender-soft: 252 100% 96%;
+    --sky: 210 74% 57%;       --sky-soft: 210 100% 95%;
+    --mint: 153 60% 41%;      --mint-soft: 152 55% 92%;
+
+    --radius: 0.5rem; /* redesign: operational surfaces cap at 8px */
   }
 
   .dark {
@@ -65,8 +76,8 @@
     --popover: 30 7% 13%;
     --popover-foreground: 40 10% 92%;
 
-    --primary: 14 72% 63%;
-    --primary-foreground: 30 12% 8%;
+    --primary: 25 100% 50%;
+    --primary-foreground: 0 0% 100%;
 
     --secondary: 30 5% 18%;
     --secondary-foreground: 40 10% 92%;
@@ -82,11 +93,17 @@
 
     --border: 30 5% 20%;
     --input: 30 5% 23%;
-    --ring: 14 72% 63%;
+    --ring: 25 100% 50%;
 
-    --brand: 14 72% 63%;
-    --brand-foreground: 30 12% 8%;
-    --brand-soft: 18 30% 18%;
+    --brand: 25 100% 50%;
+    --brand-foreground: 0 0% 100%;
+    --brand-soft: 25 40% 18%;
+
+    --coral: 6 100% 73%;      --coral-soft: 6 30% 18%;
+    --peach: 30 90% 67%;      --peach-soft: 28 35% 17%;
+    --lavender: 254 80% 76%;  --lavender-soft: 252 30% 20%;
+    --sky: 210 80% 67%;       --sky-soft: 212 40% 17%;
+    --mint: 152 55% 52%;      --mint-soft: 154 35% 15%;
   }
 }
 
@@ -123,6 +140,15 @@
 }
 
 @layer utilities {
+  /* Brand gradient — warm orange → coral → lavender (redesign §3.4).
+     Used for the sidebar, onboarding brand panel and AI/header surfaces. */
+  .bg-sidebar-gradient {
+    background-image: linear-gradient(158deg, #ff8a3d 0%, #ff6a5f 52%, #8b78e0 100%);
+  }
+  .bg-brand-gradient {
+    background-image: linear-gradient(150deg, #ff8a3d 0%, #ff6a5f 52%, #8b78e0 100%);
+  }
+
   /* Hide scrollbar but keep scroll (used by tab strips) */
   .no-scrollbar::-webkit-scrollbar {
     display: none;

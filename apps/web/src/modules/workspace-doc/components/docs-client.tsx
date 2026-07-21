@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, cn, Input } from "@vieroc/ui";
 import { ChevronDown, ChevronRight, Eye, FileText, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -22,6 +22,8 @@ interface Props {
   workspaceId: string;
   workspaceSlug: string;
   initialDocs: DocNode[];
+  /** Deep-link target (`?doc=<id>`) — e.g. from the sidebar Docs panel. */
+  initialDocId?: string | null;
 }
 
 /** Minimal, dependency-free markdown → HTML (escaped first). */
@@ -64,15 +66,25 @@ function renderMarkdown(src: string): string {
   return out.join("\n");
 }
 
-export function DocsClient({ workspaceId, workspaceSlug, initialDocs }: Props) {
+export function DocsClient({ workspaceId, workspaceSlug, initialDocs, initialDocId }: Props) {
+  const initial = initialDocs.find((d) => d.id === initialDocId) ?? initialDocs[0] ?? null;
   const [docs, setDocs] = useState<DocNode[]>(initialDocs);
-  const [selectedId, setSelectedId] = useState<string | null>(initialDocs[0]?.id ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(initial?.id ?? null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [mode, setMode] = useState<"edit" | "preview">("edit");
-  const [title, setTitle] = useState(initialDocs[0]?.title ?? "");
-  const [content, setContent] = useState(initialDocs[0]?.content ?? "");
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [content, setContent] = useState(initial?.content ?? "");
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+
+  // Follow ?doc= when it changes while the page stays mounted (sidebar links).
+  // Never clobber unsaved edits.
+  useEffect(() => {
+    if (!initialDocId || initialDocId === selectedId || dirty) return;
+    const target = docs.find((d) => d.id === initialDocId);
+    if (target) selectDoc(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDocId]);
 
   const childrenOf = useMemo(() => {
     const map = new Map<string | null, DocNode[]>();

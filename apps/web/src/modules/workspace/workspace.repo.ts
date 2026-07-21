@@ -1,6 +1,7 @@
 import "server-only";
 import { and, eq } from "drizzle-orm";
 import { db, workspaces, workspaceMembers, memberProfiles, users, type Executor } from "@vieroc/db";
+import type { WorkspaceRole } from "@vieroc/types";
 
 export type WorkspaceInsert = typeof workspaces.$inferInsert;
 export type WorkspaceRow = typeof workspaces.$inferSelect;
@@ -96,7 +97,7 @@ export async function listMembers(workspaceId: string, exec: Executor = db) {
     .where(eq(workspaceMembers.workspaceId, workspaceId));
 }
 
-export async function updateMemberRole(memberId: string, role: "owner" | "admin" | "leader" | "member" | "viewer", exec: Executor = db) {
+export async function updateMemberRole(memberId: string, role: WorkspaceRole, exec: Executor = db) {
   const [row] = await exec
     .update(workspaceMembers)
     .set({ role })

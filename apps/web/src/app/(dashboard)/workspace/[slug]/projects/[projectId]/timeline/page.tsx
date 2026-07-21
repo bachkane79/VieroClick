@@ -4,6 +4,8 @@ import { detectPlanDeviations } from "@/modules/project/project.service";
 import { GanttClient } from "@/modules/task/components/gantt-client";
 import { loadProjectViewData } from "@/modules/task/task-page-data";
 import { NotFoundError } from "@/server/lib/errors";
+import { ProjectWorkHeader } from "@/modules/task/components/project-work-header";
+import { getLocale } from "@/lib/i18n/server";
 
 interface Props {
   params: Promise<{ slug: string; projectId: string }>;
@@ -21,19 +23,17 @@ export default async function ProjectTimelinePage({ params }: Props) {
     if (err instanceof NotFoundError) notFound();
     throw err;
   }
+  const locale = await getLocale();
 
   return (
-    <div className="space-y-6 px-6 py-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold tracking-tight">Timeline & Gantt Chart</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Drag a task bar to reschedule; deviations flagged in red
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+    <div className="min-w-0">
+      <ProjectWorkHeader
+        view="gantt"
+        projectName={data.project.name}
+        taskCount={data.tasks.length}
+        locale={locale}
+      />
+      <div className="grid grid-cols-1 gap-4 px-4 py-4 sm:px-6 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           <GanttClient
             workspaceId={data.workspace.id}

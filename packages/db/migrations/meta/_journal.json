@@ -15,6 +15,13 @@
       "when": 1783682622814,
       "tag": "0001_premium_gamora",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784659381942,
+      "tag": "0002_illegal_silver_centurion",
+      "breakpoints": true
     }
   ]
 }

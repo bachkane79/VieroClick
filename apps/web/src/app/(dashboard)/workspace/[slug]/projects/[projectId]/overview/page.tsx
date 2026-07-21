@@ -13,6 +13,7 @@ import {
 } from "@/modules/project/components/ai-leader-controls";
 import { Target } from "lucide-react";
 import { NotFoundError } from "@/server/lib/errors";
+import { ShareDialog } from "@/modules/permission/components/share-dialog";
 
 interface Props {
   params: Promise<{ slug: string; projectId: string }>;
@@ -60,6 +61,24 @@ export default async function ProjectOverviewPage({ params }: Props) {
     statuses.filter((status) => status.type === "blocked").map((s) => s.id)
   );
 
+  // Phase progress (B2C spec P3/P4 — "giám sát từng phase"). Tasks carry their
+  // phase as the first label (seeded by onboarding templates / the planner);
+  // group by it so the phase health reads at a glance. Unlabelled tasks fall
+  // into a catch-all bucket at the end.
+  const todayStr = new Date().toISOString().split("T")[0]!;
+  const phaseMap = new Map<string, { total: number; done: number; overdue: number }>();
+  for (const t of tasks) {
+    const phase = t.labels[0] ?? "Chưa phân phase";
+    const bucket = phaseMap.get(phase) ?? { total: 0, done: 0, overdue: 0 };
+    bucket.total += 1;
+    if (doneStatusIds.has(t.statusId)) bucket.done += 1;
+    else if (t.dueDate && t.dueDate < todayStr) bucket.overdue += 1;
+    phaseMap.set(phase, bucket);
+  }
+  const phases = [...phaseMap.entries()].sort((a, b) =>
+    a[0] === "Chưa phân phase" ? 1 : b[0] === "Chưa phân phase" ? -1 : 0
+  );
+
   return (
     <div className="px-6 py-6">
       <AiLeaderBanner
@@ -77,6 +96,17 @@ export default async function ProjectOverviewPage({ params }: Props) {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <ShareDialog
+            workspaceId={workspace.id}
+            resourceType="project"
+            resourceId={projectId}
+            resourceName={project.name}
+            members={workspaceMembers.map((m) => ({
+              id: m.id,
+              fullName: m.fullName,
+              email: m.email,
+            }))}
+          />
           <AiLeaderSettingsMenu
             workspaceId={workspace.id}
             projectId={projectId}
@@ -101,14 +131,52 @@ export default async function ProjectOverviewPage({ params }: Props) {
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <Metric label="Tasks" value={tasks.length} />
-        <Metric label="Done" value={tasks.filter((task) => doneStatusIds.has(task.statusId)).length} />
+        <Metric label="Tasks" value={tasks.length} accent="sky" />
+        <Metric
+          label="Done"
+          value={tasks.filter((task) => doneStatusIds.has(task.statusId)).length}
+          accent="mint"
+        />
         <Metric
           label="Blocked"
           value={tasks.filter((task) => blockedStatusIds.has(task.statusId)).length}
+          accent="coral"
         />
-        <Metric label="Members" value={projectMembers.length} />
+        <Metric label="Members" value={projectMembers.length} accent="peach" />
       </div>
+
+      {phases.length > 0 && (
+        <section className="mt-6 rounded-lg border bg-card p-5 shadow-soft">
+          <h2 className="flex items-center gap-2 text-base font-bold">
+            <ListChecks className="h-4 w-4 text-lavender" />
+            Tiến độ theo Phase
+          </h2>
+          <div className="mt-4 space-y-1">
+            {phases.map(([name, s]) => {
+              const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
+              return (
+                <div key={name} className="flex items-center gap-3 border-b py-2.5 last:border-b-0">
+                  <span className="w-44 shrink-0 truncate text-sm font-semibold">{name}</span>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
+                    <div
+                      className={cn("h-full rounded-full", pct === 100 ? "bg-mint" : "bg-primary")}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className="w-24 shrink-0 text-right text-xs font-medium text-muted-foreground tabular-nums">
+                    {s.done}/{s.total} · {pct}%
+                  </span>
+                  {s.overdue > 0 && (
+                    <span className="shrink-0 rounded-full bg-coral-soft px-2 py-0.5 text-[11px] font-semibold text-coral">
+                      {s.overdue} quá hạn
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {goals.length > 0 && (
         <section className="mt-6 rounded-lg border bg-card p-5 shadow-sm">
@@ -195,11 +263,25 @@ export default async function ProjectOverviewPage({ params }: Props) {
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+const METRIC_ACCENT: Record<string, string> = {
+  sky: "text-sky",
+  mint: "text-mint",
+  coral: "text-coral",
+  peach: "text-peach",
+};
+
+function Metric({ label, value, accent }: { label: string; value: number; accent?: string }) {
   return (
-    <div className="rounded-lg border bg-card p-4 shadow-sm">
+    <div className="rounded-lg border bg-card p-4 shadow-soft">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-2 text-2xl font-bold">{value}</p>
+      <p
+        className={cn(
+          "mt-2 text-2xl font-bold tabular-nums",
+          value > 0 && accent ? METRIC_ACCENT[accent] : undefined
+        )}
+      >
+        {value}
+      </p>
     </div>
   );
 }

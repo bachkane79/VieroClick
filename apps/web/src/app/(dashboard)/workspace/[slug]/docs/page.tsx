@@ -6,10 +6,12 @@ import { NotFoundError } from "@/server/lib/errors";
 
 interface Props {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ doc?: string }>;
 }
 
-export default async function WorkspaceDocsPage({ params }: Props) {
+export default async function WorkspaceDocsPage({ params, searchParams }: Props) {
   const { slug } = await params;
+  const { doc: initialDocId } = await searchParams;
 
   let workspace;
   try {
@@ -30,6 +32,7 @@ export default async function WorkspaceDocsPage({ params }: Props) {
       <DocsClient
         workspaceId={workspace.id}
         workspaceSlug={slug}
+        initialDocId={initialDocId ?? null}
         initialDocs={docs.map((d) => ({
           id: d.id,
           parentId: d.parentId,

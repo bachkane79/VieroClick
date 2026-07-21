@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { WorkspaceRole } from "@vieroc/types";
 import { runAction } from "@/server/lib/action";
 import * as service from "./workspace.service";
 
@@ -33,7 +34,7 @@ export async function updateMemberRoleAction(args: {
   workspaceId: string;
   slug: string;
   memberId: string;
-  role: "owner" | "admin" | "leader" | "member" | "viewer";
+  role: WorkspaceRole;
 }) {
   return runAction(async () => {
     const res = await service.updateWorkspaceMemberRole(args.workspaceId, args.memberId, args.role);

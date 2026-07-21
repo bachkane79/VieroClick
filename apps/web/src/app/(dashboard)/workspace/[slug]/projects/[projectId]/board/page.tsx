@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import { TaskBoard } from "@/modules/task/components/task-board";
-import { ViewTabs } from "@/modules/task/components/view-tabs";
+import { ProjectWorkHeader } from "@/modules/task/components/project-work-header";
 import { loadProjectViewData } from "@/modules/task/task-page-data";
 import { NotFoundError } from "@/server/lib/errors";
+import { getLocale } from "@/lib/i18n/server";
 
 interface Props {
   params: Promise<{ slug: string; projectId: string }>;
@@ -18,16 +19,16 @@ export default async function ProjectBoardPage({ params }: Props) {
     if (err instanceof NotFoundError) notFound();
     throw err;
   }
+  const locale = await getLocale();
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-4">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">{data.project.name}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Board view</p>
-        </div>
-        <ViewTabs workspaceSlug={slug} projectId={projectId} />
-      </div>
+      <ProjectWorkHeader
+        view="board"
+        projectName={data.project.name}
+        taskCount={data.tasks.length}
+        locale={locale}
+      />
       <div className="min-h-0 flex-1">
         <TaskBoard
           workspaceId={data.workspace.id}

@@ -9,6 +9,14 @@ interface BaseArgs {
   slug: string;
 }
 
+/** Slim list for navigation surfaces (sidebar Docs panel) — titles only, no content. */
+export async function listWorkspaceDocsAction(args: { workspaceId: string }) {
+  return runAction(async () => {
+    const docs = await service.listWorkspaceDocs(args.workspaceId);
+    return docs.map((d) => ({ id: d.id, parentId: d.parentId, title: d.title }));
+  });
+}
+
 export async function createWorkspaceDocAction(args: BaseArgs & { data: unknown }) {
   return runAction(async () => {
     const doc = await service.createWorkspaceDoc({ workspaceId: args.workspaceId, input: args.data });

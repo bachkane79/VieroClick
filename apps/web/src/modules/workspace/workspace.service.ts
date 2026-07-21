@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { db } from "@vieroc/db";
+import type { WorkspaceRole } from "@vieroc/types";
 import { getUserId, requireActor } from "@/server/lib/context";
 import { NotFoundError } from "@/server/lib/errors";
 import { getOrSetCache, invalidateCache, invalidateCachePattern } from "@/server/lib/cache";
@@ -28,11 +29,64 @@ export async function createWorkspace(input: unknown) {
   const userId = await getUserId();
 
   return db.transaction(async (tx) => {
-    const ws = await repo.create({ name: data.name, slug: data.slug, ownerId: userId }, tx);
+    const ws = await repo.create(
+      { name: data.name, slug: data.slug, kind: data.kind, ownerId: userId },
+      tx
+    );
     const member = await repo.addMember(
       { workspaceId: ws.id, userId, role: "owner" },
       tx
     );
+    await events.workspaceCreated(
+      tx,
+      { workspaceId: ws.id, actorUserId: userId, actorMemberId: member.id },
+      ws.name
+    );
+    invalidateCachePattern(`my_workspaces:${userId}`);
+    invalidateCachePattern(`workspace_by_slug:`);
+    return ws;
+  });
+}
+
+function slugify(input: string): string {
+  return (
+    input
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 32) || "workspace"
+  );
+}
+
+/**
+ * Ensure the signed-in user owns at least one workspace, creating a personal
+ * one on first login so a fresh account lands in a real workspace (not an empty
+ * state). Idempotent: returns the existing first workspace if any.
+ */
+export async function ensurePersonalWorkspace(displayName: string) {
+  const userId = await getUserId();
+  const existing = await repo.listForUser(userId);
+  if (existing.length > 0) return existing[0]!;
+
+  const label = (displayName || "").split("@")[0]?.trim() || "My";
+  const name = `${label}'s Workspace`;
+  const base = slugify(label);
+
+  return db.transaction(async (tx) => {
+    let slug = base;
+    for (let i = 0; i < 6; i++) {
+      const candidate = i === 0 ? base : `${base}-${crypto.randomUUID().slice(0, 4)}`;
+      const taken = await repo.findBySlug(candidate, tx);
+      if (!taken) {
+        slug = candidate;
+        break;
+      }
+    }
+
+    const ws = await repo.create({ name, slug, ownerId: userId }, tx);
+    const member = await repo.addMember({ workspaceId: ws.id, userId, role: "owner" }, tx);
     await events.workspaceCreated(
       tx,
       { workspaceId: ws.id, actorUserId: userId, actorMemberId: member.id },
@@ -96,6 +150,9 @@ export async function inviteWorkspaceMember(workspaceId: string, input: unknown)
     invalidateCachePattern(`actor:`);
     invalidateCachePattern(`workspace_by_slug:`);
 
+    const { track } = await import("@/server/lib/analytics");
+    track("invitation_sent", { workspaceId, role: data.role });
+
     return member;
   });
 }
@@ -103,7 +160,7 @@ export async function inviteWorkspaceMember(workspaceId: string, input: unknown)
 export async function updateWorkspaceMemberRole(
   workspaceId: string,
   memberId: string,
-  role: "owner" | "admin" | "leader" | "member" | "viewer"
+  role: WorkspaceRole
 ) {
   const ctx = await requireActor(workspaceId);
   assertCanManageWorkspace(ctx);
