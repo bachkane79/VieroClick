@@ -23,6 +23,11 @@ export function canContribute(ctx: ActorContext): boolean {
   return !isReadOnly(ctx);
 }
 
+/** Can approve / reject task review: a project manager, or the project's reviewer. */
+export function isReviewer(ctx: ActorContext): boolean {
+  return isProjectManager(ctx) || ctx.projectRole === "reviewer";
+}
+
 /** Creating a project is gated at the workspace level (no project role yet exists). */
 export function canCreateProject(ctx: ActorContext): boolean {
   return isWorkspaceAdmin(ctx) || ctx.workspaceRole === "leader";
@@ -38,6 +43,7 @@ export const canResolveBlockers = isProjectManager;
 export const canRunAgentJobs = isProjectManager;
 export const canReviewSuggestions = isProjectManager;
 export const canManageTelegram = isProjectManager;
+export const canReviewTasks = isReviewer;
 
 export const canComment = canContribute;
 export const canSubmitDailyUpdate = canContribute;

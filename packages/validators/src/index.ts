@@ -1,4 +1,13 @@
 import { z } from "zod";
+import {
+  acceptanceCriterionSchema,
+  taskAcceptanceCriteriaSchema,
+  taskPrioritySchema,
+} from "./task-core";
+import { agentAutonomySchema } from "./agent-payloads";
+
+export * from "./task-core";
+export * from "./agent-payloads";
 
 // ─── Workspace ───────────────────────────────────────────────────────────────
 
@@ -30,37 +39,20 @@ export const createProjectSchema = z.object({
   expectedDeliverables: z.array(z.string()).default([]),
   memberIds: z.array(z.string().uuid()).default([]),
   initialContext: z.string().optional(),
+  // AI Leader master switch chosen at creation. When false, the project is
+  // created for manual work and no planning agent is dispatched.
+  aiEnabled: z.boolean().default(true),
 });
 
-export const updateProjectSchema = createProjectSchema.partial();
+export const updateProjectSchema = createProjectSchema.partial().extend({
+  agentAutonomy: agentAutonomySchema.optional(),
+  agentConfidenceThreshold: z.number().min(0).max(1).optional(),
+  aiEnabled: z.boolean().optional(),
+});
 
 // ─── Task ─────────────────────────────────────────────────────────────────────
-
-export const taskPrioritySchema = z.enum(["low", "medium", "high", "urgent"]);
-
-export const acceptanceCriterionSchema = z.object({
-  id: z.string().optional(),
-  text: z.string().min(1).max(500),
-  required: z.boolean().default(true),
-  checked: z.boolean().default(false),
-});
-
-export const taskAcceptanceCriteriaSchema = z
-  .array(
-    z.union([
-      acceptanceCriterionSchema,
-      z
-        .string()
-        .min(1)
-        .max(500)
-        .transform((text) => ({
-          text,
-          required: true,
-          checked: false,
-        })),
-    ])
-  )
-  .default([]);
+// taskPrioritySchema / acceptanceCriterionSchema / taskAcceptanceCriteriaSchema
+// live in ./task-core (shared with ./agent-payloads) and are re-exported above.
 
 export const createTaskSchema = z.object({
   title: z.string().min(1).max(500),
@@ -82,7 +74,16 @@ export const createTaskSchema = z.object({
   allowBlockedOverride: z.boolean().default(false),
 });
 
-export const updateTaskSchema = createTaskSchema.partial();
+export const updateTaskSchema = createTaskSchema.partial().extend({
+  // Actual hours logged (assignee or manager can set; feeds speed score + accuracy).
+  actualHours: z.number().min(0).max(100000).nullable().optional(),
+});
+
+export const reviewTaskSchema = z.object({
+  decision: z.enum(["approve", "rework"]),
+  feedback: z.string().max(2000).optional(),
+  actualHours: z.number().min(0).max(100000).nullable().optional(),
+});
 
 export const moveTaskSchema = z.object({
   statusId: z.string().uuid(),
@@ -120,11 +121,16 @@ export const linkedEntitySchema = z.object({
 export const commentMetadataSchema = z
   .object({
     links: z.array(linkedEntitySchema).max(20).default([]),
+    // Assigned comment (ClickUp-style): the member who must act on/resolve it.
+    assignedMemberId: z.string().uuid().nullable().optional(),
+    resolved: z.boolean().optional(),
   })
   .passthrough();
 
 export const createCommentSchema = z.object({
   body: z.string().min(1),
+  // Threaded reply target (null/omitted = top-level comment).
+  parentCommentId: z.string().uuid().nullable().optional(),
   metadata: commentMetadataSchema.default({ links: [] }),
 });
 
@@ -209,6 +215,47 @@ export const updateMemberProfileSchema = z.object({
   profileNotes: z.string().optional(),
 });
 
+// ─── Agent jobs, roles & suggestions ───────────────────────────────────────────
+// Single source of truth for the agent enums shared between web and agent-api.
+// The DB columns (agent_jobs.job_type, agent_suggestions.suggestion_type) are plain
+// text; these schemas are what web validates against, and their literal sets must
+// stay in sync with the Python side (see the notes on each).
+
+// Async job types dispatched to agent-api's Celery queue via POST /api/jobs/.
+// MUST match the task_map keys in apps/agent-api/app/api/routes/jobs.py.
+export const agentJobTypeSchema = z.enum([
+  "daily_report",
+  "task_assignment",
+  "risk_scan",
+  "qa",
+]);
+
+// Interactive agent roles dispatched synchronously via POST /api/agents/{role}.
+// MUST match AGENT_RUNNERS in apps/agent-api/app/agents/roles/__init__.py.
+export const agentRoleSchema = z.enum([
+  "planning",
+  "assignment",
+  "observer",
+  "daily_report",
+  "morning_briefing",
+  "project_qa",
+]);
+
+// suggestion_type values persisted on agent_suggestions. Produced by the web
+// apply-* routes (planning_package / assignment_suggestion / risk_scan) and by
+// the observer + Q&A roles (the rest).
+export const agentSuggestionTypeSchema = z.enum([
+  "planning_package",
+  "assignment_suggestion",
+  "risk_scan",
+  "risk_detected",
+  "blocker_escalation",
+  "plan_deviation",
+  "clarification_needed",
+  "silent_member",
+  "project_hole",
+]);
+
 // ─── Pagination ───────────────────────────────────────────────────────────────
 
 export const paginationSchema = z.object({
@@ -229,3 +276,6 @@ export type CreateDecisionLogInput = z.infer<typeof createDecisionLogSchema>;
 export type CreateRiskInput = z.infer<typeof createRiskSchema>;
 export type UpdateMemberProfileInput = z.infer<typeof updateMemberProfileSchema>;
 export type PaginationInput = z.infer<typeof paginationSchema>;
+export type AgentJobType = z.infer<typeof agentJobTypeSchema>;
+export type AgentRole = z.infer<typeof agentRoleSchema>;
+export type AgentSuggestionType = z.infer<typeof agentSuggestionTypeSchema>;

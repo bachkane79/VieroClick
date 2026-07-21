@@ -1,4 +1,4 @@
-import { pgTable, pgEnum, text, uuid, integer, date, jsonb, unique } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, text, uuid, integer, real, date, jsonb, boolean, unique } from "drizzle-orm/pg-core";
 import { timestamptz } from "./_helpers";
 import { users } from "./users";
 import { workspaces, workspaceMembers } from "./workspaces";
@@ -35,6 +35,14 @@ export const projects = pgTable("projects", {
   constraints: jsonb("constraints").$type<string[]>().notNull().default([]),
   expectedDeliverables: jsonb("expected_deliverables").$type<string[]>().notNull().default([]),
   initialContext: text("initial_context"),
+  agentAutonomy: text("agent_autonomy", { enum: ["full_auto", "review_required"] })
+    .notNull()
+    .default("full_auto"),
+  agentConfidenceThreshold: real("agent_confidence_threshold").notNull().default(0.7),
+  // AI Leader master switch: when false the project is managed manually and no
+  // agents are dispatched (planning/assignment/observer). Toggled from the
+  // overview banner (on) or project settings (off).
+  aiEnabled: boolean("ai_enabled").notNull().default(true),
   createdBy: uuid("created_by")
     .notNull()
     .references(() => users.id),

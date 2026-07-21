@@ -11,3 +11,19 @@ export function commentAdded(exec: Executor, ctx: ActorContext, taskId: string, 
     metadata: { commentId },
   });
 }
+
+export function commentResolved(
+  exec: Executor,
+  ctx: ActorContext,
+  taskId: string,
+  commentId: string,
+  resolved: boolean
+) {
+  return recordEvent(exec, {
+    ...actorFields(ctx),
+    entityType: "task",
+    entityId: taskId,
+    eventType: resolved ? "task.comment_resolved" : "task.comment_reopened",
+    metadata: { commentId },
+  });
+}

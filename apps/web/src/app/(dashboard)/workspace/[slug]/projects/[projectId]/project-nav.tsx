@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { cn } from "@vieroc/ui";
 import {
   Info,
@@ -14,6 +13,9 @@ import {
   AlertTriangle,
   FileText,
   TrendingUp,
+  BarChart3,
+  Gauge,
+  Users,
   Sparkles,
 } from "lucide-react";
 
@@ -24,15 +26,10 @@ interface Props {
 
 export function ProjectNav({ slug, projectId }: Props) {
   const pathname = usePathname();
-  const router = useRouter();
 
-  useEffect(() => {
-    // Poll the backend every 3 seconds to update client views in real-time
-    const interval = setInterval(() => {
-      router.refresh();
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [router]);
+  // No global polling here: a 3s router.refresh() re-rendered every tab and
+  // stole focus mid-typing (audit 2.2). Mutations revalidate their own paths,
+  // and the agent-activity tray polls adaptively for agent-driven changes.
 
   const tabs = [
     {
@@ -51,6 +48,11 @@ export function ProjectNav({ slug, projectId }: Props) {
       name: "Timeline",
       href: `/workspace/${slug}/projects/${projectId}/timeline`,
       icon: CalendarRange,
+    },
+    {
+      name: "Workload",
+      href: `/workspace/${slug}/projects/${projectId}/workload`,
+      icon: Gauge,
     },
     {
       name: "WBS",
@@ -85,6 +87,16 @@ export function ProjectNav({ slug, projectId }: Props) {
       name: "Reports",
       href: `/workspace/${slug}/projects/${projectId}/reports`,
       icon: TrendingUp,
+    },
+    {
+      name: "Analytics",
+      href: `/workspace/${slug}/projects/${projectId}/analytics`,
+      icon: BarChart3,
+    },
+    {
+      name: "Team",
+      href: `/workspace/${slug}/projects/${projectId}/team`,
+      icon: Users,
     },
     {
       name: "AI Assistant",

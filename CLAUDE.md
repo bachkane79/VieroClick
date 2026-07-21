@@ -4,16 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository overview
 
-pnpm monorepo (Turborepo) with two apps, a standalone local agent service, and four shared packages:
+pnpm monorepo (Turborepo) with two apps and five shared packages:
 
 - `apps/web` — Next.js 15 App Router (TypeScript)
-- `apps/agent-api` — Python 3.11 FastAPI + Celery worker
-- `band-agents/` — 6 local AI agents exposed as a FastAPI service (separate Python service, not part of the monorepo build; formerly Band.ai, now plain HTTP + Gemini)
+- `apps/agent-api` — Python 3.11 FastAPI + Celery worker; the single agent service. Hosts the 6 agent roles (`app/agents/roles/`), the Celery worker/beat rhythms, and the sync dispatch route `POST /api/agents/{role}`. (Band.ai and the former standalone `band-agents/` service have been removed; their agent logic was consolidated here.)
 - `packages/db` — Drizzle ORM schema + Neon client (shared by web)
 - `packages/types` — shared TypeScript interfaces
 - `packages/validators` — shared Zod schemas
 - `packages/ui` — minimal Tailwind component primitives
 - `packages/config` — shared ESLint / Prettier / tsconfig
+
+The canonical package manager is **pnpm** (`pnpm-lock.yaml`, `pnpm-workspace.yaml`, `"packageManager": "pnpm@11"` in the root `package.json`).
 
 ## Design specs (the authoritative source for `§` references)
 
@@ -22,11 +23,11 @@ The section numbers cited throughout this file and the codebase (`§4.2`, `§4.3
 - `nextjs_ai_monorepo_project_manager_design.md` — the product/architecture spec. `§4.1` domain modules, `§4.2` permission model, `§4.3` event-writing rule, `§7.1–7.3` agent service architecture, `§7.4–7.9` the six agents. This is where the rules the modules implement are defined.
 - `DESIGN-notion.md` — the visual design system (Notion-style: colors, typography, spacing tokens). Consult before UI work.
 
-`band-agents/README.md` documents the 6 local agents and the `POST /agents/{role}` service interface.
+The 6 agent roles and the `POST /api/agents/{role}` dispatch interface live in `apps/agent-api/app/agents/roles/` and `app/api/routes/agents.py`.
 
 ## Commands
 
-> **This is a Windows repo.** The shell is PowerShell; command blocks below use bash/POSIX syntax — translate as needed (or use the `powershell.cmd` shims at the root and in `band-agents/`). Paths and the `cp`/`source` steps in the Python sections are POSIX-style.
+> **This is a Windows repo.** The shell is PowerShell; command blocks below use bash/POSIX syntax — translate as needed (or use the `powershell.cmd` shims at the root). Paths and the `cp`/`source` steps in the Python sections are POSIX-style.
 
 ```bash
 # install everything
@@ -95,24 +96,11 @@ mypy app/
 
 FastAPI docs available at `http://localhost:8000/docs` only when `DEBUG=true`.
 
-### Local agents (`band-agents/`)
+### Agent roles (inside `apps/agent-api`)
 
-> Band.ai has been removed. The six agents no longer connect to a Band room — they run as a single **local FastAPI service** exposed over plain HTTP (`POST /agents/{role}`). All LLM calls go to the company **Gemini API** (`gemini-2.5-flash`; the planner uses `gemini-2.5-pro`).
+> Band.ai and the standalone `band-agents/` service have been removed. The six agent roles (planning, assignment, observer, daily_report, morning_briefing, project_qa) now live in `apps/agent-api/app/agents/roles/` and are dispatched **synchronously** via `POST /api/agents/{role}` — no separate :8001 process, no cross-service hop. All LLM calls go to the company **Gemini API** (`gemini-2.5-flash`; the planner uses `gemini-2.5-pro`) through `app/agents/gemini_client.py`, which retries transient rate-limit/overload errors.
 
-```bash
-cd band-agents
-
-# install
-pip install -r requirements.txt
-
-# copy and fill config (GEMINI_API_KEY, VIEROC_API_URL/TOKEN)
-cp .env.example .env
-
-# run the local agent service (default :8001)
-python run_all.py
-```
-
-The agents communicate with VieroClick via `VIEROC_API_URL` / `VIEROC_API_TOKEN` and call Gemini via `GEMINI_API_KEY` (set in `.env`). The web app dispatches jobs to `AGENT_SERVICE_URL` (default `http://localhost:8001`).
+Each role is a self-fetching `async def run(project_id, payload) -> dict`: it reads live state from the web `GET /api/project-data` and submits results back through the REST API (`app/agents/vieroc_client.py`) — never the DB directly. Run the service with the `uvicorn`/`celery` commands in the agent-api section above; config comes from the same `.env` (`GEMINI_API_KEY`, `VIEROC_API_URL`/`VIEROC_API_KEY`).
 
 ### Docker (full stack)
 
@@ -135,11 +123,10 @@ Key variables (see `.env.example` for the full list):
 | `AUTH_SECRET` / `NEXTAUTH_URL` | web auth |
 | `AGENT_API_URL` / `AGENT_API_SECRET` | web → agent-api calls |
 | `REDIS_URL` | agent-api Celery broker/backend |
-| `GEMINI_API_KEY` (+ `GEMINI_MODEL`, `GEMINI_PLANNER_MODEL`) | agent-api + band-agents LLM calls (company Gemini API) |
-| `AGENT_SERVICE_URL` / `AGENT_SERVICE_SECRET` | web → local agent service dispatch |
+| `GEMINI_API_KEY` (+ `GEMINI_MODEL`, `GEMINI_PLANNER_MODEL`) | agent-api LLM calls (company Gemini API) |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_WEBHOOK_SECRET` | agent-api Telegram integration |
 | `STORAGE_*` | S3-compatible file storage (endpoint, keys, bucket, region) |
-| `VIEROC_API_URL` / `VIEROC_API_TOKEN` | band-agents → web API calls |
+| `VIEROC_API_URL` / `VIEROC_API_KEY` | agent-api roles → web API calls |
 
 ## Architecture
 
@@ -147,13 +134,13 @@ Key variables (see `.env.example` for the full list):
 
 SQL migrations in `packages/db/migrations/` are the **single source of truth** for the schema. The Drizzle schema (`packages/db/src/schema/`) must match the SQL. The Python service reads the same Postgres database using raw SQLAlchemy — it never uses Drizzle.
 
-Migration gotcha: `migrations/meta/_journal.json` is what `pnpm db:migrate` actually replays, and it currently tracks only the `0000_previous_ultimates` baseline. The other `.sql` files in that dir (`0000_initial_schema.sql`, `0001`–`0003`) are not all journaled, so `db:migrate` won't apply them automatically — for dev, `pnpm db:push` reconciles the live Neon DB to the Drizzle schema directly. Regenerate via `pnpm db:generate` after schema edits rather than hand-editing the journal.
+Migration gotcha: `migrations/meta/_journal.json` is what `pnpm db:migrate` actually replays, and it tracks only two entries — the `0000_previous_ultimates` baseline and `0001_premium_gamora` (dead-letter, telegram tables, `agent_autonomy`/`agent_confidence_threshold` on projects, comment threads). The other named `.sql` files in that dir (`0000_initial_schema.sql` and `0001_notifications`–`0006_telegram_pending_actions`) are legacy, un-journaled history — `db:migrate` won't apply them. For dev, `pnpm db:push` reconciles the live Neon DB to the Drizzle schema directly. Regenerate via `pnpm db:generate` after schema edits rather than hand-editing the journal.
 
 The `timestamptz` column helper lives in `packages/db/src/schema/_helpers.ts` because Drizzle has no native `timestamptz` builder. All schema files import it from there; never from `drizzle-orm/pg-core`.
 
 ### Module structure (the core pattern)
 
-Every domain module under `apps/web/src/modules/<name>/` follows a fixed 6-file layout. Mirror an existing module (`task/` is the richest reference, `comment/` the simplest) rather than inventing a new shape:
+There are ~23 domain modules under `apps/web/src/modules/<name>/`. Most follow a fixed layout — mirror an existing module (`task/` is the richest reference, `comment/` a simple one) rather than inventing a new shape:
 
 - `<name>.schema.ts` — Zod schemas (re-exported from `@vieroc/validators` where they exist, else defined locally) + inferred input types.
 - `<name>.repo.ts` — `server-only` pure DB functions. Each takes `exec: Executor = db` as its **last** param so it runs against either the root client or an open transaction. Exports `XInsert`/`XRow` via `$inferInsert`/`$inferSelect`.
@@ -162,7 +149,9 @@ Every domain module under `apps/web/src/modules/<name>/` follows a fixed 6-file 
 - `<name>.service.ts` — `server-only` business logic. **Holds all logic; this is where the §4.3 flow lives.**
 - `<name>.actions.ts` — `"use server"` thin wrappers that call the service, `revalidatePath`, and return `runAction(...)` (an `ActionResult` discriminated union).
 
-The shared foundation these build on lives in `apps/web/src/server/lib/`: `errors`, `context` (`requireActor` resolves the user's workspace/project roles), `permissions` (role predicates per §4.2), `events`, `notifications`, `action`.
+Common additions on top of the six: `<name>.view.ts` (read-model / query helpers for the UI, e.g. in `task/`, `comment/`), a `components/` dir, and one-off files like `project/project.analytics.ts` (health-score computation). Not every module is complete — `member-score/` is only a repo + service (no schema/policy/events/actions); don't treat the 6-file layout as universally enforced.
+
+The shared foundation these build on lives in `apps/web/src/server/lib/`: `errors`, `context` (`requireActor` resolves the user's workspace/project roles), `permissions` (role predicates per §4.2), `events`, `notifications`, `action`, plus `cache`, `dead-letter`, `local-file-storage`, `agent-auth`, `agent-dispatch`, `agent-payload` (Zod validation of agent apply payloads), and `deviations` (`detectDeviations` — the deterministic plan-deviation checks shared by the session-authed flow, the `run-deviation-check` route, and the cron observer path).
 
 ### The mandatory mutation flow (§4.3)
 
@@ -193,13 +182,21 @@ Next.js calls the Python service only for AI jobs (planning, assignment, report 
 
 **The Python agent never mutates the DB directly.** It returns structured suggestions that the web layer reviews before applying (via `/api/agent/apply-*` routes).
 
-### Local agent boundary
+### Agent role boundary (interactive dispatch)
 
-The local agents (`band-agents/`) are a separate Python process that talks to the VieroClick API over HTTP — not to the database directly. They read live project state from `GET /api/project-data` (authenticated with `VIEROC_API_TOKEN`) and submit suggestions/actions back through the same REST API. The `band-agents/shared/vieroc_client.py` module wraps all these calls.
+The 6 agent roles live in `apps/agent-api/app/agents/roles/` and read/write project state only over HTTP — not the DB directly. Each reads live state from `GET /api/project-data` (authenticated with `VIEROC_API_KEY`) and submits suggestions/actions back through the same REST API. `apps/agent-api/app/agents/vieroc_client.py` wraps these calls.
 
-Band.ai is gone: the 6 agents (planning, assignment, observer, daily_report, morning_briefing, project_qa) are now plain `async def run(project_id, payload)` callables registered in `band-agents/server.py`, a FastAPI app (`run_all.py` launches it). Each is invoked via `POST /agents/{role}` and returns a structured JSON result — normal request/response I/O, no room or @mentions. Inter-agent orchestration is driven by the web layer: creating a project dispatches `planning`; `apply-plan` dispatches `assignment`. All reasoning uses the company Gemini API via `shared/llm.py`.
+Band.ai is gone: the 6 roles (planning, assignment, observer, daily_report, morning_briefing, project_qa) are plain `async def run(project_id, payload) -> dict` callables registered in `app/agents/roles/__init__.py` (`AGENT_RUNNERS`). Each is invoked **synchronously** via `POST /api/agents/{role}` (`app/api/routes/agents.py`) and returns a structured JSON result — normal request/response I/O. Inter-agent orchestration is driven by the web layer: creating a project dispatches `planning`; `apply-plan` dispatches `assignment`; `triggerObserver`/deviation handling dispatch `observer` (the cron path enters via the secret-authed `POST /api/agent/trigger-observer` web route, which dispatches `observer` with a valid dispatch record). All reasoning uses the company Gemini API via `app/agents/gemini_client.py`.
 
-The web app's `apps/web/src/server/lib/band-dispatch.ts` POSTs directly to the agent service (`AGENT_SERVICE_URL`). `apps/agent-api/app/api/routes/band.py` still exposes `/api/band/dispatch` for back-compat but now forwards to the same local service instead of Band.
+The web app's `apps/web/src/server/lib/agent-dispatch.ts` (`dispatchAgent`) POSTs directly to `{AGENT_API_URL}/api/agents/{role}` with the `X-Api-Secret` header. This is separate from the async Celery job path (`POST /api/jobs/` → poll `GET /api/jobs/{id}`) used by `agent-job.service.ts`.
+
+**Dispatch records (authorization on the apply chain).** For callback roles (planning/assignment/observer), `dispatchAgent` first inserts an `agent_jobs` row (`status: "running"`, `requestedByUserId` = the acting user, or null for system/cron) and sends its id as `dispatchId`. The role passes it back to the `apply-*` route, which validates it (`validateDispatch`: exists ∧ running ∧ project + job-type match ∧ < 30 min old) and consumes it single-use inside the mutation transaction (`consumeDispatch`). A request without a valid dispatchId gets 403 — the shared secret alone no longer authorizes writes. Apply payloads are Zod-validated (`packages/validators/src/agent-payloads.ts` + `parseItems` in `apps/web/src/server/lib/agent-payload.ts`): a structurally invalid envelope → 400 + dead-letter; invalid items → dropped but recorded (dead-letter row + `warnings`/`dropped` in the response), never silently coerced and logged as success. Projects carry `agent_autonomy` (`full_auto` | `review_required`) and `agent_confidence_threshold`: gated output lands as `pending` `agent_suggestions`, which `reviewSuggestion` applies through the shared logic in `apps/web/src/modules/agent-suggestion/agent-suggestion.apply.ts` — the same code path as auto-apply. `apply-deviations` stays secret-only (its only caller is the Celery health scan), but its auto-replan goes through `dispatchAgent`, so the downstream apply-plan is validated and gated normally.
+
+### Telegram bot (§2.8)
+
+`app/agents/telegram_agent.py` handles inbound Telegram updates in three channels: **slash commands** (`/help`, `/status`, `/health`, `/report`, `/member`, `/tasks`, `/blockers`, `/risks`, `/milestones`, `/updates`, `/ask`, `/blocker`, `/update` — formatters in `telegram_commands.py`), **Y/N approval replies**, and **free-text** classified into the fixed intent set `{daily_update, blocker_report, task_question, status_query, general_message}`. Questions route to `project_qa`; a suspected blocker/daily-update opens a **write-approval flow** (propose → `Y` commits / `N <reason>` cancels); chit-chat and stray out-of-flow Y/N are ignored (never acted on).
+
+Reads use `GET /api/agent/project-summary` (resolved health-score + team-metrics + task/blocker/risk/milestone/update lists). Approved writes commit via `POST /api/agent/telegram-action`, attributed to the **project lead** (Telegram carries no per-message member identity). Pending proposals live in the `telegram_pending_actions` table — one pending row per chat; the agent-api reads/writes it via raw SQLAlchemy in `app/db/queries.py`, the same way it handles `telegram_bots`.
 
 ### Auth
 
@@ -214,12 +211,15 @@ API routes that agents call use Bearer token auth (`X-Api-Secret` or `Authorizat
 
 ### Event log
 
-Every mutation writes to `activity_events` (via the module's `events.ts`, inside the transaction). This is not optional — the event log is the primary signal the Python agents observe. The notification layer (`notifications` table, migration `0001`) is enqueued the same way.
+Every mutation writes to `activity_events` (via the module's `events.ts`, inside the transaction). This is not optional — the event log is the primary signal the Python agents observe. The notification layer (`notifications` table) is enqueued the same way.
 
 ### Python agent service structure
 
-- `app/agents/` — one file per agent role (planner, assigner, reporter, observer, qa, telegram_agent). Each agent is a pure async function; none write to the DB.
-- `app/workers/tasks.py` — Celery task wrappers that call agent functions.
+- `app/agents/roles/` — the **canonical** 6 interactive roles (`planning`, `assignment`, `observer`, `daily_report`, `morning_briefing`, `project_qa`), registered in `roles/__init__.py` as `AGENT_RUNNERS` and dispatched sync via `POST /api/agents/{role}`. This is the current source of truth.
+- `app/agents/` (top level) — older flat helpers still in use by the async Celery path (`planner.py`, `assigner.py`, `reporter.py`, `qa.py`, `report_runner.py`, `message_parser.py`) plus `telegram_agent.py`, `gemini_client.py`, `vieroc_client.py`. Note the naming skew from `roles/` (planner ≠ planning, reporter ≠ daily_report). None of these write to the DB.
+- `app/api/routes/` — beyond `agents.py` and `jobs.py`, also `suggestions.py` and `telegram.py`; `app/telegram_webhook.py` sits at the app root.
+- `app/workers/tasks.py` — Celery task wrappers (`TASK_MAP`: daily_report, task_assignment, risk_scan, qa) that call agent functions.
+- `app/workers/schedule.py` — the five Celery Beat rhythms, each iterating all active projects with per-project failure isolation: `morning_briefing` (07:30 UTC+7), `escalation_scan` (09:00), `midday_health_scan` (12:00 — deterministic `run-deviation-check` → `apply-deviations`, then a best-effort observer run via `trigger-observer`), `daily_update_reminder` (17:00), `eod_report` (17:30). All of them call the web's `/api/agent/*` routes with the `VIEROC_API_KEY` bearer token; none touch the DB.
 - `app/db/connection.py` — converts the `postgresql://` Neon URL to `postgresql+asyncpg://` with `ssl=require`.
 - `app/api/deps.py` — `X-Api-Secret` header verification applied via `Depends()` on protected routes.
 - `app/settings.py` — all config loaded from `.env` via Pydantic Settings v2.

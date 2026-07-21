@@ -45,7 +45,7 @@ export function MyTasksList({ workspaceSlug, tasks }: Props) {
             <span className="font-medium text-foreground">{task.dueDate ?? "No due date"}</span>
           </div>
           <Link
-            href={`/workspace/${workspaceSlug}/projects/${task.projectId}/tasks`}
+            href={`/workspace/${workspaceSlug}/projects/${task.projectId}/tasks?task=${task.id}`}
             className={cn(buttonVariants({ variant: "outline", size: "sm" }), "justify-self-start md:justify-self-end")}
           >
             Open

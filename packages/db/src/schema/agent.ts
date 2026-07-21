@@ -1,4 +1,4 @@
-import { pgTable, pgEnum, text, uuid, jsonb, boolean } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, text, uuid, jsonb, boolean, integer } from "drizzle-orm/pg-core";
 import { timestamptz } from "./_helpers";
 import { users } from "./users";
 import { workspaceMembers } from "./workspaces";
@@ -39,5 +39,24 @@ export const agentSuggestions = pgTable("agent_suggestions", {
   status: text("status").notNull().default("pending"),
   reviewedByMemberId: uuid("reviewed_by_member_id").references(() => workspaceMembers.id),
   reviewedAt: timestamptz("reviewed_at"),
+  createdAt: timestamptz("created_at").notNull().defaultNow(),
+});
+
+/**
+ * Dead-letter log for agent work that failed terminally — Celery tasks whose
+ * retries were exhausted, and apply-* routes whose transaction threw. Rows are an
+ * operational record for inspection / manual retry; `status` tracks triage.
+ */
+export const deadLetter = pgTable("dead_letter", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  // Origin of the failure, e.g. "celery:generate_daily_report" or "apply-plan".
+  source: text("source").notNull(),
+  jobType: text("job_type"),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+  error: text("error").notNull(),
+  retryCount: integer("retry_count").notNull().default(0),
+  // pending | resolved | ignored
+  status: text("status").notNull().default("pending"),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
 });

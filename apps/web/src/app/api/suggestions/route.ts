@@ -3,6 +3,7 @@ import { db, agentSuggestions, agentJobs, projects } from "@vieroc/db";
 import { eq } from "drizzle-orm";
 import { getUserId } from "@/server/lib/context";
 import { isAgentRequest } from "@/server/lib/agent-auth";
+import { agentSuggestionTypeSchema } from "@vieroc/validators";
 import { revalidatePath } from "next/cache";
 
 export async function POST(request: Request) {
@@ -22,6 +23,16 @@ export async function POST(request: Request) {
 
     if (!projectId || !suggestionType || !title || !textBody) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    const parsedType = agentSuggestionTypeSchema.safeParse(suggestionType);
+    if (!parsedType.success) {
+      return NextResponse.json(
+        {
+          error: `Invalid suggestionType "${suggestionType}". Allowed: ${agentSuggestionTypeSchema.options.join(", ")}`,
+        },
+        { status: 400 }
+      );
     }
 
     // Resolve project to verify workspace

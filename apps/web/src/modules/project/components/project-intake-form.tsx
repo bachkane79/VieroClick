@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Input, Textarea } from "@vieroc/ui";
+import { Button, cn, Input, Textarea } from "@vieroc/ui";
+import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { createProjectAction } from "../project.actions";
+import { AiLeaderToggle } from "./ai-leader-toggle";
 
 interface WorkspaceMemberOption {
   id: string;
@@ -32,6 +34,7 @@ export function ProjectIntakeForm({ workspaceId, workspaceSlug, members }: Props
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  const [aiEnabled, setAiEnabled] = useState(true);
 
   async function onSubmit(formData: FormData) {
     setSubmitting(true);
@@ -51,6 +54,7 @@ export function ProjectIntakeForm({ workspaceId, workspaceSlug, members }: Props
       expectedDeliverables: lines(String(formData.get("expectedDeliverables") ?? "")),
       memberIds: selectedMemberIds,
       initialContext: String(formData.get("initialContext") ?? "") || undefined,
+      aiEnabled,
     };
 
     const result = await createProjectAction({
@@ -66,7 +70,7 @@ export function ProjectIntakeForm({ workspaceId, workspaceSlug, members }: Props
       return;
     }
 
-    toast.success("Project created");
+    toast.success(aiEnabled ? "Project created — AI Leader is planning it" : "Project created");
     router.push(`/workspace/${workspaceSlug}/projects/${result.data.id}/overview`);
   }
 
@@ -79,7 +83,40 @@ export function ProjectIntakeForm({ workspaceId, workspaceSlug, members }: Props
   }
 
   return (
-    <form action={onSubmit} className="mx-auto flex max-w-5xl flex-col gap-8 px-6 py-6">
+    <form action={onSubmit} className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-6">
+      {/* ── AI Leader headline toggle ─────────────────────────────────────── */}
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-xl border p-5 transition-colors",
+          aiEnabled
+            ? "border-fuchsia-500/30 bg-[linear-gradient(110deg,rgba(124,58,237,0.10),rgba(217,70,239,0.10),rgba(6,182,212,0.10))]"
+            : "border-border bg-card"
+        )}
+      >
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <span
+              className={cn(
+                "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+                aiEnabled ? "bg-fuchsia-500/15 text-fuchsia-500" : "bg-muted text-muted-foreground"
+              )}
+            >
+              <Sparkles className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="text-base font-bold tracking-tight">Sử dụng AI Leader</h2>
+              <p className="mt-0.5 max-w-xl text-sm text-muted-foreground">
+                {aiEnabled
+                  ? "AI sẽ tự sinh kế hoạch, WBS, phân công và theo dõi dự án từ phần intake bên dưới."
+                  : "Tạo dự án trống để làm thủ công (giống tạo repo). Có thể bật AI Leader sau ở trang tổng quan."}
+              </p>
+            </div>
+          </div>
+          <AiLeaderToggle checked={aiEnabled} onChange={setAiEnabled} />
+        </div>
+      </div>
+
+      {/* ── Basics (always shown) ─────────────────────────────────────────── */}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <section className="rounded-lg border bg-card p-5 shadow-sm">
           <div className="grid gap-4">
@@ -95,13 +132,6 @@ export function ProjectIntakeForm({ workspaceId, workspaceSlug, members }: Props
                 Description
               </label>
               <Textarea id="project-description" name="description" className="min-h-24" />
-            </div>
-
-            <div className="grid gap-2">
-              <label htmlFor="project-scope" className="text-sm font-medium">
-                Scope
-              </label>
-              <Textarea id="project-scope" name="scope" className="min-h-28" />
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -178,48 +208,62 @@ export function ProjectIntakeForm({ workspaceId, workspaceSlug, members }: Props
         </section>
       </div>
 
-      <section className="rounded-lg border bg-card p-5 shadow-sm">
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="grid gap-2">
-            <label htmlFor="project-goals" className="text-sm font-medium">
-              Goals
-            </label>
-            <Textarea id="project-goals" name="goals" className="min-h-36" />
-          </div>
-          <div className="grid gap-2">
-            <label htmlFor="project-constraints" className="text-sm font-medium">
-              Constraints
-            </label>
-            <Textarea id="project-constraints" name="constraints" className="min-h-36" />
-          </div>
-          <div className="grid gap-2">
-            <label htmlFor="project-deliverables" className="text-sm font-medium">
-              Expected deliverables
-            </label>
-            <Textarea
-              id="project-deliverables"
-              name="expectedDeliverables"
-              className="min-h-36"
-            />
-          </div>
+      {/* ── AI intake (only when AI Leader is on — this is what feeds the AI) ── */}
+      {aiEnabled && (
+        <div className="grid animate-[fadein_0.25s_ease] gap-6">
+          <style>{`@keyframes fadein{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}`}</style>
+          <section className="rounded-lg border bg-card p-5 shadow-sm">
+            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-fuchsia-600 dark:text-fuchsia-400">
+              <Sparkles className="h-4 w-4" />
+              AI intake
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="project-scope" className="text-sm font-medium">
+                Scope
+              </label>
+              <Textarea id="project-scope" name="scope" className="min-h-24" />
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
+              <div className="grid gap-2">
+                <label htmlFor="project-goals" className="text-sm font-medium">
+                  Goals
+                </label>
+                <Textarea id="project-goals" name="goals" className="min-h-36" />
+              </div>
+              <div className="grid gap-2">
+                <label htmlFor="project-constraints" className="text-sm font-medium">
+                  Constraints
+                </label>
+                <Textarea id="project-constraints" name="constraints" className="min-h-36" />
+              </div>
+              <div className="grid gap-2">
+                <label htmlFor="project-deliverables" className="text-sm font-medium">
+                  Expected deliverables
+                </label>
+                <Textarea id="project-deliverables" name="expectedDeliverables" className="min-h-36" />
+              </div>
+            </div>
+            <div className="mt-4 grid gap-2">
+              <label htmlFor="project-context" className="text-sm font-medium">
+                Initial context
+              </label>
+              <Textarea id="project-context" name="initialContext" className="min-h-32" />
+            </div>
+          </section>
         </div>
-      </section>
-
-      <section className="rounded-lg border bg-card p-5 shadow-sm">
-        <div className="grid gap-2">
-          <label htmlFor="project-context" className="text-sm font-medium">
-            Initial context
-          </label>
-          <Textarea id="project-context" name="initialContext" className="min-h-40" />
-        </div>
-      </section>
+      )}
 
       <div className="flex items-center justify-end gap-3 border-t pt-4">
         <Button type="button" variant="outline" onClick={() => router.back()}>
           Cancel
         </Button>
-        <Button type="submit" disabled={submitting}>
-          {submitting ? "Creating..." : "Create project"}
+        <Button type="submit" disabled={submitting} className={aiEnabled ? "gap-2" : ""}>
+          {aiEnabled && <Sparkles className="h-4 w-4" />}
+          {submitting
+            ? "Creating..."
+            : aiEnabled
+              ? "Create with AI Leader"
+              : "Create project"}
         </Button>
       </div>
     </form>

@@ -1,4 +1,6 @@
 """Raw async DB queries for the agent-api service."""
+import json
+
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -64,6 +66,94 @@ async def get_project_ids_for_workspace(workspace_id: str) -> list[str]:
             {"workspace_id": workspace_id},
         )
         return [str(row[0]) for row in result.fetchall()]
+
+
+# ─── Telegram pending-action approval flow (§2.8) ───────────────────────────
+
+
+async def create_pending_action(
+    workspace_id: str,
+    project_id: str | None,
+    chat_id: str,
+    action_type: str,
+    payload: dict,
+) -> str | None:
+    """Store a proposed write awaiting Y/N confirmation.
+
+    Any prior pending row for the same chat is expired first, so at most one
+    action is ever awaiting confirmation per chat and the user's next Y/N reply
+    is unambiguous. Returns the new row id, or None on failure.
+    """
+    async with AsyncSessionLocal() as session:
+        await session.execute(
+            text(
+                "UPDATE telegram_pending_actions "
+                "SET status = 'expired', resolved_at = now() "
+                "WHERE chat_id = :chat_id AND status = 'pending'"
+            ),
+            {"chat_id": chat_id},
+        )
+        result = await session.execute(
+            text(
+                "INSERT INTO telegram_pending_actions "
+                "(workspace_id, project_id, chat_id, action_type, payload) "
+                "VALUES (:workspace_id, :project_id, :chat_id, :action_type, "
+                "CAST(:payload AS jsonb)) RETURNING id"
+            ),
+            {
+                "workspace_id": workspace_id,
+                "project_id": project_id,
+                "chat_id": chat_id,
+                "action_type": action_type,
+                "payload": json.dumps(payload),
+            },
+        )
+        row = result.fetchone()
+        await session.commit()
+        return str(row[0]) if row else None
+
+
+async def get_pending_action(chat_id: str) -> dict | None:
+    """Return the current pending action for a chat, or None."""
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            text(
+                "SELECT id, workspace_id, project_id, action_type, payload "
+                "FROM telegram_pending_actions "
+                "WHERE chat_id = :chat_id AND status = 'pending' "
+                "ORDER BY created_at DESC LIMIT 1"
+            ),
+            {"chat_id": chat_id},
+        )
+        row = result.fetchone()
+        if not row:
+            return None
+        payload = row[4]
+        if isinstance(payload, str):
+            payload = json.loads(payload or "{}")
+        return {
+            "id": str(row[0]),
+            "workspace_id": str(row[1]),
+            "project_id": str(row[2]) if row[2] else None,
+            "action_type": row[3],
+            "payload": payload or {},
+        }
+
+
+async def resolve_pending_action(
+    action_id: str, status: str, reason: str | None = None
+) -> None:
+    """Mark a pending action approved/rejected/expired."""
+    async with AsyncSessionLocal() as session:
+        await session.execute(
+            text(
+                "UPDATE telegram_pending_actions "
+                "SET status = :status, rejection_reason = :reason, resolved_at = now() "
+                "WHERE id = :id"
+            ),
+            {"id": action_id, "status": status, "reason": reason},
+        )
+        await session.commit()
 
 
 async def get_all_active_projects() -> list[dict]:

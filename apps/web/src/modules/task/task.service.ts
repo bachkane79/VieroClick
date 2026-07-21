@@ -1,8 +1,9 @@
 import "server-only";
 import { cache } from "react";
-import { db, type Executor } from "@vieroc/db";
+import { eq } from "drizzle-orm";
+import { db, projects, type Executor } from "@vieroc/db";
 import { requireActor, type ActorContext } from "@/server/lib/context";
-import { isProjectManager } from "@/server/lib/permissions";
+import { isProjectManager, isReviewer } from "@/server/lib/permissions";
 import { NotFoundError, ValidationError } from "@/server/lib/errors";
 import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
 import { enqueueNotifications } from "@/server/lib/notifications";
@@ -10,10 +11,21 @@ import { createTaskDependencySchema } from "@/modules/task-dependency/task-depen
 import * as dependencyEvents from "@/modules/task-dependency/task-dependency.events";
 import * as blockerRepo from "@/modules/blocker/blocker.repo";
 import * as blockerEvents from "@/modules/blocker/blocker.events";
-import { createTaskSchema, updateTaskSchema, moveTaskSchema } from "./task.schema";
-import { assertCanManageTasks, assertCanUpdateTask } from "./task.policy";
+import { recomputeMemberScore } from "@/modules/member-score/member-score.service";
+import { createTaskSchema, updateTaskSchema, moveTaskSchema, reviewTaskSchema } from "./task.schema";
+import { assertCanManageTasks, assertCanReviewTask, assertCanUpdateTask } from "./task.policy";
 import * as repo from "./task.repo";
 import * as events from "./task.events";
+
+/** Best-effort score recompute — never let a scoring hiccup fail the task mutation. */
+async function safeRecomputeScore(workspaceId: string, memberId: string | null, exec: Executor) {
+  if (!memberId) return;
+  try {
+    await recomputeMemberScore({ workspaceId, workspaceMemberId: memberId, exec });
+  } catch (e) {
+    console.error("Member score recompute failed:", e);
+  }
+}
 
 type AcceptanceCriterion = {
   id?: string;
@@ -65,6 +77,15 @@ async function getTaskInProject(taskId: string, projectId: string) {
   return task;
 }
 
+async function getProjectLead(projectId: string, exec: Executor = db): Promise<string | null> {
+  const [row] = await exec
+    .select({ leadMemberId: projects.leadMemberId })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+  return row?.leadMemberId ?? null;
+}
+
 async function getStatusInProject(statusId: string, projectId: string) {
   const status = await repo.findStatusById(statusId);
   if (!status || status.projectId !== projectId) throw new ValidationError("Invalid task status");
@@ -83,6 +104,13 @@ async function assertCanMoveIntoStatus(p: {
   const targetStatus = await getStatusInProject(p.targetStatusId, p.projectId);
 
   if (targetStatus.type === "done") {
+    // 4.2: closing a task is a review gate — only a reviewer/lead may approve it.
+    // Everyone else submits it to "In Review" and waits for approval.
+    if (!isReviewer(p.ctx)) {
+      throw new ValidationError(
+        "Only a reviewer or lead can mark a task done. Move it to In Review to submit it for approval."
+      );
+    }
     assertDoneCriteria(p.acceptanceCriteria);
   }
 
@@ -135,12 +163,27 @@ async function createBlockerForTask(
 export const listBoard = cache(async function listBoard(workspaceId: string, projectId: string) {
   await requireActor(workspaceId, projectId);
   return getOrSetCache(`board:${projectId}`, async () => {
-    const [tasks, statuses, dependencies] = await Promise.all([
+    const [tasks, statuses, dependencies, assignees] = await Promise.all([
       repo.listByProject(projectId),
       repo.listStatuses(projectId),
       repo.listDependenciesByProject(projectId),
+      repo.listAssigneesByProject(projectId),
     ]);
-    return { tasks, statuses, dependencies };
+    // Attach the full assignee set per task, primary (assigneeMemberId) first.
+    const byTask = new Map<string, string[]>();
+    for (const a of assignees) {
+      const list = byTask.get(a.taskId) ?? [];
+      list.push(a.workspaceMemberId);
+      byTask.set(a.taskId, list);
+    }
+    const enriched = tasks.map((t) => {
+      const ids = byTask.get(t.id) ?? [];
+      const ordered = t.assigneeMemberId
+        ? [t.assigneeMemberId, ...ids.filter((id) => id !== t.assigneeMemberId)]
+        : ids;
+      return { ...t, assigneeMemberIds: ordered };
+    });
+    return { tasks: enriched, statuses, dependencies };
   });
 });
 
@@ -223,6 +266,8 @@ export async function updateTask(p: {
   assertCanUpdateTask(ctx, existing.assigneeMemberId);
 
   const manager = isProjectManager(ctx);
+  const isAssignee =
+    !!existing.assigneeMemberId && existing.assigneeMemberId === ctx.workspaceMemberId;
   const values: Partial<repo.TaskInsert> = {};
 
   if (manager) {
@@ -244,6 +289,11 @@ export async function updateTask(p: {
     if (data.milestoneId !== undefined) values.milestoneId = data.milestoneId ?? null;
   } else if (data.statusId !== undefined) {
     values.statusId = data.statusId;
+  }
+
+  // 4.3: the assignee (or a manager) may log actual hours on their own task.
+  if (data.actualHours !== undefined && (manager || isAssignee)) {
+    values.actualHours = data.actualHours != null ? String(data.actualHours) : null;
   }
 
   const nextAcceptanceCriteria =
@@ -284,6 +334,24 @@ export async function updateTask(p: {
       if (targetStatus?.type === "blocked" && data.blockerReason) {
         await createBlockerForTask(tx, ctx, updated, data.blockerReason);
       }
+      // 4.2: submitting for review pings the lead to approve/reject.
+      if (targetStatus?.type === "in_review") {
+        await events.taskSubmittedForReview(tx, ctx, updated);
+        const leadMemberId = await getProjectLead(p.projectId, tx);
+        if (leadMemberId && leadMemberId !== ctx.workspaceMemberId) {
+          await enqueueNotifications(tx, [
+            {
+              workspaceId: ctx.workspaceId,
+              recipientMemberId: leadMemberId,
+              projectId: p.projectId,
+              type: "task.review_requested",
+              title: `Review requested: ${updated.title}`,
+              entityType: "task",
+              entityId: updated.id,
+            },
+          ]);
+        }
+      }
     }
 
     if (dueDateChanged) {
@@ -311,6 +379,105 @@ export async function updateTask(p: {
       }
     }
 
+    // 4.1: a reviewer/manager closing a task directly also refreshes scores.
+    if (targetStatus?.type === "done") {
+      await safeRecomputeScore(ctx.workspaceId, updated.assigneeMemberId, tx);
+    }
+
+    invalidateCache(`board:${p.projectId}`);
+    return updated;
+  });
+}
+
+/**
+ * 4.2 — Reviewer/lead decision on a task currently in review.
+ *  - approve: → done (validates acceptance criteria), notify assignee.
+ *  - rework:  → in_progress (or todo), increments reworkCount + feedback, notify assignee.
+ */
+export async function reviewTask(p: {
+  workspaceId: string;
+  projectId: string;
+  taskId: string;
+  input: unknown;
+}) {
+  const data = reviewTaskSchema.parse(p.input);
+  const ctx = await requireActor(p.workspaceId, p.projectId);
+  assertCanReviewTask(ctx);
+
+  const existing = await getTaskInProject(p.taskId, p.projectId);
+  const currentStatus = await getStatusInProject(existing.statusId, p.projectId);
+  if (currentStatus.type !== "in_review") {
+    throw new ValidationError("Only a task in review can be approved or sent back for rework");
+  }
+
+  const statuses = await repo.listStatuses(p.projectId);
+
+  return db.transaction(async (tx) => {
+    const values: Partial<repo.TaskInsert> = {};
+    if (data.actualHours !== undefined) {
+      values.actualHours = data.actualHours != null ? String(data.actualHours) : null;
+    }
+
+    if (data.decision === "approve") {
+      const doneStatus = statuses.find((s) => s.type === "done");
+      if (!doneStatus) throw new ValidationError("This project has no 'done' status configured");
+      assertDoneCriteria(existing.acceptanceCriteria);
+      values.statusId = doneStatus.id;
+      values.completedAt = new Date();
+
+      const updated = await repo.update(p.taskId, values, tx);
+      if (!updated) throw new NotFoundError("Task");
+
+      await events.taskStatusChanged(tx, ctx, existing, updated);
+      await events.taskApproved(tx, ctx, updated);
+      if (updated.assigneeMemberId && updated.assigneeMemberId !== ctx.workspaceMemberId) {
+        await enqueueNotifications(tx, [
+          {
+            workspaceId: ctx.workspaceId,
+            recipientMemberId: updated.assigneeMemberId,
+            projectId: p.projectId,
+            type: "task.approved",
+            title: `Approved: ${updated.title}`,
+            entityType: "task",
+            entityId: updated.id,
+          },
+        ]);
+      }
+      // 4.1: closing a task feeds the assignee's operational scores.
+      await safeRecomputeScore(ctx.workspaceId, updated.assigneeMemberId, tx);
+      invalidateCache(`board:${p.projectId}`);
+      return updated;
+    }
+
+    // rework — send back to in_progress (fallback todo), count it, relay feedback.
+    const backStatus =
+      statuses.find((s) => s.type === "in_progress") ?? statuses.find((s) => s.type === "todo");
+    if (!backStatus) {
+      throw new ValidationError("This project has no in-progress/todo status to return the task to");
+    }
+    values.statusId = backStatus.id;
+    values.completedAt = null;
+    values.reworkCount = (existing.reworkCount ?? 0) + 1;
+
+    const updated = await repo.update(p.taskId, values, tx);
+    if (!updated) throw new NotFoundError("Task");
+
+    await events.taskStatusChanged(tx, ctx, existing, updated);
+    await events.taskReworkRequested(tx, ctx, updated, data.feedback);
+    if (updated.assigneeMemberId && updated.assigneeMemberId !== ctx.workspaceMemberId) {
+      await enqueueNotifications(tx, [
+        {
+          workspaceId: ctx.workspaceId,
+          recipientMemberId: updated.assigneeMemberId,
+          projectId: p.projectId,
+          type: "task.rework_requested",
+          title: `Changes requested: ${updated.title}`,
+          body: data.feedback ?? null,
+          entityType: "task",
+          entityId: updated.id,
+        },
+      ]);
+    }
     invalidateCache(`board:${p.projectId}`);
     return updated;
   });
@@ -327,6 +494,53 @@ export async function assignTask(p: {
     projectId: p.projectId,
     taskId: p.taskId,
     input: { assigneeMemberId: p.memberId },
+  });
+}
+
+/**
+ * Multi-assignee: replace the full assignee set. The first entry becomes the
+ * primary (`assigneeMemberId`) so all single-assignee code paths keep working.
+ * Follows the §4.3 flow; notifies members newly added to the task.
+ */
+export async function setTaskAssignees(p: {
+  workspaceId: string;
+  projectId: string;
+  taskId: string;
+  memberIds: string[];
+}) {
+  const ctx = await requireActor(p.workspaceId, p.projectId);
+  assertCanManageTasks(ctx);
+
+  const existing = await getTaskInProject(p.taskId, p.projectId);
+  const memberIds = [...new Set(p.memberIds)].slice(0, 20);
+  const primary = memberIds[0] ?? null;
+  const previous = new Set(await repo.listAssigneeIds(p.taskId));
+
+  return db.transaction(async (tx) => {
+    await repo.setAssignees(p.taskId, memberIds, tx);
+    const updated = await repo.update(p.taskId, { assigneeMemberId: primary }, tx);
+    if (!updated) throw new NotFoundError("Task");
+
+    await events.taskAssigned(tx, ctx, updated);
+
+    const added = memberIds.filter((id) => !previous.has(id) && id !== ctx.workspaceMemberId);
+    if (added.length > 0) {
+      await enqueueNotifications(
+        tx,
+        added.map((memberId) => ({
+          workspaceId: ctx.workspaceId,
+          recipientMemberId: memberId,
+          projectId: p.projectId,
+          type: "task.assigned",
+          title: `You were assigned: ${updated.title}`,
+          entityType: "task",
+          entityId: updated.id,
+        }))
+      );
+    }
+
+    invalidateCache(`board:${p.projectId}`);
+    return { ...updated, assigneeMemberIds: memberIds };
   });
 }
 

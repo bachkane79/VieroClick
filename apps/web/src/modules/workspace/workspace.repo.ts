@@ -44,7 +44,12 @@ export async function findBySlugForUser(
 
 export async function listForUser(userId: string, exec: Executor = db) {
   return exec
-    .select({ id: workspaces.id, name: workspaces.name, slug: workspaces.slug })
+    .select({
+      id: workspaces.id,
+      name: workspaces.name,
+      slug: workspaces.slug,
+      organizationId: workspaces.organizationId,
+    })
     .from(workspaces)
     .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
     .where(eq(workspaceMembers.userId, userId));

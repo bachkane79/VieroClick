@@ -23,6 +23,7 @@ export async function listByProject(projectId: string, exec: Executor = db): Pro
     .select({
       id: taskComments.id,
       taskId: taskComments.taskId,
+      parentCommentId: taskComments.parentCommentId,
       authorMemberId: taskComments.authorMemberId,
       body: taskComments.body,
       metadata: taskComments.metadata,
@@ -44,6 +45,7 @@ export async function findByIdInProject(
     .select({
       id: taskComments.id,
       taskId: taskComments.taskId,
+      parentCommentId: taskComments.parentCommentId,
       authorMemberId: taskComments.authorMemberId,
       body: taskComments.body,
       metadata: taskComments.metadata,

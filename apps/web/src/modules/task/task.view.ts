@@ -13,7 +13,10 @@ export interface TaskView {
   title: string;
   description: string | null;
   priority: "low" | "medium" | "high" | "urgent";
+  /** Primary/lead assignee (backward compatible). */
   assigneeMemberId: string | null;
+  /** Full assignee set (multi-assignee). Includes the primary as the first entry. */
+  assigneeMemberIds: string[];
   reporterMemberId: string | null;
   startDate: string | null;
   dueDate: string | null;
@@ -89,6 +92,7 @@ export function toTaskView(task: {
   description: string | null;
   priority: "low" | "medium" | "high" | "urgent";
   assigneeMemberId: string | null;
+  assigneeMemberIds?: string[];
   reporterMemberId: string | null;
   startDate: string | null;
   dueDate: string | null;
@@ -99,6 +103,14 @@ export function toTaskView(task: {
   position: number;
   isMilestone: boolean;
 }): TaskView {
+  // Prefer the explicit multi-assignee set; fall back to the primary column so
+  // rows loaded without the join still render an assignee.
+  const assigneeMemberIds =
+    task.assigneeMemberIds && task.assigneeMemberIds.length > 0
+      ? task.assigneeMemberIds
+      : task.assigneeMemberId
+        ? [task.assigneeMemberId]
+        : [];
   return {
     id: task.id,
     projectId: task.projectId,
@@ -108,6 +120,7 @@ export function toTaskView(task: {
     description: task.description,
     priority: task.priority,
     assigneeMemberId: task.assigneeMemberId,
+    assigneeMemberIds,
     reporterMemberId: task.reporterMemberId,
     startDate: task.startDate,
     dueDate: task.dueDate,

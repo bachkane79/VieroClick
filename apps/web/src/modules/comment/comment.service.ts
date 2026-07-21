@@ -10,6 +10,7 @@ import { createCommentSchema } from "./comment.schema";
 import { assertCanComment, assertCanModifyComment } from "./comment.policy";
 import * as events from "./comment.events";
 import * as repo from "./comment.repo";
+import { toCommentView } from "./comment.view";
 
 type CommentLink = {
   type: "task" | "doc" | "comment";
@@ -54,7 +55,8 @@ function mentionTokens(body: string) {
 export async function listComments(workspaceId: string, projectId: string, taskId: string) {
   await requireActor(workspaceId, projectId);
   await getTaskInProject(taskId, projectId);
-  return repo.listByTask(taskId);
+  const rows = await repo.listByTask(taskId);
+  return rows.map(toCommentView);
 }
 
 export async function listProjectComments(workspaceId: string, projectId: string) {
@@ -75,10 +77,19 @@ export async function addComment(p: {
   const task = await getTaskInProject(p.taskId, p.projectId);
   await assertLinksBelongToProject(data.metadata.links, p.projectId);
 
+  // Threaded reply: parent must be a comment on the same task.
+  if (data.parentCommentId) {
+    const parent = await repo.findByIdInProject(data.parentCommentId, p.projectId);
+    if (!parent || parent.taskId !== p.taskId) {
+      throw new ValidationError("Reply target must be a comment on this task");
+    }
+  }
+
   return db.transaction(async (tx) => {
     const comment = await repo.create(
       {
         taskId: p.taskId,
+        parentCommentId: data.parentCommentId ?? null,
         authorMemberId: ctx.workspaceMemberId,
         body: data.body.trim(),
         metadata: {
@@ -92,10 +103,32 @@ export async function addComment(p: {
     await events.commentAdded(tx, ctx, p.taskId, comment.id);
 
     const allMembers = await workspaceRepo.listMembers(ctx.workspaceId, tx);
+
+    // Assigned comment: the target member must exist in this workspace.
+    if (data.metadata.assignedMemberId) {
+      const assigned = allMembers.find((member) => member.id === data.metadata.assignedMemberId);
+      if (!assigned) throw new ValidationError("Assigned member must belong to this workspace");
+      if (assigned.id !== ctx.workspaceMemberId) {
+        await enqueueNotifications(tx, [
+          {
+            workspaceId: ctx.workspaceId,
+            recipientMemberId: assigned.id,
+            projectId: p.projectId,
+            type: "comment.assigned",
+            title: `A comment on ${task.title} was assigned to you`,
+            body: data.body.slice(0, 140),
+            entityType: "task",
+            entityId: p.taskId,
+          },
+        ]);
+      }
+    }
+
     const authorMember = allMembers.find((member) => member.id === ctx.workspaceMemberId);
     const authorName = authorMember ? authorMember.fullName : "A workspace member";
     const mentionedNamesOrEmails = mentionTokens(data.body);
     const notifiedMemberIds = new Set<string>();
+    if (data.metadata.assignedMemberId) notifiedMemberIds.add(data.metadata.assignedMemberId);
 
     if (mentionedNamesOrEmails.length > 0) {
       const mentionNotifications = [];
@@ -148,6 +181,35 @@ export async function addComment(p: {
     }
 
     return comment;
+  });
+}
+
+export async function resolveComment(p: {
+  workspaceId: string;
+  projectId: string;
+  commentId: string;
+  resolved: boolean;
+}) {
+  const ctx = await requireActor(p.workspaceId, p.projectId);
+  const existing = await repo.findByIdInProject(p.commentId, p.projectId);
+  if (!existing) throw new NotFoundError("Comment");
+
+  const metadata = (existing.metadata ?? {}) as Record<string, unknown>;
+  const assignedMemberId =
+    typeof metadata.assignedMemberId === "string" ? metadata.assignedMemberId : null;
+  // Author, the assigned member, or a manager can resolve/reopen.
+  if (assignedMemberId !== ctx.workspaceMemberId) {
+    assertCanModifyComment(ctx, existing.authorMemberId);
+  }
+
+  return db.transaction(async (tx) => {
+    const updated = await repo.update(
+      p.commentId,
+      { metadata: { ...metadata, resolved: p.resolved } },
+      tx
+    );
+    await events.commentResolved(tx, ctx, existing.taskId, p.commentId, p.resolved);
+    return updated;
   });
 }
 

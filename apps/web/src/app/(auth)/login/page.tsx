@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import { auth } from "@/server/auth";
+import { devBypassEnabled } from "@/server/auth/config";
 import { LoginForm } from "@/modules/auth/components/login-form";
 
 export default async function LoginPage() {
@@ -35,7 +36,7 @@ export default async function LoginPage() {
             Your AI virtual project manager
           </p>
         </div>
-        <LoginForm />
+        <LoginForm showDevBypass={devBypassEnabled} />
         <p className="mt-8 text-center text-xs text-muted-foreground">
           By continuing you agree to our Terms &amp; Privacy Policy.
         </p>

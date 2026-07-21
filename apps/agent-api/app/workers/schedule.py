@@ -35,7 +35,8 @@ async def run_morning_briefing_for_project(project_id: str, workspace_id: str) -
 
 
 async def run_midday_health_scan(project_id: str, workspace_id: str) -> dict:
-    """Run deterministic deviation check → apply feedback loop (replan/notify/escalate)."""
+    """Run deterministic deviation check → apply feedback loop (replan/notify/escalate),
+    then run the observer LLM for soft signals code cannot detect (4.3)."""
     logger.info("midday_health_scan: project=%s workspace=%s", project_id, workspace_id)
     headers = {"Authorization": f"Bearer {settings.vieroc_api_key}"}
 
@@ -48,22 +49,47 @@ async def run_midday_health_scan(project_id: str, workspace_id: str) -> dict:
         resp.raise_for_status()
         deviations = resp.json().get("deviations", [])
 
-    if not deviations:
-        logger.info("midday_health_scan: no deviations for project=%s", project_id)
-        return {"ok": True, "skipped": True, "reason": "no_deviations"}
+    processed = 0
+    if deviations:
+        logger.info("midday_health_scan: %d deviations for project=%s", len(deviations), project_id)
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp2 = await client.post(
+                f"{settings.vieroc_api_url}/api/agent/apply-deviations",
+                json={"projectId": project_id, "workspaceId": workspace_id, "deviations": deviations},
+                headers=headers,
+            )
+            resp2.raise_for_status()
+            processed = resp2.json().get("processed", 0)
+    else:
+        logger.info("midday_health_scan: no deterministic deviations for project=%s", project_id)
 
-    logger.info("midday_health_scan: %d deviations for project=%s", len(deviations), project_id)
+    # Observer LLM runs even with zero deterministic deviations — its whole job
+    # is the soft signals (scope creep, silent members, vague blockers) that the
+    # rule pass cannot see. Best-effort: an observer failure must not fail the scan.
+    observer_saved = 0
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            obs = await client.post(
+                f"{settings.vieroc_api_url}/api/agent/trigger-observer",
+                json={"projectId": project_id},
+                headers=headers,
+            )
+            obs.raise_for_status()
+            obs_result = (obs.json().get("result") or {}).get("result") or {}
+            observer_saved = obs_result.get("savedCount", 0)
+            logger.info(
+                "midday_health_scan: observer processed %s suggestion(s) for project=%s",
+                observer_saved, project_id,
+            )
+    except Exception as e:
+        logger.error("midday_health_scan: observer run failed for project=%s: %s", project_id, e)
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp2 = await client.post(
-            f"{settings.vieroc_api_url}/api/agent/apply-deviations",
-            json={"projectId": project_id, "workspaceId": workspace_id, "deviations": deviations},
-            headers=headers,
-        )
-        resp2.raise_for_status()
-        result = resp2.json()
-
-    return {"ok": True, "deviationCount": len(deviations), "processed": result.get("processed", 0)}
+    return {
+        "ok": True,
+        "deviationCount": len(deviations),
+        "processed": processed,
+        "observerSuggestions": observer_saved,
+    }
 
 
 async def run_eod_report(project_id: str, workspace_id: str) -> dict:

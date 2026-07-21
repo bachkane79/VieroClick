@@ -7,9 +7,12 @@ export interface CommentLinkView {
 export interface CommentView {
   id: string;
   taskId: string;
+  parentCommentId: string | null;
   authorMemberId: string;
   body: string;
   links: CommentLinkView[];
+  assignedMemberId: string | null;
+  resolved: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -40,6 +43,7 @@ function normalizeLinks(metadata: Record<string, unknown>): CommentLinkView[] {
 export function toCommentView(comment: {
   id: string;
   taskId: string;
+  parentCommentId?: string | null;
   authorMemberId: string;
   body: string;
   metadata: Record<string, unknown>;
@@ -49,9 +53,15 @@ export function toCommentView(comment: {
   return {
     id: comment.id,
     taskId: comment.taskId,
+    parentCommentId: comment.parentCommentId ?? null,
     authorMemberId: comment.authorMemberId,
     body: comment.body,
     links: normalizeLinks(comment.metadata),
+    assignedMemberId:
+      typeof comment.metadata.assignedMemberId === "string"
+        ? comment.metadata.assignedMemberId
+        : null,
+    resolved: comment.metadata.resolved === true,
     createdAt: comment.createdAt.toISOString(),
     updatedAt: comment.updatedAt.toISOString(),
   };

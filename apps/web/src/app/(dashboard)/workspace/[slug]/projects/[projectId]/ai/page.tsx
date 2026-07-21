@@ -45,6 +45,8 @@ export default async function ProjectAiPage({ params }: Props) {
         projectId={projectId}
         workspaceSlug={slug}
         initialSuggestions={adaptedSuggestions}
+        agentAutonomy={project.agentAutonomy}
+        agentConfidenceThreshold={project.agentConfidenceThreshold}
       />
     </div>
   );

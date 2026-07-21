@@ -4,6 +4,7 @@ from typing import Any
 from app.agents import assigner, reporter
 from app.db import queries
 from app.workers.celery_app import celery_app
+from app.workers.dead_letter import record_dead_letter
 
 
 def run_async(coro: Any) -> Any:
@@ -14,13 +15,37 @@ def run_async(coro: Any) -> Any:
         loop.close()
 
 
-@celery_app.task(name="app.workers.tasks.generate_daily_report", bind=True)
+class AgentTask(celery_app.Task):
+    """Base task that records terminal failures (retries exhausted) to dead_letter."""
+
+    def on_failure(self, exc: Exception, task_id: str, args: Any, kwargs: Any, einfo: Any) -> None:
+        record_dead_letter(
+            source=f"celery:{self.name}",
+            error=str(exc),
+            project_id=(kwargs or {}).get("project_id"),
+            payload=(kwargs or {}).get("input_data") or {},
+            retry_count=self.request.retries,
+        )
+
+
+# On-demand jobs: retry transient failures with exponential backoff, then dead-letter.
+_RETRY_KW = dict(
+    base=AgentTask,
+    autoretry_for=(Exception,),
+    max_retries=3,
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+)
+
+
+@celery_app.task(name="app.workers.tasks.generate_daily_report", bind=True, **_RETRY_KW)
 def generate_daily_report(self: Any, job_id: str, project_id: str, input_data: dict[str, Any]) -> dict[str, Any]:
     result = run_async(reporter.generate_report(input_data))
     return {"job_id": job_id, "output": result}
 
 
-@celery_app.task(name="app.workers.tasks.suggest_task_assignment", bind=True)
+@celery_app.task(name="app.workers.tasks.suggest_task_assignment", bind=True, **_RETRY_KW)
 def suggest_task_assignment(self: Any, job_id: str, project_id: str, input_data: dict[str, Any]) -> dict[str, Any]:
     task = input_data.get("task", {})
     members = input_data.get("members", [])
@@ -34,7 +59,7 @@ def scan_project_risks(self: Any, job_id: str, project_id: str, input_data: dict
     return {"job_id": job_id, "output": {"error": "Use apply-observer-suggestions route instead"}}
 
 
-@celery_app.task(name="app.workers.tasks.answer_project_question", bind=True)
+@celery_app.task(name="app.workers.tasks.answer_project_question", bind=True, **_RETRY_KW)
 def answer_project_question(self: Any, job_id: str, project_id: str, input_data: dict[str, Any]) -> dict[str, Any]:
     from app.agents.qa import answer_question
     question = input_data.get("question", "")

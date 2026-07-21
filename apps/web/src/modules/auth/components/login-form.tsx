@@ -3,7 +3,12 @@
 import { signIn } from "next-auth/react";
 import { useState } from "react";
 
-export function LoginForm() {
+interface Props {
+  /** Render the passwordless dev-bypass form (never in production). */
+  showDevBypass?: boolean;
+}
+
+export function LoginForm({ showDevBypass = false }: Props) {
   const [loading, setLoading] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -79,6 +84,8 @@ export function LoginForm() {
         </button>
       </div>
 
+      {showDevBypass && (
+        <>
       {/* Divider */}
       <div className="relative flex items-center justify-center">
         <div className="absolute inset-0 flex items-center">
@@ -137,6 +144,8 @@ export function LoginForm() {
           )}
         </button>
       </form>
+        </>
+      )}
     </div>
   );
 }

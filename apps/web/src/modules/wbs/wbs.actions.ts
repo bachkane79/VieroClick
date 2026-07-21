@@ -10,6 +10,17 @@ interface BaseArgs {
   slug: string;
 }
 
+/** Lean phase list for the sidebar tree (Project → Phases). */
+export async function listProjectPhasesAction(args: { workspaceId: string; projectId: string }) {
+  return runAction(async () => {
+    const nodes = await service.listWbsNodes(args.workspaceId, args.projectId);
+    return nodes
+      .filter((n) => n.nodeType === "phase")
+      .sort((a, b) => a.position - b.position)
+      .map((n) => ({ id: n.id, title: n.title }));
+  });
+}
+
 export async function createWbsNodeAction(args: BaseArgs & { data: unknown }) {
   return runAction(async () => {
     const node = await service.createWbsNode({

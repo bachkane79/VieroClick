@@ -73,6 +73,8 @@ export const tasks = pgTable(
     dueDate: date("due_date"),
     estimateHours: numeric("estimate_hours", { precision: 6, scale: 2 }),
     actualHours: numeric("actual_hours", { precision: 6, scale: 2 }),
+    // Number of times this task was sent back for rework during review (feeds quality score).
+    reworkCount: integer("rework_count").notNull().default(0),
     acceptanceCriteria: jsonb("acceptance_criteria")
       .$type<AcceptanceCriterion[]>()
       .notNull()
@@ -115,11 +117,33 @@ export const taskDependencies = pgTable(
   (t) => [unique().on(t.blockerTaskId, t.blockedTaskId)]
 );
 
+// Multi-assignee join table. `tasks.assigneeMemberId` remains the PRIMARY/lead
+// assignee (kept in sync as the first entry) for backward compatibility; this
+// table holds the full assignee set.
+export const taskAssignees = pgTable(
+  "task_assignees",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    workspaceMemberId: uuid("workspace_member_id")
+      .notNull()
+      .references(() => workspaceMembers.id, { onDelete: "cascade" }),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [unique("task_assignees_task_member_unique").on(t.taskId, t.workspaceMemberId)]
+);
+
 export const taskComments = pgTable("task_comments", {
   id: uuid("id").primaryKey().defaultRandom(),
   taskId: uuid("task_id")
     .notNull()
     .references(() => tasks.id, { onDelete: "cascade" }),
+  // Self-reference for threaded replies (null = top-level comment).
+  parentCommentId: uuid("parent_comment_id").references((): AnyPgColumn => taskComments.id, {
+    onDelete: "cascade",
+  }),
   authorMemberId: uuid("author_member_id")
     .notNull()
     .references(() => workspaceMembers.id),

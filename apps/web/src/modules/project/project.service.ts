@@ -1,12 +1,22 @@
 import "server-only";
 import { cache } from "react";
-import { and, eq, lt, ne, sql } from "drizzle-orm";
-import { db, tasks, taskStatuses, taskDependencies, blockers, projectRisks } from "@vieroc/db";
+import { and, desc, eq, lt, ne, sql } from "drizzle-orm";
+import {
+  db,
+  projects,
+  tasks,
+  taskStatuses,
+  taskDependencies,
+  blockers,
+  projectRisks,
+  activityEvents,
+  users,
+} from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
 import { NotFoundError, ValidationError } from "@/server/lib/errors";
 import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
 import { enqueueNotifications } from "@/server/lib/notifications";
-import { dispatchBandAgent } from "@/server/lib/band-dispatch";
+import { dispatchAgent } from "@/server/lib/agent-dispatch";
 import { createProjectSchema, updateProjectSchema } from "./project.schema";
 import { assertCanCreateProject, assertCanManageProject } from "./project.policy";
 import * as repo from "./project.repo";
@@ -68,6 +78,7 @@ export async function createProject(workspaceId: string, input: unknown) {
         constraints: data.constraints,
         expectedDeliverables: data.expectedDeliverables,
         initialContext: data.initialContext ?? null,
+        aiEnabled: data.aiEnabled,
         createdBy: ctx.userId,
       },
       tx
@@ -110,20 +121,67 @@ export async function createProject(workspaceId: string, input: unknown) {
     return project;
   });
 
-  void dispatchBandAgent({
-    targetRole: "planning",
-    senderRole: "assignment",
-    projectId: project.id,
-    message: "A new VieroClick project was created. Generate and apply the implementation plan.",
-    payload: {
-      projectName: project.name,
-      createdBy: ctx.userId,
-    },
-  }).catch((error) => {
-    console.error("Failed to dispatch planning agent after project creation:", error);
-  });
+  // AI Leader OFF → manual project, no agents dispatched. The user can flip it
+  // on later from the overview banner (which dispatches planning then).
+  if (data.aiEnabled) {
+    void dispatchAgent({
+      targetRole: "planning",
+      senderRole: "assignment",
+      projectId: project.id,
+      message: "A new VieroClick project was created. Generate and apply the implementation plan.",
+      actorUserId: ctx.userId,
+      payload: {
+        projectName: project.name,
+        createdBy: ctx.userId,
+      },
+    }).catch((error) => {
+      console.error("Failed to dispatch planning agent after project creation:", error);
+    });
+  }
 
   return project;
+}
+
+/**
+ * Flip the AI Leader master switch. Turning it ON (from a manual project)
+ * dispatches the planning agent so the AI populates the plan; turning it OFF
+ * just stops future agent activity.
+ */
+export async function setAiLeader(p: {
+  workspaceId: string;
+  projectId: string;
+  enabled: boolean;
+}) {
+  const ctx = await requireActor(p.workspaceId, p.projectId);
+  assertCanManageProject(ctx);
+
+  const existing = await repo.findById(p.projectId);
+  if (!existing) throw new NotFoundError("Project");
+
+  const updated = await db.transaction(async (tx) => {
+    const row = await repo.update(p.projectId, { aiEnabled: p.enabled }, tx);
+    if (!row) throw new NotFoundError("Project");
+    await events.projectUpdated(tx, ctx, existing, { aiEnabled: p.enabled });
+    invalidateCache(`project:${p.projectId}`);
+    invalidateCache(`projects:${p.workspaceId}`);
+    return row;
+  });
+
+  // Enabling on a project that has no tasks yet → let the planner build it.
+  if (p.enabled && !existing.aiEnabled) {
+    void dispatchAgent({
+      targetRole: "planning",
+      senderRole: "assignment",
+      projectId: p.projectId,
+      message: "AI Leader was enabled for this project. Generate and apply the implementation plan.",
+      actorUserId: ctx.userId,
+      payload: { projectName: existing.name, createdBy: ctx.userId },
+    }).catch((error) => {
+      console.error("Failed to dispatch planning agent after enabling AI Leader:", error);
+    });
+  }
+
+  return updated;
 }
 
 export async function updateProject(workspaceId: string, projectId: string, input: unknown) {
@@ -147,6 +205,9 @@ export async function updateProject(workspaceId: string, projectId: string, inpu
   if (data.expectedDeliverables !== undefined)
     patch.expectedDeliverables = data.expectedDeliverables;
   if (data.initialContext !== undefined) patch.initialContext = data.initialContext ?? null;
+  if (data.agentAutonomy !== undefined) patch.agentAutonomy = data.agentAutonomy;
+  if (data.agentConfidenceThreshold !== undefined)
+    patch.agentConfidenceThreshold = data.agentConfidenceThreshold;
 
   return db.transaction(async (tx) => {
     const updated = await repo.update(projectId, patch, tx);
@@ -156,6 +217,68 @@ export async function updateProject(workspaceId: string, projectId: string, inpu
     invalidateCache(`project:${projectId}`);
     return updated;
   });
+}
+
+/**
+ * Per-project task rollup across a whole workspace (for the workspace overview
+ * dashboard). One grouped query, aggregated in JS. Requires workspace membership.
+ */
+export async function getWorkspaceProjectStats(workspaceId: string) {
+  await requireActor(workspaceId);
+  const todayStr = new Date().toISOString().split("T")[0]!;
+
+  const rows = await db
+    .select({
+      projectId: tasks.projectId,
+      statusType: taskStatuses.type,
+      dueDate: tasks.dueDate,
+    })
+    .from(tasks)
+    .innerJoin(taskStatuses, eq(taskStatuses.id, tasks.statusId))
+    .innerJoin(projects, eq(projects.id, tasks.projectId))
+    .where(eq(projects.workspaceId, workspaceId));
+
+  const stats = new Map<
+    string,
+    { total: number; done: number; blocked: number; overdue: number }
+  >();
+  for (const r of rows) {
+    const s = stats.get(r.projectId) ?? { total: 0, done: 0, blocked: 0, overdue: 0 };
+    s.total += 1;
+    if (r.statusType === "done") s.done += 1;
+    if (r.statusType === "blocked") s.blocked += 1;
+    if (
+      r.statusType !== "done" &&
+      r.statusType !== "cancelled" &&
+      r.dueDate &&
+      r.dueDate < todayStr
+    ) {
+      s.overdue += 1;
+    }
+    stats.set(r.projectId, s);
+  }
+  return stats;
+}
+
+/** Recent workspace-wide activity for the Team Hub feed. Requires membership. */
+export async function getWorkspaceActivity(workspaceId: string, limit = 15) {
+  await requireActor(workspaceId);
+  return db
+    .select({
+      id: activityEvents.id,
+      eventType: activityEvents.eventType,
+      entityType: activityEvents.entityType,
+      actorType: activityEvents.actorType,
+      actorName: users.fullName,
+      projectName: projects.name,
+      createdAt: activityEvents.createdAt,
+    })
+    .from(activityEvents)
+    .leftJoin(users, eq(users.id, activityEvents.actorUserId))
+    .leftJoin(projects, eq(projects.id, activityEvents.projectId))
+    .where(eq(activityEvents.workspaceId, workspaceId))
+    .orderBy(desc(activityEvents.createdAt))
+    .limit(limit);
 }
 
 export async function detectPlanDeviations(workspaceId: string, projectId: string) {
@@ -294,10 +417,11 @@ export async function triggerReplan(workspaceId: string, projectId: string, reas
   const ctx = await requireActor(workspaceId, projectId);
   assertCanManageProject(ctx);
 
-  return dispatchBandAgent({
+  return dispatchAgent({
     targetRole: "planning",
     projectId,
     message: `Replan requested: ${reason}`,
+    actorUserId: ctx.userId,
     payload: {
       mode: "replan",
       reason,
@@ -313,10 +437,11 @@ export async function triggerObserver(workspaceId: string, projectId: string) {
   // Run deterministic deviation checks first so LLM doesn't re-compute what code already knows
   const deviations = await detectPlanDeviations(workspaceId, projectId);
 
-  return dispatchBandAgent({
+  return dispatchAgent({
     targetRole: "observer",
     projectId,
     message: "Run observer scan with pre-computed deviations.",
+    actorUserId: ctx.userId,
     payload: { plan_deviations: deviations },
   });
 }

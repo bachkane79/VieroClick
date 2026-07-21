@@ -3,21 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Button, Input, Textarea } from "@vieroc/ui";
-import {
-  Download,
-  FileUp,
-  Link2,
-  MessageSquare,
-  Paperclip,
-  Plus,
-  Send,
-  Trash2,
-  UserRound,
-  X,
-} from "lucide-react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { Button, cn, Input, Textarea } from "@vieroc/ui";
+import { Check, ChevronDown, Download, FileUp, Paperclip, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
-import type { CommentLinkView, CommentView } from "@/modules/comment/comment.view";
 import { uploadTaskAttachmentAction } from "@/modules/file/file.actions";
 import type { TaskAttachmentView } from "@/modules/file/file.view";
 import {
@@ -25,13 +14,12 @@ import {
   createTaskAction,
   deleteTaskAction,
   removeTaskDependencyFromTaskAction,
+  reviewTaskAction,
+  setTaskAssigneesAction,
   updateTaskAction,
 } from "../task.actions";
-import {
-  addCommentAction,
-  deleteCommentAction,
-  listCommentsAction,
-} from "@/modules/comment/comment.actions";
+import { memberInitials } from "../status-colors";
+import { TaskComments } from "./task-comments";
 
 import type {
   AcceptanceCriterionView,
@@ -53,7 +41,6 @@ interface Props {
   statuses: TaskStatusView[];
   members: MemberOptionView[];
   dependencies: TaskDependencyView[];
-  comments: CommentView[];
   attachments: TaskAttachmentView[];
   onSelectTask: (task: TaskView) => void;
 }
@@ -81,25 +68,6 @@ function formatFileSize(sizeBytes: number | null) {
   return `${(sizeBytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("en", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
-
-function linkLabel(link: CommentLinkView) {
-  if (link.label) return link.label;
-  return `${link.type}:${link.id.slice(0, 8)}`;
-}
-
-function appendToken(current: string, token: string) {
-  if (!current.trim()) return token;
-  return `${current.trimEnd()} ${token}`;
-}
-
 export function TaskDetailDrawer({
   open,
   onOpenChange,
@@ -113,7 +81,6 @@ export function TaskDetailDrawer({
   members,
   dependencies,
   attachments,
-  onSelectTask,
 }: Props) {
   const router = useRouter();
   const defaultStatusId = initialStatusId ?? statuses[0]?.id ?? "";
@@ -122,32 +89,22 @@ export function TaskDetailDrawer({
   const [description, setDescription] = useState("");
   const [statusId, setStatusId] = useState(defaultStatusId);
   const [priority, setPriority] = useState<"low" | "medium" | "high" | "urgent">("medium");
-  const [assigneeMemberId, setAssigneeMemberId] = useState("");
+  const [assigneeMemberIds, setAssigneeMemberIds] = useState<string[]>([]);
   const [parentTaskId, setParentTaskId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [estimateHours, setEstimateHours] = useState("");
+  const [actualHours, setActualHours] = useState("");
+  const [reviewFeedback, setReviewFeedback] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [labels, setLabels] = useState("");
   const [isMilestone, setIsMilestone] = useState(false);
   const [criteria, setCriteria] = useState<AcceptanceCriterionView[]>([]);
   const [blockerReason, setBlockerReason] = useState("");
   const [allowBlockedOverride, setAllowBlockedOverride] = useState(false);
   const [dependencyCandidate, setDependencyCandidate] = useState("");
-  const [commentBody, setCommentBody] = useState("");
-  const [commentLinks, setCommentLinks] = useState<CommentLinkView[]>([]);
-  const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [uploadSubmitting, setUploadSubmitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [mentionMemberId, setMentionMemberId] = useState("");
-  const [linkType, setLinkType] = useState<CommentLinkView["type"]>("task");
-  const [linkedTaskId, setLinkedTaskId] = useState("");
-  const [linkedCommentId, setLinkedCommentId] = useState("");
-  const [linkedDocId, setLinkedDocId] = useState("");
-  const [linkedDocLabel, setLinkedDocLabel] = useState("");
-
-  const [comments, setComments] = useState<any[]>([]);
-  const [loadingComments, setLoadingComments] = useState(false);
-  const [newCommentBody, setNewCommentBody] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -155,90 +112,21 @@ export function TaskDetailDrawer({
     setDescription(task?.description ?? "");
     setStatusId(task?.statusId ?? initialStatusId ?? statuses[0]?.id ?? "");
     setPriority(task?.priority ?? "medium");
-    setAssigneeMemberId(task?.assigneeMemberId ?? "");
+    setAssigneeMemberIds(task?.assigneeMemberIds ?? []);
     setParentTaskId(task?.parentTaskId ?? "");
     setStartDate(task?.startDate ?? "");
     setDueDate(task?.dueDate ?? "");
     setEstimateHours(task?.estimateHours ?? "");
+    setActualHours(task?.actualHours ?? "");
+    setReviewFeedback("");
     setLabels(task?.labels.join(", ") ?? "");
     setIsMilestone(task?.isMilestone ?? false);
     setCriteria(task?.acceptanceCriteria.length ? task.acceptanceCriteria : []);
     setBlockerReason("");
     setAllowBlockedOverride(false);
     setDependencyCandidate("");
-    setCommentBody("");
-    setCommentLinks([]);
     setSelectedFile(null);
-    setMentionMemberId("");
-    setLinkType("task");
-    setLinkedTaskId("");
-    setLinkedCommentId("");
-    setLinkedDocId("");
-    setLinkedDocLabel("");
   }, [initialStatusId, open, statuses, task]);
-
-  useEffect(() => {
-    if (!open || !task) {
-      setComments([]);
-      return;
-    }
-    async function loadComments() {
-      setLoadingComments(true);
-      const res = await listCommentsAction({
-        workspaceId,
-        projectId,
-        taskId: task!.id,
-      });
-      setLoadingComments(false);
-      if (res.ok) {
-        setComments(res.data);
-      }
-    }
-    loadComments();
-  }, [open, task, workspaceId, projectId]);
-
-  async function submitComment() {
-    if (!task || !newCommentBody.trim()) return;
-    const body = newCommentBody.trim();
-    setNewCommentBody("");
-    const result = await addCommentAction({
-      workspaceId,
-      projectId,
-      slug: workspaceSlug,
-      taskId: task.id,
-      data: { body },
-    });
-    if (!result.ok) {
-      toast.error(result.error);
-      return;
-    }
-    const res = await listCommentsAction({
-      workspaceId,
-      projectId,
-      taskId: task.id,
-    });
-    if (res.ok) {
-      setComments(res.data);
-    }
-    toast.success("Comment posted");
-  }
-
-  async function deleteComment(commentId: string) {
-    if (!task) return;
-    const result = await deleteCommentAction({
-      workspaceId,
-      projectId,
-      slug: workspaceSlug,
-      commentId,
-    });
-    if (!result.ok) {
-      toast.error(result.error);
-      return;
-    }
-    setComments((current) => current.filter((c) => c.id !== commentId));
-    toast.success("Comment deleted");
-  }
-
 
   const selectedStatus = statuses.find((status) => status.id === statusId);
   const taskById = useMemo(() => new Map(tasks.map((item) => [item.id, item])), [tasks]);
@@ -246,14 +134,38 @@ export function TaskDetailDrawer({
     ? dependencies.filter((dependency) => dependency.blockedTaskId === task.id)
     : [];
   const availableBlockers = tasks.filter((item) => item.id !== task?.id);
-  const taskComments = task ? comments.filter((comment) => comment.taskId === task.id) : [];
   const taskAttachments = task
     ? attachments.filter((attachment) => attachment.taskId === task.id)
     : [];
-  const memberById = useMemo(
-    () => new Map(members.map((member) => [member.id, member])),
-    [members]
-  );
+
+  async function handleReview(decision: "approve" | "rework") {
+    if (!task) return;
+    if (decision === "rework" && !reviewFeedback.trim()) {
+      toast.error("Add feedback so the assignee knows what to change.");
+      return;
+    }
+    setReviewSubmitting(true);
+    const actual = actualHours.trim() ? Number(actualHours) : undefined;
+    const result = await reviewTaskAction({
+      workspaceId,
+      projectId,
+      slug: workspaceSlug,
+      taskId: task.id,
+      data: {
+        decision,
+        feedback: reviewFeedback.trim() || undefined,
+        actualHours: actual !== undefined && Number.isFinite(actual) ? actual : undefined,
+      },
+    });
+    setReviewSubmitting(false);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(decision === "approve" ? "Task approved and closed" : "Sent back for rework");
+    onOpenChange(false);
+    router.refresh();
+  }
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -261,16 +173,18 @@ export function TaskDetailDrawer({
 
     setSubmitting(true);
     const estimate = estimateHours ? Number(estimateHours) : undefined;
+    const actual = actualHours.trim() ? Number(actualHours) : undefined;
     const payload = {
       title: title.trim(),
       description: description.trim() || undefined,
       statusId,
       priority,
-      assigneeMemberId: assigneeMemberId || null,
+      assigneeMemberId: assigneeMemberIds[0] ?? null,
       parentTaskId: parentTaskId || null,
       startDate: startDate || undefined,
       dueDate: dueDate || undefined,
       estimateHours: Number.isFinite(estimate) ? estimate : undefined,
+      actualHours: actual !== undefined && Number.isFinite(actual) ? actual : undefined,
       labels: splitLabels(labels),
       isMilestone,
       acceptanceCriteria: criteria
@@ -295,13 +209,26 @@ export function TaskDetailDrawer({
           data: payload,
         });
 
-    setSubmitting(false);
-
     if (!result.ok) {
+      setSubmitting(false);
       toast.error(result.error);
       return;
     }
 
+    // Sync the full multi-assignee set (the base payload only carried the
+    // primary). Only when 2+ assignees, since a single primary is already set.
+    const savedId = task ? task.id : result.data.id;
+    if (savedId && assigneeMemberIds.length > 1) {
+      await setTaskAssigneesAction({
+        workspaceId,
+        projectId,
+        slug: workspaceSlug,
+        taskId: savedId,
+        memberIds: assigneeMemberIds,
+      });
+    }
+
+    setSubmitting(false);
     toast.success(task ? "Task updated" : "Task created");
     onOpenChange(false);
     router.refresh();
@@ -365,103 +292,6 @@ export function TaskDetailDrawer({
     router.refresh();
   }
 
-  function insertMention() {
-    const member = memberById.get(mentionMemberId);
-    if (!member) return;
-    setCommentBody((current) => appendToken(current, `@${member.email}`));
-    setMentionMemberId("");
-  }
-
-  function addCommentLink() {
-    let nextLink: CommentLinkView | null = null;
-
-    if (linkType === "task") {
-      const linkedTask = taskById.get(linkedTaskId);
-      if (linkedTask) {
-        nextLink = { type: "task", id: linkedTask.id, label: linkedTask.title };
-      }
-    }
-
-    if (linkType === "comment") {
-      const linkedComment = comments.find((comment) => comment.id === linkedCommentId);
-      if (linkedComment) {
-        nextLink = {
-          type: "comment",
-          id: linkedComment.id,
-          label: `Comment ${linkedComment.id.slice(0, 8)}`,
-        };
-      }
-    }
-
-    if (linkType === "doc" && linkedDocId) {
-      nextLink = {
-        type: "doc",
-        id: linkedDocId,
-        label: linkedDocLabel.trim() || `Doc ${linkedDocId.slice(0, 8)}`,
-      };
-    }
-
-    if (!nextLink) return;
-
-    setCommentLinks((current) => {
-      if (current.some((link) => link.type === nextLink!.type && link.id === nextLink!.id)) {
-        return current;
-      }
-      return [...current, nextLink!];
-    });
-    setCommentBody((current) =>
-      appendToken(current, `[${linkLabel(nextLink!)}](${nextLink!.type}:${nextLink!.id})`)
-    );
-    setLinkedTaskId("");
-    setLinkedCommentId("");
-    setLinkedDocId("");
-    setLinkedDocLabel("");
-  }
-
-  async function postComment() {
-    if (!task || !commentBody.trim()) return;
-
-    setCommentSubmitting(true);
-    const result = await addCommentAction({
-      workspaceId,
-      projectId,
-      slug: workspaceSlug,
-      taskId: task.id,
-      data: {
-        body: commentBody.trim(),
-        metadata: { links: commentLinks },
-      },
-    });
-    setCommentSubmitting(false);
-
-    if (!result.ok) {
-      toast.error(result.error);
-      return;
-    }
-
-    toast.success("Comment added");
-    setCommentBody("");
-    setCommentLinks([]);
-    router.refresh();
-  }
-
-  async function removeComment(commentId: string) {
-    const result = await deleteCommentAction({
-      workspaceId,
-      projectId,
-      slug: workspaceSlug,
-      commentId,
-    });
-
-    if (!result.ok) {
-      toast.error(result.error);
-      return;
-    }
-
-    toast.success("Comment deleted");
-    router.refresh();
-  }
-
   async function uploadAttachment() {
     if (!task || !selectedFile) return;
 
@@ -485,20 +315,6 @@ export function TaskDetailDrawer({
     toast.success("Attachment uploaded");
     setSelectedFile(null);
     router.refresh();
-  }
-
-  function openLinkedEntity(link: CommentLinkView) {
-    if (link.type === "task") {
-      const linkedTask = taskById.get(link.id);
-      if (linkedTask) onSelectTask(linkedTask);
-    }
-
-    if (link.type === "comment") {
-      document.getElementById(`comment-${link.id}`)?.scrollIntoView({
-        block: "center",
-        behavior: "smooth",
-      });
-    }
   }
 
   return (
@@ -581,21 +397,18 @@ export function TaskDetailDrawer({
                   </select>
                 </Field>
 
-                <Field label="Assignee" htmlFor="task-assignee">
-                  <select
-                    id="task-assignee"
-                    value={assigneeMemberId}
-                    onChange={(e) => setAssigneeMemberId(e.target.value)}
-                    className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    <option value="">Unassigned</option>
-                    {members.map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.fullName}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                <div className="grid gap-2">
+                  <span className="text-sm font-medium">Assignees</span>
+                  <AssigneeMultiSelect
+                    members={members}
+                    selected={assigneeMemberIds}
+                    onToggle={(id) =>
+                      setAssigneeMemberIds((cur) =>
+                        cur.includes(id) ? cur.filter((m) => m !== id) : [...cur, id]
+                      )
+                    }
+                  />
+                </div>
 
                 <Field label="Parent task" htmlFor="task-parent">
                   <select
@@ -633,7 +446,7 @@ export function TaskDetailDrawer({
                   />
                 </Field>
 
-                <Field label="Estimate" htmlFor="task-estimate">
+                <Field label="Estimate (h)" htmlFor="task-estimate">
                   <Input
                     id="task-estimate"
                     type="number"
@@ -641,6 +454,18 @@ export function TaskDetailDrawer({
                     step="0.25"
                     value={estimateHours}
                     onChange={(e) => setEstimateHours(e.target.value)}
+                  />
+                </Field>
+
+                <Field label="Actual (h)" htmlFor="task-actual">
+                  <Input
+                    id="task-actual"
+                    type="number"
+                    min="0"
+                    step="0.25"
+                    placeholder="Log real time"
+                    value={actualHours}
+                    onChange={(e) => setActualHours(e.target.value)}
                   />
                 </Field>
 
@@ -669,20 +494,57 @@ export function TaskDetailDrawer({
                 </section>
               )}
 
+              {task && selectedStatus?.type === "in_review" && (
+                <section className="grid gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
+                  <div className="text-sm font-semibold">Review</div>
+                  <p className="text-xs text-muted-foreground">
+                    Approve to close the task, or request changes with feedback. Only a reviewer or lead
+                    can decide.
+                  </p>
+                  <Textarea
+                    value={reviewFeedback}
+                    onChange={(e) => setReviewFeedback(e.target.value)}
+                    placeholder="Feedback for the assignee (required to request changes)"
+                    className="min-h-[64px] text-sm"
+                  />
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      onClick={() => handleReview("approve")}
+                      disabled={reviewSubmitting}
+                      className="bg-green-600 text-white hover:bg-green-700"
+                    >
+                      Approve &amp; close
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => handleReview("rework")}
+                      disabled={reviewSubmitting}
+                    >
+                      Request changes
+                    </Button>
+                  </div>
+                </section>
+              )}
+
               <section className="grid gap-2">
                 <label htmlFor="task-labels" className="text-sm font-medium">
                   Labels
                 </label>
-                <Input
-                  id="task-labels"
-                  value={labels}
-                  onChange={(e) => setLabels(e.target.value)}
-                />
+                <Input id="task-labels" value={labels} onChange={(e) => setLabels(e.target.value)} />
               </section>
 
               <section className="grid gap-3">
                 <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-sm font-semibold">Acceptance criteria</h3>
+                  <h3 className="flex items-center gap-2 text-sm font-semibold">
+                    Acceptance criteria
+                    {criteria.length > 0 && (
+                      <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                        {criteria.filter((c) => c.checked).length}/{criteria.length}
+                      </span>
+                    )}
+                  </h3>
                   <Button
                     type="button"
                     size="sm"
@@ -694,6 +556,18 @@ export function TaskDetailDrawer({
                     Add
                   </Button>
                 </div>
+                {criteria.length > 0 && (
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all"
+                      style={{
+                        width: `${Math.round(
+                          (criteria.filter((c) => c.checked).length / criteria.length) * 100
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                )}
                 <div className="space-y-2">
                   {criteria.map((item, index) => (
                     <div key={item.id ?? index} className="grid gap-2 rounded-md border p-3">
@@ -804,269 +678,69 @@ export function TaskDetailDrawer({
               )}
 
               {task && (
-                <section className="grid gap-5 border-t pt-5">
-                  <div className="grid gap-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <h3 className="flex items-center gap-2 text-sm font-semibold">
-                        <MessageSquare className="h-4 w-4" />
-                        Comments
-                      </h3>
-                      <span className="text-xs text-muted-foreground">{taskComments.length}</span>
-                    </div>
+                <TaskComments
+                  workspaceId={workspaceId}
+                  workspaceSlug={workspaceSlug}
+                  projectId={projectId}
+                  taskId={task.id}
+                  members={members}
+                />
+              )}
 
-                    <div className="grid gap-3 rounded-md border bg-muted/20 p-3">
-                      <Textarea
-                        value={commentBody}
-                        onChange={(e) => setCommentBody(e.target.value)}
-                        className="min-h-24 bg-background"
-                      />
-
-                      <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
-                        <select
-                          value={mentionMemberId}
-                          onChange={(e) => setMentionMemberId(e.target.value)}
-                          className="h-9 min-w-0 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        >
-                          <option value="">Mention member</option>
-                          {members.map((member) => (
-                            <option key={member.id} value={member.id}>
-                              {member.fullName}
-                            </option>
-                          ))}
-                        </select>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="gap-2"
-                          disabled={!mentionMemberId}
-                          onClick={insertMention}
-                        >
-                          <UserRound className="h-4 w-4" />
-                          Mention
-                        </Button>
-                      </div>
-
-                      <div className="grid gap-2">
-                        <div className="grid gap-2 md:grid-cols-[120px_minmax(0,1fr)_auto]">
-                          <select
-                            value={linkType}
-                            onChange={(e) => setLinkType(e.target.value as CommentLinkView["type"])}
-                            className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                          >
-                            <option value="task">Task</option>
-                            <option value="comment">Comment</option>
-                            <option value="doc">Doc</option>
-                          </select>
-
-                          {linkType === "task" && (
-                            <select
-                              value={linkedTaskId}
-                              onChange={(e) => setLinkedTaskId(e.target.value)}
-                              className="h-9 min-w-0 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                            >
-                              <option value="">Select task</option>
-                              {tasks.map((item) => (
-                                <option key={item.id} value={item.id}>
-                                  {item.title}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-
-                          {linkType === "comment" && (
-                            <select
-                              value={linkedCommentId}
-                              onChange={(e) => setLinkedCommentId(e.target.value)}
-                              className="h-9 min-w-0 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                            >
-                              <option value="">Select comment</option>
-                              {comments.map((comment) => (
-                                <option key={comment.id} value={comment.id}>
-                                  {memberById.get(comment.authorMemberId)?.fullName ?? "Member"} -{" "}
-                                  {formatDateTime(comment.createdAt)}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-
-                          {linkType === "doc" && (
-                            <div className="grid gap-2 md:grid-cols-2">
-                              <Input
-                                value={linkedDocId}
-                                onChange={(e) => setLinkedDocId(e.target.value)}
-                                aria-label="Doc id"
-                              />
-                              <Input
-                                value={linkedDocLabel}
-                                onChange={(e) => setLinkedDocLabel(e.target.value)}
-                                aria-label="Doc label"
-                              />
-                            </div>
-                          )}
-
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="gap-2"
-                            disabled={
-                              (linkType === "task" && !linkedTaskId) ||
-                              (linkType === "comment" && !linkedCommentId) ||
-                              (linkType === "doc" && !linkedDocId)
-                            }
-                            onClick={addCommentLink}
-                          >
-                            <Link2 className="h-4 w-4" />
-                            Link
-                          </Button>
-                        </div>
-
-                        {commentLinks.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5">
-                            {commentLinks.map((link) => (
-                              <button
-                                key={`${link.type}-${link.id}`}
-                                type="button"
-                                className="rounded-full border bg-background px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground"
-                                onClick={() =>
-                                  setCommentLinks((current) =>
-                                    current.filter(
-                                      (item) => item.type !== link.type || item.id !== link.id
-                                    )
-                                  )
-                                }
-                              >
-                                {linkLabel(link)}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex justify-end">
-                        <Button
-                          type="button"
-                          className="gap-2"
-                          disabled={commentSubmitting || !commentBody.trim()}
-                          onClick={postComment}
-                        >
-                          <Send className="h-4 w-4" />
-                          {commentSubmitting ? "Posting..." : "Post"}
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      {taskComments.map((comment) => {
-                        const author = memberById.get(comment.authorMemberId);
-                        return (
-                          <article
-                            key={comment.id}
-                            id={`comment-${comment.id}`}
-                            className="rounded-md border bg-card p-3"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-medium">
-                                  {author?.fullName ?? "Workspace member"}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {formatDateTime(comment.createdAt)}
-                                </p>
-                              </div>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                aria-label="Delete comment"
-                                onClick={() => removeComment(comment.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                            <p className="mt-3 whitespace-pre-wrap text-sm leading-6">
-                              {comment.body}
-                            </p>
-                            {comment.links?.length > 0 && (
-                              <div className="mt-3 flex flex-wrap gap-1.5">
-                                {comment.links.map((link: CommentLinkView) => (
-                                  <button
-                                    key={`${comment.id}-${link.type}-${link.id}`}
-                                    type="button"
-                                    className="rounded-full border bg-muted/40 px-2 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground"
-                                    onClick={() => openLinkedEntity(link)}
-                                  >
-                                    {linkLabel(link)}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </article>
-                        );
-                      })}
-                      {taskComments.length === 0 && (
-                        <div className="rounded-md border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-                          No comments yet.
-                        </div>
-                      )}
-                    </div>
+              {task && (
+                <section className="grid gap-3 border-t pt-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="flex items-center gap-2 text-sm font-semibold">
+                      <Paperclip className="h-4 w-4" />
+                      Attachments
+                    </h3>
+                    <span className="text-xs text-muted-foreground">{taskAttachments.length}</span>
                   </div>
 
-                  <div className="grid gap-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <h3 className="flex items-center gap-2 text-sm font-semibold">
-                        <Paperclip className="h-4 w-4" />
-                        Attachments
-                      </h3>
-                      <span className="text-xs text-muted-foreground">
-                        {taskAttachments.length}
-                      </span>
-                    </div>
+                  <div className="grid gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-[minmax(0,1fr)_auto]">
+                    <Input
+                      type="file"
+                      onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+                      className="bg-background"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="gap-2"
+                      disabled={uploadSubmitting || !selectedFile}
+                      onClick={uploadAttachment}
+                    >
+                      <FileUp className="h-4 w-4" />
+                      {uploadSubmitting ? "Uploading..." : "Upload"}
+                    </Button>
+                  </div>
 
-                    <div className="grid gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-[minmax(0,1fr)_auto]">
-                      <Input
-                        type="file"
-                        onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
-                        className="bg-background"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="gap-2"
-                        disabled={uploadSubmitting || !selectedFile}
-                        onClick={uploadAttachment}
+                  <div className="space-y-2">
+                    {taskAttachments.map((attachment) => (
+                      <div
+                        key={attachment.attachmentId}
+                        className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
                       >
-                        <FileUp className="h-4 w-4" />
-                        {uploadSubmitting ? "Uploading..." : "Upload"}
-                      </Button>
-                    </div>
-
-                    <div className="space-y-2">
-                      {taskAttachments.map((attachment) => (
-                        <div
-                          key={attachment.attachmentId}
-                          className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{attachment.fileName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatFileSize(attachment.sizeBytes)}
+                          </p>
+                        </div>
+                        <a
+                          href={`/api/files/${attachment.fileId}?projectId=${projectId}`}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2"
+                          aria-label="Download attachment"
                         >
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">{attachment.fileName}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatFileSize(attachment.sizeBytes)}
-                            </p>
-                          </div>
-                          <a
-                            href={`/api/files/${attachment.fileId}?projectId=${projectId}`}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2"
-                            aria-label="Download attachment"
-                          >
-                            <Download className="h-4 w-4" />
-                          </a>
-                        </div>
-                      ))}
-                      {taskAttachments.length === 0 && (
-                        <div className="rounded-md border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-                          No attachments yet.
-                        </div>
-                      )}
-                    </div>
+                          <Download className="h-4 w-4" />
+                        </a>
+                      </div>
+                    ))}
+                    {taskAttachments.length === 0 && (
+                      <div className="rounded-md border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
+                        No attachments yet.
+                      </div>
+                    )}
                   </div>
                 </section>
               )}
@@ -1080,68 +754,6 @@ export function TaskDetailDrawer({
                 />
                 Override blocker dependency
               </label>
-
-              {task && (
-                <section className="grid gap-3 border-t pt-5">
-                  <h3 className="text-sm font-semibold">Comments</h3>
-                  <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
-                    {loadingComments ? (
-                      <p className="text-xs text-muted-foreground">Loading comments...</p>
-                    ) : comments.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">No comments yet. Start the conversation!</p>
-                    ) : (
-                      comments.map((comment) => {
-                        const author = members.find((m) => m.id === comment.authorMemberId);
-                        const authorName = author?.fullName ?? "Unknown Member";
-                        return (
-                          <div
-                            key={comment.id}
-                            className="rounded-lg bg-neutral-50 dark:bg-neutral-900 border p-3 text-sm flex items-start justify-between gap-3 group"
-                          >
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="font-bold text-xs">{authorName}</span>
-                                <span className="text-[10px] text-muted-foreground">
-                                  {new Date(comment.createdAt).toLocaleString()}
-                                </span>
-                              </div>
-                              <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
-                                {comment.body}
-                              </p>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                              onClick={() => deleteComment(comment.id)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                            </Button>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                  <div className="flex gap-2 items-end mt-2">
-                    <Textarea
-                      placeholder="Add a comment... Use @name to mention"
-                      value={newCommentBody}
-                      onChange={(e) => setNewCommentBody(e.target.value)}
-                      className="min-h-16 flex-1 text-xs"
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      disabled={!newCommentBody.trim()}
-                      onClick={submitComment}
-                    >
-                      Post
-                    </Button>
-                  </div>
-                </section>
-              )}
-
             </div>
 
             <div className="flex items-center justify-between gap-3 border-t px-5 py-4">
@@ -1191,5 +803,83 @@ function Field({
       </label>
       {children}
     </div>
+  );
+}
+
+function AssigneeMultiSelect({
+  members,
+  selected,
+  onToggle,
+}: {
+  members: MemberOptionView[];
+  selected: string[];
+  onToggle: (id: string) => void;
+}) {
+  const byId = new Map(members.map((m) => [m.id, m]));
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <button
+          type="button"
+          className="flex min-h-9 items-center justify-between gap-2 rounded-md border border-input bg-background px-2 py-1 text-left text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          <span className="flex min-w-0 flex-wrap gap-1">
+            {selected.length === 0 && <span className="text-muted-foreground">Unassigned</span>}
+            {selected.map((id) => {
+              const m = byId.get(id);
+              if (!m) return null;
+              return (
+                <span
+                  key={id}
+                  className="flex items-center gap-1 rounded-full bg-primary/10 py-0.5 pl-0.5 pr-2 text-[11px] font-medium text-primary"
+                >
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/20 text-[8px]">
+                    {memberInitials(m.fullName)}
+                  </span>
+                  {m.fullName}
+                </span>
+              );
+            })}
+          </span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="start"
+          sideOffset={4}
+          className="z-[60] max-h-64 min-w-[240px] overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+        >
+          {members.length === 0 && (
+            <p className="px-2 py-1.5 text-xs text-muted-foreground">No project members.</p>
+          )}
+          {members.map((m) => {
+            const on = selected.includes(m.id);
+            return (
+              <DropdownMenu.CheckboxItem
+                key={m.id}
+                checked={on}
+                onCheckedChange={() => onToggle(m.id)}
+                onSelect={(e) => e.preventDefault()}
+                className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent"
+              >
+                <span
+                  className={cn(
+                    "flex h-4 w-4 items-center justify-center rounded-sm border",
+                    on && "border-primary bg-primary text-primary-foreground"
+                  )}
+                >
+                  {on && <Check className="h-3 w-3" />}
+                </span>
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-[9px] font-semibold text-primary">
+                  {memberInitials(m.fullName)}
+                </span>
+                {m.fullName}
+              </DropdownMenu.CheckboxItem>
+            );
+          })}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }

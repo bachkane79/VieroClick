@@ -71,6 +71,22 @@ export async function upsert(
   return row!;
 }
 
+/** Updates submitted for a given workDate (for the lead daily summary — 4.6). */
+export async function listUpdatesForDate(
+  projectId: string,
+  workDate: string,
+  exec: Executor = db
+): Promise<{ memberId: string; blockersText: string | null; confidenceLevel: number | null }[]> {
+  return exec
+    .select({
+      memberId: dailyUpdates.memberId,
+      blockersText: dailyUpdates.blockersText,
+      confidenceLevel: dailyUpdates.confidenceLevel,
+    })
+    .from(dailyUpdates)
+    .where(and(eq(dailyUpdates.projectId, projectId), eq(dailyUpdates.workDate, workDate)));
+}
+
 /**
  * Return workspace member IDs of project members who haven't submitted a daily-update
  * for the given workDate. Uses LEFT JOIN: any member with no row for that date is included.
