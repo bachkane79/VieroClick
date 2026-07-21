@@ -3,107 +3,143 @@
 @tailwind utilities;
 
 /*
-  VieroClick design language — "paper-calm productivity"
+  VierocClick design language — "one shell, one system"
   ----------------------------------------------------------------
-  Adapted from the Notion analysis (DESIGN-notion.md):
-  · warm paper-soft canvas over pure-white surfaces (gentle figure/ground)
-  · near-black warm ink type, tight negative tracking on display sizes
-  · ONE structural accent — Claude terracotta-orange — reserved for
-    CTAs, links, active + focus signals. Nothing else is painted.
-  · elevation by hairline + barely-there layered shadow, never heavy.
+  Unified UX/UI redesign (docs/ux-ui-system-redesign-plan.md §8).
+  · Neutral, near-white cool canvas over pure-white surfaces.
+  · ONE action colour — primary blue (#2563EB) — reserved for actions,
+    links and selection. Semantic colours only carry status meaning.
+  · No gradients in the application shell, sidebar, toolbar or panels.
+  · AI purple (#6757C8) is a classification signal only — never a wash.
+  · Elevation by hairline border; shadow only on hover/focus/overlay.
+
+  Token names keep the legacy HSL-variable contract (--background,
+  --foreground, --primary, …) so every existing component adopts the new
+  system through the cascade. New tokens are added, none renamed away.
 */
 
 @layer base {
   :root {
-    /* Surfaces — warm near-white canvas (#faf9f7), pure-white cards.
-       (Redesign: lifted off the old milky grey so surfaces read cleaner and
-       the pastel accents below have room to breathe — B2C spec §3.3.) */
-    --background: 40 22% 98%; /* #faf9f7 warm near-white */
-    --foreground: 30 8% 11%; /* near-black warm ink */
+    /* ── Surfaces ─────────────────────────────────────────────── */
+    --canvas: 220 22% 97%; /* #F6F7F9 app background */
+    --background: 220 22% 97%;
+    --surface: 0 0% 100%; /* #FFFFFF content, popover, dialog */
+    --surface-subtle: 216 20% 95%; /* #F0F2F5 sidebar / secondary areas */
+    --surface-hover: 214 24% 93%; /* #E9EDF2 soft hover */
 
     --card: 0 0% 100%;
-    --card-foreground: 30 8% 11%;
-
+    --card-foreground: 218 14% 15%;
     --popover: 0 0% 100%;
-    --popover-foreground: 30 8% 11%;
+    --popover-foreground: 218 14% 15%;
 
-    /* The single structural accent — brand orange #dd5b00 */
-    --primary: 25 100% 43%; /* #dd5b00 */
+    /* ── Text ─────────────────────────────────────────────────── */
+    --foreground: 218 14% 15%; /* #20242A primary ink */
+    --text-secondary: 218 10% 45%; /* #68707C metadata */
+    --text-disabled: 214 8% 64%; /* #9AA1AB disabled */
+
+    /* ── Lines ────────────────────────────────────────────────── */
+    --border: 214 16% 89%; /* #DFE3E8 default divider */
+    --border-strong: 214 14% 81%; /* #C8CED6 interactive / selected */
+    --input: 214 14% 81%;
+
+    /* ── Action & selection ───────────────────────────────────── */
+    --primary: 221 83% 53%; /* #2563EB */
     --primary-foreground: 0 0% 100%;
+    --primary-hover: 226 71% 48%; /* #1D4ED8 */
+    --ring: 221 83% 53%;
+    --focus-ring: 217 88% 78%; /* #93B4F8 keyboard focus */
 
-    /* Quiet neutrals */
-    --secondary: 40 9% 93%;
-    --secondary-foreground: 30 8% 18%;
+    /* ── Neutrals (chips, hover, muted text) ──────────────────── */
+    --secondary: 216 20% 95%;
+    --secondary-foreground: 218 14% 22%;
+    --muted: 216 20% 95%;
+    --muted-foreground: 218 10% 45%;
+    --accent: 214 24% 93%;
+    --accent-foreground: 218 14% 18%;
 
-    --muted: 40 10% 94%;
-    --muted-foreground: 35 6% 42%; /* stone */
-
-    --accent: 38 12% 91%;
-    --accent-foreground: 30 8% 14%;
-
-    --destructive: 4 74% 52%;
+    /* ── Semantic status ──────────────────────────────────────── */
+    --success: 154 72% 31%; /* #16875B */
+    --warning: 36 100% 36%; /* #B76E00 */
+    --destructive: 357 60% 53%; /* #CF3F46 */
     --destructive-foreground: 0 0% 100%;
 
-    /* Hairlines */
-    --border: 38 11% 88%;
-    --input: 38 11% 85%;
-    --ring: 25 100% 43%;
+    /* ── AI classification signal (icon/chip only) ────────────── */
+    --ai: 249 52% 56%; /* #6757C8 */
+    --ai-foreground: 0 0% 100%;
 
-    /* Brand alias (decorative emphasis) */
-    --brand: 25 100% 43%;
+    /* ── Brand alias → primary (no orange, no gradient) ───────── */
+    --brand: 221 83% 53%;
     --brand-foreground: 0 0% 100%;
-    --brand-soft: 28 100% 95%;
+    --brand-soft: 221 100% 96%;
 
-    /* Pastel accent family (redesign §3.4) — for dashboards, empty states,
-       categories and status illustration. NOT the action colour; orange stays
-       the only CTA/active signal. Each has a soft (surface-tint) partner. */
-    --coral: 4 100% 69%;      --coral-soft: 6 100% 95%;
-    --peach: 27 90% 61%;      --peach-soft: 33 100% 94%;
-    --lavender: 254 62% 68%;  --lavender-soft: 252 100% 96%;
-    --sky: 210 74% 57%;       --sky-soft: 210 100% 95%;
-    --mint: 153 60% 41%;      --mint-soft: 152 55% 92%;
+    /* Accent family — status / illustration / project colour dots only.
+       Never a full-card wash (redesign §8.1). Each has a soft partner. */
+    --coral: 4 74% 58%;        --coral-soft: 6 78% 96%;
+    --peach: 27 84% 52%;       --peach-soft: 33 90% 95%;
+    --lavender: 249 52% 60%;   --lavender-soft: 250 90% 96%;
+    --sky: 210 74% 50%;        --sky-soft: 210 90% 95%;
+    --mint: 154 60% 36%;       --mint-soft: 152 45% 93%;
 
-    --radius: 0.5rem; /* redesign: operational surfaces cap at 8px */
+    --radius: 0.5rem; /* 8px card/dialog; controls derive to 6px */
+
+    /* ── Motion (Dock-inspired, §9.1) ─────────────────────────── */
+    --motion-fast: 120ms;
+    --motion-standard: 180ms;
+    --motion-slow: 240ms;
+    --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .dark {
-    --background: 30 6% 9%;
-    --foreground: 40 10% 92%;
+    --canvas: 220 16% 8%;
+    --background: 220 16% 8%;
+    --surface: 220 14% 11%;
+    --surface-subtle: 220 12% 13%;
+    --surface-hover: 218 12% 18%;
 
-    --card: 30 6% 12%;
-    --card-foreground: 40 10% 92%;
+    --card: 220 14% 11%;
+    --card-foreground: 210 16% 92%;
+    --popover: 220 14% 13%;
+    --popover-foreground: 210 16% 92%;
 
-    --popover: 30 7% 13%;
-    --popover-foreground: 40 10% 92%;
+    --foreground: 210 16% 92%;
+    --text-secondary: 216 10% 62%;
+    --text-disabled: 216 8% 46%;
 
-    --primary: 25 100% 50%;
+    --border: 216 12% 20%;
+    --border-strong: 216 12% 30%;
+    --input: 216 12% 26%;
+
+    --primary: 217 90% 61%;
     --primary-foreground: 0 0% 100%;
+    --primary-hover: 221 83% 53%;
+    --ring: 217 90% 61%;
+    --focus-ring: 217 80% 60%;
 
-    --secondary: 30 5% 18%;
-    --secondary-foreground: 40 10% 92%;
+    --secondary: 220 12% 16%;
+    --secondary-foreground: 210 16% 92%;
+    --muted: 220 12% 16%;
+    --muted-foreground: 216 10% 62%;
+    --accent: 218 12% 20%;
+    --accent-foreground: 210 16% 92%;
 
-    --muted: 30 5% 16%;
-    --muted-foreground: 38 7% 60%;
-
-    --accent: 30 5% 21%;
-    --accent-foreground: 40 10% 92%;
-
-    --destructive: 4 70% 52%;
+    --success: 154 55% 46%;
+    --warning: 38 92% 56%;
+    --destructive: 357 68% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 30 5% 20%;
-    --input: 30 5% 23%;
-    --ring: 25 100% 50%;
+    --ai: 249 72% 72%;
+    --ai-foreground: 0 0% 100%;
 
-    --brand: 25 100% 50%;
+    --brand: 217 90% 61%;
     --brand-foreground: 0 0% 100%;
-    --brand-soft: 25 40% 18%;
+    --brand-soft: 220 40% 20%;
 
-    --coral: 6 100% 73%;      --coral-soft: 6 30% 18%;
-    --peach: 30 90% 67%;      --peach-soft: 28 35% 17%;
-    --lavender: 254 80% 76%;  --lavender-soft: 252 30% 20%;
-    --sky: 210 80% 67%;       --sky-soft: 212 40% 17%;
-    --mint: 152 55% 52%;      --mint-soft: 154 35% 15%;
+    --coral: 6 80% 66%;        --coral-soft: 6 30% 18%;
+    --peach: 30 84% 62%;       --peach-soft: 28 32% 17%;
+    --lavender: 249 72% 74%;   --lavender-soft: 250 28% 22%;
+    --sky: 210 78% 64%;        --sky-soft: 212 36% 18%;
+    --mint: 154 52% 52%;       --mint-soft: 154 32% 16%;
   }
 }
 
@@ -119,37 +155,44 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "cv11", "ss01", "lnum";
+    letter-spacing: 0;
   }
 
-  /* Notion-tight headings: heavier weight, negative tracking that
-     tightens as the size grows. */
+  /* Product headings: clean, no landing-page display sizes (§8.2). */
   h1 {
-    @apply font-bold tracking-tight;
-    letter-spacing: -0.025em;
+    @apply font-semibold;
+    letter-spacing: -0.011em;
   }
   h2,
   h3 {
-    @apply font-bold tracking-tight;
-    letter-spacing: -0.018em;
+    @apply font-semibold;
+    letter-spacing: -0.006em;
   }
 
   ::selection {
     background-color: hsl(var(--primary) / 0.18);
     color: hsl(var(--foreground));
   }
+
+  /* Consistent, visible keyboard focus at the same weight as hover (§9.4). */
+  :focus-visible {
+    outline: 2px solid hsl(var(--focus-ring));
+    outline-offset: 2px;
+  }
 }
 
 @layer utilities {
-  /* Brand gradient — warm orange → coral → lavender (redesign §3.4).
-     Used for the sidebar, onboarding brand panel and AI/header surfaces. */
+  /* Legacy "gradient" utilities repointed to flat fills — the redesign
+     removes gradients from the shell. Kept as aliases so any remaining
+     consumer degrades to a solid, on-brand surface. */
   .bg-sidebar-gradient {
-    background-image: linear-gradient(158deg, #ff8a3d 0%, #ff6a5f 52%, #8b78e0 100%);
+    background-color: hsl(var(--surface-subtle));
   }
   .bg-brand-gradient {
-    background-image: linear-gradient(150deg, #ff8a3d 0%, #ff6a5f 52%, #8b78e0 100%);
+    background-color: hsl(var(--primary));
   }
 
-  /* Hide scrollbar but keep scroll (used by tab strips) */
+  /* Hide scrollbar but keep scroll (tab strips). */
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
@@ -158,33 +201,74 @@
     scrollbar-width: none;
   }
 
-  /* Barely-there layered elevation — Notion's signature soft lift */
+  /* Hairline-first elevation — used only on hover/focus/overlay. */
   .shadow-soft {
     box-shadow:
-      rgba(15, 15, 15, 0.012) 0 0.2px 1px,
-      rgba(15, 15, 15, 0.02) 0 1px 3px,
-      rgba(15, 15, 15, 0.028) 0 4px 12px;
+      rgba(16, 24, 40, 0.03) 0 1px 2px,
+      rgba(16, 24, 40, 0.04) 0 2px 6px;
   }
   .shadow-elevated {
     box-shadow:
-      rgba(15, 15, 15, 0.02) 0 1px 3px,
-      rgba(15, 15, 15, 0.04) 0 8px 22px,
-      rgba(15, 15, 15, 0.05) 0 22px 48px;
+      rgba(16, 24, 40, 0.06) 0 4px 12px,
+      rgba(16, 24, 40, 0.08) 0 12px 28px;
+  }
+
+  /* ── Dock-inspired interaction primitives (§9.2–9.3) ──────────
+     Icon/nav items may lift + scale; panels and rows only translate
+     slightly. Container must reserve space so transforms never shift
+     layout. Only transform/opacity/colours are animated. */
+  .dock-item {
+    transition:
+      transform var(--motion-standard) var(--ease-spring),
+      background-color var(--motion-fast) var(--ease-standard),
+      color var(--motion-fast) var(--ease-standard);
+    will-change: transform;
+  }
+  .dock-item:hover {
+    transform: translateY(-3px) scale(1.06);
+  }
+  .dock-item:active {
+    transform: translateY(-1px) scale(1.02);
+  }
+
+  .lift {
+    transition:
+      transform var(--motion-standard) var(--ease-standard),
+      border-color var(--motion-fast) var(--ease-standard),
+      box-shadow var(--motion-standard) var(--ease-standard);
+  }
+  .lift:hover {
+    transform: translateY(-2px);
   }
 }
 
-/* Quiet, refined scrollbars across the app */
+/* Reduced motion — drop scale/translate, keep colour changes (§9.4). */
+@media (prefers-reduced-motion: reduce) {
+  .dock-item,
+  .lift {
+    transition: background-color var(--motion-fast) var(--ease-standard),
+      color var(--motion-fast) var(--ease-standard),
+      border-color var(--motion-fast) var(--ease-standard);
+  }
+  .dock-item:hover,
+  .dock-item:active,
+  .lift:hover {
+    transform: none;
+  }
+}
+
+/* Quiet, refined scrollbars across the app. */
 @layer base {
   * {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--border)) transparent;
+    scrollbar-color: hsl(var(--border-strong)) transparent;
   }
   *::-webkit-scrollbar {
     width: 10px;
     height: 10px;
   }
   *::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--border));
+    background-color: hsl(var(--border-strong));
     border-radius: 9999px;
     border: 3px solid transparent;
     background-clip: content-box;

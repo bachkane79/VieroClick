@@ -32,11 +32,11 @@ interface Props {
 }
 
 const PROJECT_STATUS_BADGE: Record<string, string> = {
-  draft: "bg-muted text-muted-foreground",
-  active: "bg-mint-soft text-mint",
-  paused: "bg-peach-soft text-peach",
-  completed: "bg-sky-soft text-sky",
-  archived: "bg-muted text-muted-foreground",
+  draft: "bg-surface-subtle text-text-secondary",
+  active: "bg-success/10 text-success",
+  paused: "bg-warning/10 text-warning",
+  completed: "bg-primary/10 text-primary",
+  archived: "bg-surface-subtle text-text-secondary",
 };
 
 export default async function WorkspaceOverviewPage({ params }: Props) {
@@ -85,16 +85,23 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
   for (const s of stats.values()) wsBlocked += s.blocked;
   const activeCount = projects.filter((p) => p.status === "active").length;
 
+  const todayLabel = new Intl.DateTimeFormat(locale === "vi" ? "vi" : "en", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(new Date());
+
   return (
-    <div className="mx-auto max-w-[1080px] px-6 py-8">
-      {/* Greeting */}
+    <div className="mx-auto max-w-[1080px] px-6 py-6 lg:px-8">
+      {/* Greeting — compact attention header, not a hero (§11.1) */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-[30px] font-bold tracking-tight">
+          <h1 className="text-xl font-semibold tracking-tight">
             {t(locale, "home.greeting", { name: myName })}
           </h1>
-          <p className="mt-1.5 text-[15px] text-muted-foreground">
-            {workspace.name} · {t(locale, "home.members", { n: members.length })}
+          <p className="mt-1 text-[13px] text-text-secondary">
+            <span className="capitalize">{todayLabel}</span> · {workspace.name} ·{" "}
+            {t(locale, "home.members", { n: members.length })}
           </p>
         </div>
         <Link href={`/workspace/${slug}/projects/new`} className={cn(buttonVariants(), "gap-2")}>
@@ -103,19 +110,19 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
         </Link>
       </div>
 
-      {/* Stat tiles */}
-      <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label={t(locale, "home.stat.open")} value={myOpen} accent="sky" />
-        <Stat label={t(locale, "home.stat.review")} value={myInReview} accent="peach" />
-        <Stat label={t(locale, "home.stat.overdue")} value={myOverdue} accent={myOverdue > 0 ? "coral" : "muted"} />
-        <Stat label={t(locale, "home.stat.done")} value={myDone} accent="mint" />
+      {/* Attention strip — status tiles carry semantic colour only (§8.1) */}
+      <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat label={t(locale, "home.stat.open")} value={myOpen} accent="primary" />
+        <Stat label={t(locale, "home.stat.review")} value={myInReview} accent={myInReview > 0 ? "warning" : "muted"} />
+        <Stat label={t(locale, "home.stat.overdue")} value={myOverdue} accent={myOverdue > 0 ? "danger" : "muted"} />
+        <Stat label={t(locale, "home.stat.done")} value={myDone} accent="success" />
       </div>
 
       {/* Today & upcoming */}
       <section className="mt-8">
         <div className="mb-3 flex items-center gap-2.5">
-          <CalendarClock className="h-4 w-4 text-peach" />
-          <h2 className="text-base font-bold">{t(locale, "home.today")}</h2>
+          <CalendarClock className="h-4 w-4 text-text-secondary" />
+          <h2 className="text-[15px] font-semibold">{t(locale, "home.today")}</h2>
           <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">
             {soon.length}
           </span>
@@ -149,7 +156,7 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">{task.title}</span>
                   <span className="flex shrink-0 items-center gap-2">
                     {(task.priority === "high" || task.priority === "urgent") && (
-                      <span className="rounded-full bg-coral-soft px-2 py-0.5 text-[11px] font-semibold text-coral">
+                      <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold text-destructive">
                         <Flag className="mr-1 inline h-3 w-3" />
                         {task.priority === "urgent"
                           ? locale === "vi"
@@ -162,9 +169,9 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
                       className={cn(
                         "rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums",
                         due.tone === "over"
-                          ? "bg-coral-soft text-coral"
+                          ? "bg-destructive/10 text-destructive"
                           : due.tone === "soon"
-                            ? "bg-peach-soft text-peach"
+                            ? "bg-warning/10 text-warning"
                             : "bg-secondary text-muted-foreground"
                       )}
                     >
@@ -199,8 +206,8 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
         />
 
         <div className="rounded-lg border bg-card p-4 shadow-soft">
-          <h2 className="mb-3 flex items-center gap-2 text-base font-bold">
-            <Activity className="h-4 w-4 text-lavender" />
+          <h2 className="mb-3 flex items-center gap-2 text-[15px] font-semibold">
+            <Activity className="h-4 w-4 text-text-secondary" />
             {t(locale, "home.activity")}
           </h2>
           {activity.length === 0 ? (
@@ -215,8 +222,8 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
                     className={cn(
                       "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold",
                       a.actorType === "human"
-                        ? "bg-peach-soft text-peach"
-                        : "bg-lavender-soft text-lavender"
+                        ? "bg-surface-subtle text-text-secondary"
+                        : "bg-ai/10 text-ai"
                     )}
                   >
                     {a.actorType === "human" ? memberInitials(a.actorName ?? "?") : "AI"}
@@ -247,8 +254,8 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
 
       {/* Projects */}
       <div className="mb-3 mt-8 flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-base font-bold">
-          <Layers className="h-4 w-4 text-sky" />
+        <h2 className="flex items-center gap-2 text-[15px] font-semibold">
+          <Layers className="h-4 w-4 text-text-secondary" />
           {t(locale, "home.projects")}
         </h2>
         <Link
@@ -276,11 +283,11 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
               <Link
                 key={project.id}
                 href={`/workspace/${slug}/projects/${project.id}/overview`}
-                className="rounded-lg border bg-card p-4 shadow-soft transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-elevated"
+                className="lift rounded-lg border bg-card p-4 hover:border-border-strong hover:shadow-soft"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-sky-soft text-sky">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
                       <FolderKanban className="h-4 w-4" />
                     </span>
                     <div className="min-w-0">
@@ -305,7 +312,7 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
                 <div className="mt-3 flex items-center gap-2">
                   <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-secondary">
                     <div
-                      className={cn("h-full rounded-full", pct === 100 ? "bg-mint" : "bg-primary")}
+                      className={cn("h-full rounded-full", pct === 100 ? "bg-success" : "bg-primary")}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
@@ -319,10 +326,10 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
                     {s.done}/{s.total} {t(locale, "home.doneOf")}
                   </span>
                   {s.blocked > 0 && (
-                    <span className="text-coral">{t(locale, "home.blockedN", { n: s.blocked })}</span>
+                    <span className="text-destructive">{t(locale, "home.blockedN", { n: s.blocked })}</span>
                   )}
                   {s.overdue > 0 && (
-                    <span className="text-peach">{t(locale, "home.overdueN", { n: s.overdue })}</span>
+                    <span className="text-warning">{t(locale, "home.overdueN", { n: s.overdue })}</span>
                   )}
                   {project.targetEndDate && (
                     <span className="ml-auto">
@@ -378,10 +385,10 @@ function relTime(date: Date, locale: Locale): string {
 }
 
 const ACCENT: Record<string, string> = {
-  sky: "text-sky",
-  peach: "text-peach",
-  coral: "text-coral",
-  mint: "text-mint",
+  primary: "text-primary",
+  warning: "text-warning",
+  danger: "text-destructive",
+  success: "text-success",
   muted: "text-foreground",
 };
 
@@ -399,7 +406,7 @@ function Stat({ label, value, accent }: { label: string; value: number; accent: 
 function MiniStat({ label, value, danger }: { label: string; value: number; danger?: boolean }) {
   return (
     <div>
-      <p className={cn("text-lg font-bold tabular-nums", danger && value > 0 && "text-coral")}>
+      <p className={cn("text-lg font-bold tabular-nums", danger && value > 0 && "text-destructive")}>
         {value}
       </p>
       <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>

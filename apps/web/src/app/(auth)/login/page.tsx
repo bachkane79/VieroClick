@@ -15,10 +15,11 @@ export default async function LoginPage() {
 
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
-      {/* Brand panel */}
-      <div className="relative hidden overflow-hidden bg-sidebar-gradient p-12 text-white lg:flex lg:flex-col lg:justify-between">
-        <div className="pointer-events-none absolute -right-16 -top-16 h-72 w-72 rounded-full bg-white/20 blur-2xl" />
-        <div className="pointer-events-none absolute -left-12 bottom-16 h-52 w-52 rounded-full bg-white/10 blur-2xl" />
+      {/* Brand panel — solid primary (login is a marketing surface, not the
+          application shell; a single flat brand fill keeps white text legible). */}
+      <div className="relative hidden overflow-hidden bg-primary p-12 text-white lg:flex lg:flex-col lg:justify-between">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-72 w-72 rounded-full bg-white/10 blur-2xl" />
+        <div className="pointer-events-none absolute -left-12 bottom-16 h-52 w-52 rounded-full bg-white/5 blur-2xl" />
         <div className="relative z-10 flex items-center gap-2.5 text-xl font-extrabold tracking-tight">
           <Image
             src="/logo_transparent.png"

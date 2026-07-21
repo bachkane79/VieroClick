@@ -5,11 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import { cn } from "@vieroc/ui";
 import {
+  BookText,
   CalendarDays,
   Home,
   Inbox,
   KanbanSquare,
+  LayoutDashboard,
   ListChecks,
+  MessagesSquare,
   Network,
   Search,
   Settings,
@@ -18,6 +21,8 @@ import {
   Folder,
 } from "lucide-react";
 import { listProjectsAction } from "@/modules/project/project.actions";
+import { useLocale } from "@/lib/i18n/client";
+import { t } from "@/lib/i18n/dict";
 
 interface Props {
   workspaces: Array<{ id: string; name: string; slug: string }>;
@@ -38,16 +43,18 @@ interface Command {
  */
 export function CommandPalette({ workspaces }: Props) {
   const router = useRouter();
+  const locale = useLocale();
   const params = useParams() as { slug?: string; projectId?: string };
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
 
-  const activeWorkspace = workspaces.find((w) => w.slug === params.slug);
+  const activeWorkspace = workspaces.find((w) => w.slug === params.slug) ?? workspaces[0];
   const wsBase = activeWorkspace ? `/workspace/${activeWorkspace.slug}` : "";
 
-  // Toggle on Ctrl/Cmd+K anywhere.
+  // Toggle on Ctrl/Cmd+K anywhere; also open on the shell's custom event
+  // (search box / Help button dispatch `vc:open-command`).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -55,8 +62,15 @@ export function CommandPalette({ workspaces }: Props) {
         setOpen((v) => !v);
       }
     }
+    function onOpen() {
+      setOpen(true);
+    }
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("vc:open-command", onOpen);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("vc:open-command", onOpen);
+    };
   }, []);
 
   // Load projects for the active workspace when the palette opens.
@@ -79,15 +93,20 @@ export function CommandPalette({ workspaces }: Props) {
   }, [open]);
 
   const commands = useMemo<Command[]>(() => {
-    const list: Command[] = [
-      { id: "home", label: "Home", icon: Home, href: "/dashboard", keywords: "dashboard" },
-    ];
+    const list: Command[] = [];
     if (activeWorkspace) {
       list.push(
-        { id: "mytasks", label: "My Tasks", icon: ListChecks, href: `${wsBase}/my-tasks` },
-        { id: "inbox", label: "Inbox", icon: Inbox, href: `${wsBase}/inbox`, keywords: "notifications" },
-        { id: "settings", label: "Members & Settings", icon: Settings, href: `${wsBase}/settings` }
+        { id: "home", label: t(locale, "sb.home"), icon: Home, href: wsBase, keywords: "home trang chu" },
+        { id: "mywork", label: t(locale, "sb.myWork"), icon: ListChecks, href: `${wsBase}/my-tasks`, keywords: "tasks viec cua toi" },
+        { id: "inbox", label: t(locale, "sb.inbox"), icon: Inbox, href: `${wsBase}/inbox`, keywords: "notifications hop thu" },
+        { id: "projects", label: t(locale, "sb.projects"), icon: Folder, href: `${wsBase}/projects`, keywords: "du an" },
+        { id: "docs", label: t(locale, "sb.docs"), icon: BookText, href: `${wsBase}/docs`, keywords: "tai lieu wiki" },
+        { id: "chat", label: t(locale, "sb.chat"), icon: MessagesSquare, href: `${wsBase}/chat`, keywords: "trao doi" },
+        { id: "dashboards", label: t(locale, "sb.dashboards"), icon: LayoutDashboard, href: `${wsBase}/dashboards`, keywords: "bao cao" },
+        { id: "settings", label: t(locale, "sb.settings"), icon: Settings, href: `${wsBase}/settings`, keywords: "cai dat members" }
       );
+    } else {
+      list.push({ id: "home", label: t(locale, "sb.home"), icon: Home, href: "/dashboard", keywords: "home" });
     }
 
     // Current project view jumps.
@@ -115,7 +134,7 @@ export function CommandPalette({ workspaces }: Props) {
       });
     }
     return list;
-  }, [activeWorkspace, wsBase, params.projectId, projects]);
+  }, [activeWorkspace, wsBase, params.projectId, projects, locale]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -167,7 +186,7 @@ export function CommandPalette({ workspaces }: Props) {
                 setActive(0);
               }}
               onKeyDown={onInputKeyDown}
-              placeholder="Search projects, jump to a view…"
+              placeholder={t(locale, "tb.search")}
               className="h-12 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
             <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">

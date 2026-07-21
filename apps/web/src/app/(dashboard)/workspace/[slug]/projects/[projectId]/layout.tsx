@@ -25,31 +25,31 @@ export default async function ProjectLayout({ children, params }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full min-h-screen bg-background text-foreground">
-      {/* Compact ClickUp-style breadcrumb row: Workspace / Projects / Name + status */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card/25 px-6 py-2.5">
+    <div className="flex flex-col h-full min-h-screen bg-canvas text-foreground">
+      {/* Context header: Workspace / Projects / Name + status (redesign §11.3) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-4 py-2.5">
         <nav className="flex min-w-0 items-center gap-1.5 text-[13px]">
           <Link
             href={`/workspace/${slug}/projects`}
-            className="shrink-0 font-medium text-muted-foreground transition-colors hover:text-foreground"
+            className="shrink-0 font-medium text-text-secondary transition-colors hover:text-foreground"
           >
             {workspace.name}
           </Link>
-          <span className="text-muted-foreground/50">/</span>
+          <span className="text-text-secondary/60">/</span>
           <Link
             href={`/workspace/${slug}/projects`}
-            className="shrink-0 font-medium text-muted-foreground transition-colors hover:text-foreground"
+            className="shrink-0 font-medium text-text-secondary transition-colors hover:text-foreground"
           >
             Projects
           </Link>
-          <span className="text-muted-foreground/50">/</span>
-          <span className="truncate font-semibold text-foreground">{project.name}</span>
-          <span className="ml-2 inline-flex shrink-0 items-center rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold capitalize text-primary">
+          <span className="text-text-secondary/60">/</span>
+          <span className="truncate text-[15px] font-semibold text-foreground">{project.name}</span>
+          <span className="ml-1 inline-flex shrink-0 items-center rounded-full border border-border-strong bg-surface-subtle px-2 py-0.5 text-[11px] font-semibold capitalize text-text-secondary">
             {project.status}
           </span>
         </nav>
         {project.description && (
-          <p className="hidden max-w-md truncate text-xs text-muted-foreground lg:block">
+          <p className="hidden max-w-md truncate text-xs text-text-secondary lg:block">
             {project.description}
           </p>
         )}

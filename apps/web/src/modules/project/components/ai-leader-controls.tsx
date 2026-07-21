@@ -39,7 +39,7 @@ export function AiLeaderBanner({ workspaceId, projectId, slug, aiEnabled }: Prop
   }
 
   return (
-    <div className="mb-6 overflow-hidden rounded-xl border border-fuchsia-500/30 bg-[linear-gradient(110deg,rgba(124,58,237,0.12),rgba(217,70,239,0.12),rgba(6,182,212,0.12))] p-5">
+    <div className="mb-6 overflow-hidden rounded-xl border border-ai/25 bg-ai/[0.06] p-5">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-start gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-fuchsia-500/15 text-fuchsia-500">

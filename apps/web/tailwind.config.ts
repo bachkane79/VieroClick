@@ -9,14 +9,33 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        border: "hsl(var(--border))",
+        border: {
+          DEFAULT: "hsl(var(--border))",
+          strong: "hsl(var(--border-strong))",
+        },
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
+        "focus-ring": "hsl(var(--focus-ring))",
         background: "hsl(var(--background))",
+        canvas: "hsl(var(--canvas))",
+        surface: {
+          DEFAULT: "hsl(var(--surface))",
+          subtle: "hsl(var(--surface-subtle))",
+          hover: "hsl(var(--surface-hover))",
+        },
         foreground: "hsl(var(--foreground))",
+        "text-secondary": "hsl(var(--text-secondary))",
+        "text-disabled": "hsl(var(--text-disabled))",
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          hover: "hsl(var(--primary-hover))",
+        },
+        success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
+        ai: {
+          DEFAULT: "hsl(var(--ai))",
+          foreground: "hsl(var(--ai-foreground))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -62,9 +81,8 @@ const config: Config = {
         sm: "calc(var(--radius) - 4px)",
       },
       boxShadow: {
-        soft: "rgba(15,15,15,0.012) 0 0.2px 1px, rgba(15,15,15,0.02) 0 1px 3px, rgba(15,15,15,0.028) 0 4px 12px",
-        elevated:
-          "rgba(15,15,15,0.02) 0 1px 3px, rgba(15,15,15,0.04) 0 8px 22px, rgba(15,15,15,0.05) 0 22px 48px",
+        soft: "rgba(16,24,40,0.03) 0 1px 2px, rgba(16,24,40,0.04) 0 2px 6px",
+        elevated: "rgba(16,24,40,0.06) 0 4px 12px, rgba(16,24,40,0.08) 0 12px 28px",
       },
       keyframes: {
         "fade-in": {

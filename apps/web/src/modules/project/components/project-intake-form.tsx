@@ -88,9 +88,7 @@ export function ProjectIntakeForm({ workspaceId, workspaceSlug, members }: Props
       <div
         className={cn(
           "relative overflow-hidden rounded-xl border p-5 transition-colors",
-          aiEnabled
-            ? "border-fuchsia-500/30 bg-[linear-gradient(110deg,rgba(124,58,237,0.10),rgba(217,70,239,0.10),rgba(6,182,212,0.10))]"
-            : "border-border bg-card"
+          aiEnabled ? "border-ai/25 bg-ai/[0.06]" : "border-border bg-card"
         )}
       >
         <div className="flex items-center justify-between gap-4">

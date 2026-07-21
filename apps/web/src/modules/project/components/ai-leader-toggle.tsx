@@ -13,8 +13,9 @@ interface Props {
 }
 
 /**
- * The headline "Sử dụng AI Leader" switch: a large gradient toggle with a
- * press/bounce animation. When on, the track shows an animated gradient + glow.
+ * The headline "Sử dụng AI Leader" switch. When on, the track carries the
+ * single AI classification colour (redesign §8.1) — a solid fill, no
+ * multi-colour gradient competing with the primary action colour.
  */
 export function AiLeaderToggle({ checked, onChange, disabled, size = "lg" }: Props) {
   const [pressed, setPressed] = useState(false);
@@ -33,9 +34,7 @@ export function AiLeaderToggle({ checked, onChange, disabled, size = "lg" }: Pro
       className={cn(
         "relative inline-flex shrink-0 items-center rounded-full transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-50",
         big ? "h-9 w-16 p-1" : "h-6 w-11 p-0.5",
-        checked
-          ? "bg-[linear-gradient(110deg,#7c3aed,#d946ef,#06b6d4)] bg-[length:200%_100%] shadow-[0_0_18px_rgba(217,70,239,0.55)] animate-[aileader-pan_3s_linear_infinite]"
-          : "bg-muted",
+        checked ? "bg-ai" : "bg-muted",
         pressed && "scale-95"
       )}
     >
@@ -49,12 +48,10 @@ export function AiLeaderToggle({ checked, onChange, disabled, size = "lg" }: Pro
         <Sparkles
           className={cn(
             big ? "h-3.5 w-3.5" : "h-3 w-3",
-            checked ? "text-fuchsia-500" : "text-muted-foreground/50"
+            checked ? "text-ai" : "text-muted-foreground/50"
           )}
         />
       </span>
-      {/* keyframes for the gradient pan */}
-      <style>{`@keyframes aileader-pan{0%{background-position:0% 50%}100%{background-position:200% 50%}}`}</style>
     </button>
   );
 }

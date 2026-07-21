@@ -61,10 +61,10 @@ const ESSENTIAL: ViewDef[] = [
   { key: "calendar", name: "", nameKey: "nav.calendar", path: "calendar", icon: CalendarDays },
   { key: "timeline", name: "Gantt", path: "timeline", icon: CalendarRange },
   { key: "table", name: "Table", path: "table", icon: Table2 },
+  { key: "dashboard", name: "Dashboard", path: "dashboard", icon: LayoutDashboard },
 ];
 
 const EXTRA: ViewDef[] = [
-  { key: "dashboard", name: "Dashboard", path: "dashboard", icon: LayoutDashboard },
   { key: "wbs", name: "WBS", path: "wbs", icon: Network },
   { key: "workload", name: "Workload", path: "workload", icon: Gauge },
   { key: "daily", name: "Daily Updates", path: "daily", icon: ClipboardList },
@@ -74,15 +74,10 @@ const EXTRA: ViewDef[] = [
   { key: "reports", name: "Reports", path: "reports", icon: TrendingUp },
   { key: "analytics", name: "Analytics", path: "analytics", icon: BarChart3 },
   { key: "team", name: "Team", path: "team", icon: Users },
+  // AI is a global entry (top bar); it stays reachable here as a normal view,
+  // but no longer competes as a highlighted tab (redesign §7.1).
+  { key: "ai", name: "AI Manager", path: "ai", icon: Sparkles },
 ];
-
-const AI_VIEW: ViewDef = {
-  key: "ai",
-  name: "AI Assistant",
-  path: "ai",
-  icon: Sparkles,
-  highlight: true,
-};
 
 function storageKey(projectId: string) {
   return `vc-pinned-views:${projectId}`;
@@ -128,12 +123,12 @@ export function ProjectNav({ slug, projectId }: Props) {
   const activeExtraKey = EXTRA.find((v) => isActive(v))?.key ?? null;
   const barViews = useMemo(() => {
     const pinnedViews = EXTRA.filter((v) => pinned.includes(v.key) || v.key === activeExtraKey);
-    return [...ESSENTIAL, ...pinnedViews, AI_VIEW];
+    return [...ESSENTIAL, ...pinnedViews];
   }, [pinned, activeExtraKey]);
 
   return (
-    <div className="sticky top-0 z-30 border-b border-border bg-card/70 px-6 backdrop-blur-md">
-      <div className="no-scrollbar flex items-center gap-0.5 overflow-x-auto scroll-smooth py-0.5">
+    <div className="sticky top-0 z-20 border-b border-border bg-surface px-4">
+      <div className="no-scrollbar flex items-center gap-0.5 overflow-x-auto scroll-smooth">
         {barViews.map((tab) => {
           const Icon = tab.icon;
           const active = isActive(tab);
@@ -143,37 +138,32 @@ export function ProjectNav({ slug, projectId }: Props) {
               href={`${base}/${tab.path}`}
               prefetch={true}
               className={cn(
-                "group relative flex h-10 items-center gap-1.5 whitespace-nowrap rounded-md px-3 text-[13px] font-medium transition-colors",
-                "hover:bg-secondary hover:text-foreground",
+                "group relative flex h-10 items-center gap-1.5 whitespace-nowrap px-3 text-[13px] font-medium transition-colors",
                 active
                   ? "font-semibold text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
+                  : "text-text-secondary hover:text-foreground"
               )}
             >
               <Icon
-                className={cn(
-                  "h-3.5 w-3.5 shrink-0",
-                  active ? "text-primary" : tab.highlight && "text-lavender"
-                )}
+                className={cn("h-3.5 w-3.5 shrink-0", active ? "text-primary" : "text-text-secondary")}
               />
               <span>
                 {"nameKey" in tab && tab.nameKey ? t(locale, tab.nameKey as MessageKey) : tab.name}
               </span>
-              {tab.highlight && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-lavender" />}
               {active && (
-                <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-primary" />
+                <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary" />
               )}
             </Link>
           );
         })}
 
-        {/* Thêm view */}
+        {/* Add view */}
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
             <button
               className={cn(
-                "flex h-10 items-center gap-1.5 whitespace-nowrap rounded-md px-3 text-[13px] font-medium text-muted-foreground transition-colors",
-                "hover:bg-secondary hover:text-foreground"
+                "flex h-10 items-center gap-1.5 whitespace-nowrap rounded-md px-3 text-[13px] font-medium text-text-secondary transition-colors",
+                "hover:bg-surface-hover hover:text-foreground"
               )}
             >
               <Plus className="h-3.5 w-3.5" />
