@@ -11,6 +11,7 @@ import { useViewPrefs } from "./use-view-prefs";
 import { ViewControls } from "./view-controls";
 import type { MemberOptionView, TaskDependencyView, TaskStatusView, TaskView } from "../task.view";
 import type { TaskAttachmentView } from "@/modules/file/file.view";
+import { useLocale } from "@/lib/i18n/client";
 
 interface Props {
   workspaceId: string;
@@ -24,7 +25,10 @@ interface Props {
   phases: PhaseNode[];
 }
 
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const WEEKDAYS = {
+  vi: ["T2", "T3", "T4", "T5", "T6", "T7", "CN"],
+  en: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+};
 
 function ymd(date: Date): string {
   const y = date.getFullYear();
@@ -44,6 +48,7 @@ export function CalendarViewClient({
   attachments,
   phases,
 }: Props) {
+  const locale = useLocale();
   const { effectiveTasks } = useOptimisticTasks(tasks);
   const api = useViewPrefs(projectId, "none");
   const { prefs } = api;
@@ -94,9 +99,10 @@ export function CalendarViewClient({
     return grid;
   }, [cursor]);
 
-  const monthLabel = new Intl.DateTimeFormat("en", { month: "long", year: "numeric" }).format(
-    new Date(cursor.year, cursor.month, 1)
-  );
+  const monthLabel = new Intl.DateTimeFormat(locale === "vi" ? "vi-VN" : "en", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(cursor.year, cursor.month, 1));
   const todayStr = ymd(now);
 
   function shiftMonth(delta: number) {
@@ -117,11 +123,25 @@ export function CalendarViewClient({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <ViewControls api={api} statuses={statuses} members={members} showGroupBy={false} />
           <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" size="icon" className="h-8 w-8" onClick={() => shiftMonth(-1)} aria-label="Previous month">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => shiftMonth(-1)}
+              aria-label={locale === "vi" ? "Tháng trước" : "Previous month"}
+            >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <span className="min-w-[140px] text-center text-sm font-semibold">{monthLabel}</span>
-            <Button type="button" variant="outline" size="icon" className="h-8 w-8" onClick={() => shiftMonth(1)} aria-label="Next month">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => shiftMonth(1)}
+              aria-label={locale === "vi" ? "Tháng sau" : "Next month"}
+            >
               <ChevronRight className="h-4 w-4" />
             </Button>
             <Button
@@ -131,14 +151,14 @@ export function CalendarViewClient({
               className="h-8"
               onClick={() => setCursor({ year: now.getFullYear(), month: now.getMonth() })}
             >
-              Today
+              {locale === "vi" ? "Hôm nay" : "Today"}
             </Button>
           </div>
         </div>
 
         <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
           <div className="grid grid-cols-7 border-b bg-muted/40 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {WEEKDAYS.map((d) => (
+            {WEEKDAYS[locale].map((d) => (
               <div key={d} className="px-2 py-1.5 text-center">
                 {d}
               </div>
@@ -196,7 +216,7 @@ export function CalendarViewClient({
                     })}
                     {dayTasks.length > 4 && (
                       <p className="px-1 text-[10px] text-muted-foreground">
-                        +{dayTasks.length - 4} more
+                        +{dayTasks.length - 4} {locale === "vi" ? "việc" : "more"}
                       </p>
                     )}
                   </div>
@@ -209,7 +229,7 @@ export function CalendarViewClient({
         {undated.length > 0 && (
           <div className="rounded-lg border bg-card p-3 shadow-sm">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              No due date ({undated.length})
+              {locale === "vi" ? "Chưa có hạn" : "No due date"} ({undated.length})
             </p>
             <div className="flex flex-wrap gap-2">
               {undated.map((task) => {

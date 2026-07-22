@@ -9,13 +9,14 @@ import {
   removeMemberAction,
 } from "@/modules/workspace/workspace.actions";
 import { Button } from "@vieroc/ui";
+import type { WorkspaceRole } from "@vieroc/types";
 import { toast } from "sonner";
 import { UserPlus, Trash2, Shield, Save, Mail, Calendar, User } from "lucide-react";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 interface Member {
   id: string;
-  role: "owner" | "admin" | "leader" | "member" | "viewer";
+  role: WorkspaceRole;
   title: string | null;
   department: string | null;
   joinedAt: Date;
@@ -125,7 +126,7 @@ export function WorkspaceSettingsForm({ workspace, initialMembers }: Props) {
     }
   };
 
-  const handleRoleChange = async (memberId: string, role: "owner" | "admin" | "leader" | "member" | "viewer") => {
+  const handleRoleChange = async (memberId: string, role: WorkspaceRole) => {
     setUpdatingMemberId(memberId);
     try {
       const res = await updateMemberRoleAction({

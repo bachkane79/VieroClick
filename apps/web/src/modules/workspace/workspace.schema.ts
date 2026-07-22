@@ -8,7 +8,7 @@ export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceSchema>;
 
 export const inviteMemberSchema = z.object({
   email: z.string().email(),
-  role: z.enum(["owner", "admin", "leader", "member", "viewer"]),
+  role: z.enum(["owner", "admin", "leader", "member", "viewer", "guest"]),
 });
 
 export type InviteMemberInput = z.infer<typeof inviteMemberSchema>;

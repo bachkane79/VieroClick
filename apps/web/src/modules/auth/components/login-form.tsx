@@ -4,7 +4,10 @@ import { signIn } from "next-auth/react";
 import { useState } from "react";
 
 interface Props {
-  /** Render the passwordless dev-bypass form (never in production). */
+  /**
+   * Show the email sign-in / sign-up form. It creates a real account in the DB
+   * (passwordless), so it is gated off in production unless ALLOW_DEV_BYPASS.
+   */
   showDevBypass?: boolean;
 }
 
@@ -92,7 +95,7 @@ export function LoginForm({ showDevBypass = false }: Props) {
           <div className="w-full border-t border-input"></div>
         </div>
         <span className="relative px-3 text-xs uppercase tracking-wider text-muted-foreground bg-background">
-          or developer bypass
+          hoặc đăng nhập bằng email
         </span>
       </div>
 
@@ -137,10 +140,10 @@ export function LoginForm({ showDevBypass = false }: Props) {
           {loading === "credentials" ? (
             <span className="flex items-center gap-2">
               <span className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-              Signing in...
+              Đang đăng nhập...
             </span>
           ) : (
-            "Enter Workspace Sandbox"
+            "Đăng nhập / Tạo tài khoản"
           )}
         </button>
       </form>

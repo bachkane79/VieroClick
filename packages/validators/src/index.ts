@@ -6,39 +6,73 @@ import {
 } from "./task-core";
 import { agentAutonomySchema } from "./agent-payloads";
 
+/** Normalize user-authored text before validation and persistence.
+ * NFC keeps Vietnamese diacritics byte-stable across forms, search and views.
+ */
+const nfc = (value: unknown) => (typeof value === "string" ? value.normalize("NFC") : value);
+const nfcText = (schema: z.ZodString) => z.preprocess(nfc, schema);
+
 export * from "./task-core";
 export * from "./agent-payloads";
 
 // ─── Workspace ───────────────────────────────────────────────────────────────
 
+export const workspaceKindSchema = z.enum(["personal", "team"]);
+
 export const createWorkspaceSchema = z.object({
-  name: z.string().min(1).max(100),
+  name: nfcText(z.string().trim().min(1).max(100)),
   slug: z
     .string()
     .min(1)
     .max(50)
     .regex(/^[a-z0-9-]+$/, "Slug must be lowercase letters, numbers, and hyphens only"),
+  kind: workspaceKindSchema.default("personal"),
 });
 
 export const updateWorkspaceSchema = createWorkspaceSchema.partial();
+
+// ─── Onboarding ───────────────────────────────────────────────────────────────
+// The first-run wizard: mode (personal/team) + a starter template (or the AI
+// path) + a name, optionally inviting teammates. One action creates the
+// workspace, its first project, seeds the template tasks and marks onboarding
+// done. Template ids mirror modules/onboarding/templates.ts.
+export const onboardingTemplateSchema = z.enum([
+  "personal-planning",
+  "study",
+  "freelance-client",
+  "small-team-project",
+  "blank",
+  "ai-generated",
+]);
+
+export const completeOnboardingSchema = z.object({
+  mode: workspaceKindSchema,
+  template: onboardingTemplateSchema,
+  workspaceName: nfcText(z.string().trim().min(1).max(100)),
+  projectName: nfcText(z.string().trim().min(1).max(200)),
+  // AI path only: the free-text project description the planner works from.
+  aiPrompt: nfcText(z.string().max(2000)).optional(),
+  // Team mode only: emails to invite (optional, skippable).
+  invites: z.array(z.string().email()).max(50).default([]),
+});
 
 // ─── Project ──────────────────────────────────────────────────────────────────
 
 export const projectStatusSchema = z.enum(["draft", "active", "paused", "completed", "archived"]);
 
 export const createProjectSchema = z.object({
-  name: z.string().min(1).max(200),
-  description: z.string().optional(),
-  scope: z.string().optional(),
+  name: nfcText(z.string().trim().min(1).max(200)),
+  description: nfcText(z.string()).optional(),
+  scope: nfcText(z.string()).optional(),
   status: projectStatusSchema.default("draft"),
   leadMemberId: z.string().uuid().optional(),
   startDate: z.string().date().optional(),
   targetEndDate: z.string().date().optional(),
-  goals: z.array(z.string()).default([]),
-  constraints: z.array(z.string()).default([]),
-  expectedDeliverables: z.array(z.string()).default([]),
+  goals: z.array(nfcText(z.string())).default([]),
+  constraints: z.array(nfcText(z.string())).default([]),
+  expectedDeliverables: z.array(nfcText(z.string())).default([]),
   memberIds: z.array(z.string().uuid()).default([]),
-  initialContext: z.string().optional(),
+  initialContext: nfcText(z.string()).optional(),
   // AI Leader master switch chosen at creation. When false, the project is
   // created for manual work and no planning agent is dispatched.
   aiEnabled: z.boolean().default(true),
@@ -55,8 +89,8 @@ export const updateProjectSchema = createProjectSchema.partial().extend({
 // live in ./task-core (shared with ./agent-payloads) and are re-exported above.
 
 export const createTaskSchema = z.object({
-  title: z.string().min(1).max(500),
-  description: z.string().optional(),
+  title: nfcText(z.string().trim().min(1).max(500)),
+  description: nfcText(z.string()).optional(),
   statusId: z.string().uuid(),
   priority: taskPrioritySchema.default("medium"),
   assigneeMemberId: z.string().uuid().nullable().optional(),
@@ -67,10 +101,10 @@ export const createTaskSchema = z.object({
   dueDate: z.string().date().optional(),
   estimateHours: z.number().min(0).optional(),
   acceptanceCriteria: taskAcceptanceCriteriaSchema,
-  labels: z.array(z.string()).default([]),
+  labels: z.array(nfcText(z.string())).default([]),
   position: z.number().int().min(0).default(0),
   isMilestone: z.boolean().default(false),
-  blockerReason: z.string().optional(),
+  blockerReason: nfcText(z.string()).optional(),
   allowBlockedOverride: z.boolean().default(false),
 });
 
@@ -81,7 +115,7 @@ export const updateTaskSchema = createTaskSchema.partial().extend({
 
 export const reviewTaskSchema = z.object({
   decision: z.enum(["approve", "rework"]),
-  feedback: z.string().max(2000).optional(),
+  feedback: nfcText(z.string().max(2000)).optional(),
   actualHours: z.number().min(0).max(100000).nullable().optional(),
 });
 
@@ -104,7 +138,7 @@ export const taskStatusTypeSchema = z.enum([
 ]);
 
 export const createTaskStatusSchema = z.object({
-  name: z.string().min(1).max(100),
+  name: nfcText(z.string().trim().min(1).max(100)),
   type: taskStatusTypeSchema,
   position: z.number().int().min(0).default(0),
   isDefault: z.boolean().default(false),
@@ -128,7 +162,7 @@ export const commentMetadataSchema = z
   .passthrough();
 
 export const createCommentSchema = z.object({
-  body: z.string().min(1),
+  body: nfcText(z.string().trim().min(1)),
   // Threaded reply target (null/omitted = top-level comment).
   parentCommentId: z.string().uuid().nullable().optional(),
   metadata: commentMetadataSchema.default({ links: [] }),
@@ -176,9 +210,9 @@ export const projectDocTypeSchema = z.enum([
 ]);
 
 export const createProjectDocSchema = z.object({
-  title: z.string().min(1).max(300),
+  title: nfcText(z.string().trim().min(1).max(300)),
   type: projectDocTypeSchema.default("other"),
-  content: z.string().min(1),
+  content: nfcText(z.string().min(1)),
 });
 
 export const updateProjectDocSchema = createProjectDocSchema.partial();
@@ -223,12 +257,7 @@ export const updateMemberProfileSchema = z.object({
 
 // Async job types dispatched to agent-api's Celery queue via POST /api/jobs/.
 // MUST match the task_map keys in apps/agent-api/app/api/routes/jobs.py.
-export const agentJobTypeSchema = z.enum([
-  "daily_report",
-  "task_assignment",
-  "risk_scan",
-  "qa",
-]);
+export const agentJobTypeSchema = z.enum(["daily_report", "task_assignment", "risk_scan", "qa"]);
 
 // Interactive agent roles dispatched synchronously via POST /api/agents/{role}.
 // MUST match AGENT_RUNNERS in apps/agent-api/app/agents/roles/__init__.py.
@@ -264,6 +293,9 @@ export const paginationSchema = z.object({
 });
 
 export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>;
+export type WorkspaceKind = z.infer<typeof workspaceKindSchema>;
+export type OnboardingTemplate = z.infer<typeof onboardingTemplateSchema>;
+export type CompleteOnboardingInput = z.infer<typeof completeOnboardingSchema>;
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type AcceptanceCriterionInput = z.infer<typeof acceptanceCriterionSchema>;

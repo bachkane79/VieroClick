@@ -127,7 +127,7 @@ export function TaskList({
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <ViewControls api={api} statuses={statuses} members={members} />
-          <Button type="button" className="gap-2" onClick={() => openTask(null)}>
+          <Button type="button" className="h-8 gap-2" onClick={() => openTask(null)}>
             <Plus className="h-4 w-4" />
             New task
           </Button>
@@ -276,7 +276,8 @@ function GroupSection({
               const assignees = task.assigneeMemberIds
                 .map((id) => memberById.get(id))
                 .filter((m): m is MemberOptionView => Boolean(m));
-              const rowColor = colors ?? statusColor(statuses.find((s) => s.id === task.statusId)?.type);
+              const rowColor =
+                colors ?? statusColor(statuses.find((s) => s.id === task.statusId)?.type);
               return (
                 <div
                   key={task.id}

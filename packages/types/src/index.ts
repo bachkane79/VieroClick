@@ -1,5 +1,7 @@
 // Enums
-export type WorkspaceRole = "owner" | "admin" | "leader" | "member" | "viewer";
+export type WorkspaceRole = "owner" | "admin" | "leader" | "member" | "viewer" | "guest";
+// Fine-grained per-item access levels (§4.2), weakest → strongest.
+export type PermissionLevel = "view" | "comment" | "edit" | "full";
 export type ProjectRole = "project_lead" | "tech_lead" | "member" | "reviewer" | "stakeholder";
 export type ProjectStatus = "draft" | "active" | "paused" | "completed" | "archived";
 export type TaskStatusType =

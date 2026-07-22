@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "@/styles/globals.css";
 import { Toaster } from "sonner";
+import { getLocale } from "@/lib/i18n/server";
 
 const inter = Inter({
-  subsets: ["latin"],
+  subsets: ["latin", "vietnamese"],
   variable: "--font-sans",
   display: "swap",
 });
@@ -19,17 +20,18 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const locale = await getLocale();
+
   return (
-    <html lang="en" suppressHydrationWarning className={inter.variable}>
+    <html lang={locale} suppressHydrationWarning className={inter.variable}>
       <body className={`${inter.className} min-h-screen antialiased`}>
         {children}
         <Toaster
           position="top-right"
           toastOptions={{
             classNames: {
-              toast:
-                "rounded-xl border border-border bg-card text-card-foreground shadow-elevated",
+              toast: "rounded-xl border border-border bg-card text-card-foreground shadow-elevated",
             },
           }}
         />

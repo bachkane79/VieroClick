@@ -2,11 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { buttonVariants, cn } from "@vieroc/ui";
 import {
-  AlertOctagon,
+  Activity,
   CalendarClock,
   CheckCircle2,
-  CircleDot,
+  Circle,
+  Flag,
   FolderKanban,
+  Layers,
   Plus,
 } from "lucide-react";
 import { getWorkspace, listWorkspaceMembers } from "@/modules/workspace/workspace.service";
@@ -18,9 +20,11 @@ import {
 import { listMyTasks } from "@/modules/task/task.service";
 import { listWorkspacePosts } from "@/modules/workspace-post/workspace-post.service";
 import { AnnouncementsPanel } from "@/modules/workspace-post/components/announcements-panel";
+import { QuickCreate } from "@/modules/task/components/quick-create";
 import { requireActor } from "@/server/lib/context";
+import { getLocale } from "@/lib/i18n/server";
+import { t, type Locale } from "@/lib/i18n/dict";
 import { memberInitials } from "@/modules/task/status-colors";
-import { Activity } from "lucide-react";
 import { NotFoundError } from "@/server/lib/errors";
 
 interface Props {
@@ -29,9 +33,9 @@ interface Props {
 
 const PROJECT_STATUS_BADGE: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
-  active: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  paused: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  completed: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+  active: "bg-mint-soft text-mint",
+  paused: "bg-peach-soft text-peach",
+  completed: "bg-sky-soft text-sky",
   archived: "bg-muted text-muted-foreground",
 };
 
@@ -56,92 +60,128 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
     requireActor(workspace.id),
   ]);
 
+  const locale = await getLocale();
   const canManage = ["owner", "admin", "leader"].includes(ctx.workspaceRole);
+  const myName =
+    members.find((m) => m.id === ctx.workspaceMemberId)?.fullName?.split(" ").slice(-1)[0] ?? "bạn";
 
   const todayStr = new Date().toISOString().split("T")[0]!;
+  const soonStr = new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0]!;
   const isOpen = (t: (typeof myTasks)[number]) =>
     t.statusType !== "done" && t.statusType !== "cancelled";
 
-  // Personal statistics across the workspace.
   const myOpen = myTasks.filter(isOpen).length;
   const myInReview = myTasks.filter((t) => t.statusType === "in_review").length;
   const myDone = myTasks.filter((t) => t.statusType === "done").length;
-  const myOverdue = myTasks.filter(
-    (t) => isOpen(t) && t.dueDate && t.dueDate < todayStr
-  ).length;
+  const myOverdue = myTasks.filter((t) => isOpen(t) && t.dueDate && t.dueDate < todayStr).length;
 
-  // Workspace-wide rollups.
-  let wsTotal = 0;
-  let wsDone = 0;
+  // "Today & upcoming" = my open tasks that are overdue or due within 7 days.
+  const soon = myTasks
+    .filter((t) => isOpen(t) && t.dueDate && t.dueDate <= soonStr)
+    .sort((a, b) => (a.dueDate! < b.dueDate! ? -1 : 1))
+    .slice(0, 6);
+
   let wsBlocked = 0;
-  for (const s of stats.values()) {
-    wsTotal += s.total;
-    wsDone += s.done;
-    wsBlocked += s.blocked;
-  }
+  for (const s of stats.values()) wsBlocked += s.blocked;
   const activeCount = projects.filter((p) => p.status === "active").length;
 
   return (
-    <div className="px-6 py-6">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <div className="mx-auto max-w-[1080px] px-6 py-8">
+      {/* Greeting */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-primary">Team Hub</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight">{workspace.name}</h1>
-          <div className="mt-2 flex items-center gap-2">
-            <div className="flex -space-x-1.5">
-              {members.slice(0, 6).map((m) => (
-                <span
-                  key={m.id}
-                  title={m.fullName}
-                  className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-[9px] font-semibold text-primary ring-2 ring-background"
-                >
-                  {memberInitials(m.fullName)}
-                </span>
-              ))}
-            </div>
-            <span className="text-xs text-muted-foreground">{members.length} thành viên</span>
-          </div>
+          <h1 className="text-[30px] font-bold tracking-tight">
+            {t(locale, "home.greeting", { name: myName })}
+          </h1>
+          <p className="mt-1.5 text-[15px] text-muted-foreground">
+            {workspace.name} · {t(locale, "home.members", { n: members.length })}
+          </p>
         </div>
         <Link href={`/workspace/${slug}/projects/new`} className={cn(buttonVariants(), "gap-2")}>
           <Plus className="h-4 w-4" />
-          New project
+          {t(locale, "home.newProject")}
         </Link>
       </div>
 
-      {/* Personal statistics */}
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-        <CircleDot className="h-4 w-4" />
-        Your work
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="My open tasks" value={myOpen} icon={<FolderKanban className="h-4 w-4" />} />
-        <Kpi label="In review" value={myInReview} icon={<CalendarClock className="h-4 w-4" />} />
-        <Kpi
-          label="Overdue"
-          value={myOverdue}
-          icon={<AlertOctagon className="h-4 w-4" />}
-          tone={myOverdue > 0 ? "danger" : "default"}
-        />
-        <Kpi label="Completed" value={myDone} icon={<CheckCircle2 className="h-4 w-4" />} tone="success" />
+      {/* Stat tiles */}
+      <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat label={t(locale, "home.stat.open")} value={myOpen} accent="sky" />
+        <Stat label={t(locale, "home.stat.review")} value={myInReview} accent="peach" />
+        <Stat label={t(locale, "home.stat.overdue")} value={myOverdue} accent={myOverdue > 0 ? "coral" : "muted"} />
+        <Stat label={t(locale, "home.stat.done")} value={myDone} accent="mint" />
       </div>
 
-      {/* Workspace rollups */}
-      <div className="mb-3 mt-8 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-        <FolderKanban className="h-4 w-4" />
-        Workspace
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Projects" value={projects.length} />
-        <Kpi label="Active" value={activeCount} />
-        <Kpi label="Open tasks" value={wsTotal - wsDone} />
-        <Kpi
-          label="Blocked"
-          value={wsBlocked}
-          tone={wsBlocked > 0 ? "danger" : "default"}
-        />
-      </div>
+      {/* Today & upcoming */}
+      <section className="mt-8">
+        <div className="mb-3 flex items-center gap-2.5">
+          <CalendarClock className="h-4 w-4 text-peach" />
+          <h2 className="text-base font-bold">{t(locale, "home.today")}</h2>
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">
+            {soon.length}
+          </span>
+        </div>
+        <div className="overflow-hidden rounded-lg border bg-card shadow-soft">
+          <QuickCreate
+            workspaceId={workspace.id}
+            slug={slug}
+            projects={projects.map((p) => ({ id: p.id, name: p.name }))}
+          />
+          {soon.length === 0 ? (
+            <div className="px-5 py-10 text-center">
+              <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-secondary text-muted-foreground">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+              <h3 className="text-[15px] font-semibold">{t(locale, "home.empty.title")}</h3>
+              <p className="mx-auto mt-1 max-w-sm text-[13px] text-muted-foreground">
+                {t(locale, "home.empty.sub")}
+              </p>
+            </div>
+          ) : (
+            soon.map((task) => {
+              const due = dueMeta(task.dueDate!, todayStr, locale);
+              return (
+                <Link
+                  key={task.id}
+                  href={`/workspace/${slug}/projects/${task.projectId}/tasks`}
+                  className="flex items-center gap-3 border-b px-4 py-3 transition-colors last:border-b-0 hover:bg-secondary/60"
+                >
+                  <Circle className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{task.title}</span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    {(task.priority === "high" || task.priority === "urgent") && (
+                      <span className="rounded-full bg-coral-soft px-2 py-0.5 text-[11px] font-semibold text-coral">
+                        <Flag className="mr-1 inline h-3 w-3" />
+                        {task.priority === "urgent"
+                          ? locale === "vi"
+                            ? "Gấp"
+                            : "Urgent"
+                          : t(locale, "qc.prio.high")}
+                      </span>
+                    )}
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums",
+                        due.tone === "over"
+                          ? "bg-coral-soft text-coral"
+                          : due.tone === "soon"
+                            ? "bg-peach-soft text-peach"
+                            : "bg-secondary text-muted-foreground"
+                      )}
+                    >
+                      {due.label}
+                    </span>
+                    <span className="hidden max-w-[140px] truncate text-xs text-muted-foreground sm:inline">
+                      {task.projectName}
+                    </span>
+                  </span>
+                </Link>
+              );
+            })
+          )}
+        </div>
+      </section>
 
-      {/* Team Hub — announcements + activity feed */}
+      {/* Lower grid: announcements + activity/rollup */}
       <div className="mt-8 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <AnnouncementsPanel
           workspaceId={workspace.id}
@@ -158,13 +198,15 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
           currentMemberId={ctx.workspaceMemberId}
         />
 
-        <div className="rounded-lg border bg-card p-4 shadow-sm">
-          <h2 className="mb-3 flex items-center gap-2 text-base font-semibold">
-            <Activity className="h-4 w-4 text-primary" />
-            Recent activity
+        <div className="rounded-lg border bg-card p-4 shadow-soft">
+          <h2 className="mb-3 flex items-center gap-2 text-base font-bold">
+            <Activity className="h-4 w-4 text-lavender" />
+            {t(locale, "home.activity")}
           </h2>
           {activity.length === 0 ? (
-            <p className="py-4 text-center text-xs text-muted-foreground">No activity yet.</p>
+            <p className="py-4 text-center text-xs text-muted-foreground">
+              {t(locale, "home.activity.empty")}
+            </p>
           ) : (
             <ul className="space-y-2.5">
               {activity.map((a) => (
@@ -173,8 +215,8 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
                     className={cn(
                       "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold",
                       a.actorType === "human"
-                        ? "bg-primary/10 text-primary"
-                        : "bg-fuchsia-500/10 text-fuchsia-500"
+                        ? "bg-peach-soft text-peach"
+                        : "bg-lavender-soft text-lavender"
                     )}
                   >
                     {a.actorType === "human" ? memberInitials(a.actorName ?? "?") : "AI"}
@@ -189,34 +231,40 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
                         <span className="text-muted-foreground"> · {a.projectName}</span>
                       )}
                     </p>
-                    <p className="text-[10px] text-muted-foreground">{relTime(a.createdAt)}</p>
+                    <p className="text-[10px] text-muted-foreground">{relTime(a.createdAt, locale)}</p>
                   </div>
                 </li>
               ))}
             </ul>
           )}
+          <div className="mt-4 grid grid-cols-3 gap-2 border-t pt-3 text-center">
+            <MiniStat label={t(locale, "home.mini.projects")} value={projects.length} />
+            <MiniStat label={t(locale, "home.mini.active")} value={activeCount} />
+            <MiniStat label={t(locale, "home.mini.blocked")} value={wsBlocked} danger={wsBlocked > 0} />
+          </div>
         </div>
       </div>
 
-      {/* Projects health */}
+      {/* Projects */}
       <div className="mb-3 mt-8 flex items-center justify-between">
-        <h2 className="text-base font-semibold">Projects</h2>
+        <h2 className="flex items-center gap-2 text-base font-bold">
+          <Layers className="h-4 w-4 text-sky" />
+          {t(locale, "home.projects")}
+        </h2>
         <Link
           href={`/workspace/${slug}/projects`}
           className="text-xs font-medium text-primary hover:underline"
         >
-          View all
+          {t(locale, "home.viewAll")}
         </Link>
       </div>
 
       {projects.length === 0 ? (
         <div className="rounded-lg border border-dashed p-10 text-center">
-          <h3 className="text-base font-semibold">No projects yet</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Create the first project intake for this workspace.
-          </p>
+          <h3 className="text-base font-semibold">{t(locale, "home.noProjects.title")}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">{t(locale, "home.noProjects.sub")}</p>
           <Link href={`/workspace/${slug}/projects/new`} className={cn(buttonVariants(), "mt-5")}>
-            Create project
+            {t(locale, "home.createProject")}
           </Link>
         </div>
       ) : (
@@ -228,16 +276,21 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
               <Link
                 key={project.id}
                 href={`/workspace/${slug}/projects/${project.id}/overview`}
-                className="rounded-lg border bg-card p-4 shadow-sm transition-colors hover:border-primary/50"
+                className="rounded-lg border bg-card p-4 shadow-soft transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-elevated"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold">{project.name}</p>
-                    {project.description && (
-                      <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                        {project.description}
-                      </p>
-                    )}
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-sky-soft text-sky">
+                      <FolderKanban className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{project.name}</p>
+                      {project.description && (
+                        <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                          {project.description}
+                        </p>
+                      )}
+                    </div>
                   </div>
                   <span
                     className={cn(
@@ -250,29 +303,32 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
                 </div>
 
                 <div className="mt-3 flex items-center gap-2">
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-secondary">
                     <div
-                      className={cn(
-                        "h-full rounded-full",
-                        pct === 100 ? "bg-green-500" : "bg-primary"
-                      )}
+                      className={cn("h-full rounded-full", pct === 100 ? "bg-mint" : "bg-primary")}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                  <span className="shrink-0 text-xs font-medium text-muted-foreground">{pct}%</span>
+                  <span className="shrink-0 text-xs font-medium text-muted-foreground tabular-nums">
+                    {pct}%
+                  </span>
                 </div>
 
                 <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-                  <span>
-                    {s.done}/{s.total} done
+                  <span className="tabular-nums">
+                    {s.done}/{s.total} {t(locale, "home.doneOf")}
                   </span>
                   {s.blocked > 0 && (
-                    <span className="text-red-500">{s.blocked} blocked</span>
+                    <span className="text-coral">{t(locale, "home.blockedN", { n: s.blocked })}</span>
                   )}
                   {s.overdue > 0 && (
-                    <span className="text-amber-600 dark:text-amber-400">{s.overdue} overdue</span>
+                    <span className="text-peach">{t(locale, "home.overdueN", { n: s.overdue })}</span>
                   )}
-                  {project.targetEndDate && <span className="ml-auto">Due {project.targetEndDate}</span>}
+                  {project.targetEndDate && (
+                    <span className="ml-auto">
+                      {t(locale, "home.dueAt", { d: project.targetEndDate })}
+                    </span>
+                  )}
                 </div>
               </Link>
             );
@@ -283,49 +339,70 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
   );
 }
 
+function dueMeta(
+  due: string,
+  today: string,
+  locale: Locale
+): { label: string; tone: "over" | "soon" | "plain" } {
+  const d = new Date(due + "T00:00:00");
+  const base = new Date(today + "T00:00:00");
+  const diff = Math.round((d.getTime() - base.getTime()) / 86400000);
+  if (diff < 0) return { label: t(locale, "due.overdue"), tone: "over" };
+  if (diff === 0) return { label: t(locale, "due.today"), tone: "soon" };
+  if (diff === 1) return { label: t(locale, "due.tomorrow"), tone: "soon" };
+  const label = new Intl.DateTimeFormat(locale === "vi" ? "vi" : "en", {
+    day: "numeric",
+    month: "short",
+  }).format(d);
+  return { label, tone: diff <= 3 ? "soon" : "plain" };
+}
+
 function humanizeEvent(eventType: string): string {
-  // "task.status_changed" → "changed task status"
   const [entity, ...rest] = eventType.split(".");
   const action = rest.join(".").replace(/_/g, " ");
   if (!action) return eventType.replace(/[._]/g, " ");
   return `${action} ${entity}`.trim();
 }
 
-function relTime(date: Date): string {
+function relTime(date: Date, locale: Locale): string {
   const diff = Math.round((Date.now() - new Date(date).getTime()) / 1000);
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(date));
+  const rtf = new Intl.RelativeTimeFormat(locale === "vi" ? "vi" : "en", { numeric: "auto" });
+  if (diff < 60) return rtf.format(0, "minute");
+  if (diff < 3600) return rtf.format(-Math.floor(diff / 60), "minute");
+  if (diff < 86400) return rtf.format(-Math.floor(diff / 3600), "hour");
+  if (diff < 604800) return rtf.format(-Math.floor(diff / 86400), "day");
+  return new Intl.DateTimeFormat(locale === "vi" ? "vi" : "en", {
+    month: "short",
+    day: "numeric",
+  }).format(new Date(date));
 }
 
-function Kpi({
-  label,
-  value,
-  icon,
-  tone = "default",
-}: {
-  label: string;
-  value: number;
-  icon?: React.ReactNode;
-  tone?: "default" | "danger" | "success";
-}) {
+const ACCENT: Record<string, string> = {
+  sky: "text-sky",
+  peach: "text-peach",
+  coral: "text-coral",
+  mint: "text-mint",
+  muted: "text-foreground",
+};
+
+function Stat({ label, value, accent }: { label: string; value: number; accent: string }) {
   return (
-    <div className="rounded-lg border bg-card p-4 shadow-sm">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-        {icon && <span className="text-muted-foreground/60">{icon}</span>}
-      </div>
-      <p
-        className={cn(
-          "mt-2 text-2xl font-bold",
-          tone === "danger" && value > 0 && "text-red-500",
-          tone === "success" && value > 0 && "text-green-600 dark:text-green-400"
-        )}
-      >
+    <div className="rounded-lg border bg-card p-4 shadow-soft">
+      <p className="text-xs font-semibold text-muted-foreground">{label}</p>
+      <p className={cn("mt-1 text-[26px] font-bold tracking-tight tabular-nums", ACCENT[accent])}>
         {value}
       </p>
+    </div>
+  );
+}
+
+function MiniStat({ label, value, danger }: { label: string; value: number; danger?: boolean }) {
+  return (
+    <div>
+      <p className={cn("text-lg font-bold tabular-nums", danger && value > 0 && "text-coral")}>
+        {value}
+      </p>
+      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
     </div>
   );
 }

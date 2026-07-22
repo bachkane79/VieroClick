@@ -1,0 +1,984 @@
+<style>
+:root{
+  --canvas:#faf9f7;--surface:#fff;--surface-2:#f5f3f0;--surface-3:#efece7;
+  --ink:#1c1a17;--ink-2:#57524b;--ink-muted:#8a837a;--hairline:#ebe8e3;
+  --primary:#ea6100;--primary-hover:#cc5500;--primary-soft:#fff1e6;--on-primary:#fff;
+  --coral:#ff6a5f;--coral-soft:#ffe9e6;--peach:#f59042;--peach-soft:#fff0e2;
+  --lav:#8b78e0;--lav-soft:#efeaff;--sky:#3f92e3;--sky-soft:#e6f1fd;--mint:#2ba86f;--mint-soft:#e2f5ec;
+  --good:#1aae39;--warn:#c47a00;--crit:#e5484d;--crit-soft:#fdeaea;
+  --grad:linear-gradient(150deg,#ff8a3d 0%,#ff6a5f 52%,#8b78e0 100%);
+  --shadow-sm:0 1px 2px rgba(28,26,23,.06),0 1px 3px rgba(28,26,23,.05);
+  --shadow-md:0 4px 12px rgba(28,26,23,.08),0 2px 4px rgba(28,26,23,.05);
+  --shadow-lg:0 12px 34px rgba(28,26,23,.14),0 4px 10px rgba(28,26,23,.08);
+  --r-sm:5px;--r-md:8px;--r-full:9999px;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Apple Color Emoji",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --canvas:#171512;--surface:#221f1a;--surface-2:#2a2620;--surface-3:#332e27;
+  --ink:#f7f4ee;--ink-2:#cbc4b9;--ink-muted:#948d82;--hairline:#37312a;
+  --primary:#ff8636;--primary-hover:#ff9a55;--primary-soft:#3a2413;--on-primary:#1c1206;
+  --coral:#ff8177;--coral-soft:#3a221f;--peach:#f5a463;--peach-soft:#382517;
+  --lav:#a794f2;--lav-soft:#241f38;--sky:#6aabee;--sky-soft:#16253a;--mint:#4cc088;--mint-soft:#15291f;
+  --good:#3fd15f;--warn:#e0a53a;--crit:#ff6b6f;--crit-soft:#3a1e1f;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.4);--shadow-md:0 4px 14px rgba(0,0,0,.45);--shadow-lg:0 16px 40px rgba(0,0,0,.55);
+}}
+:root[data-theme="light"]{
+  --canvas:#faf9f7;--surface:#fff;--surface-2:#f5f3f0;--surface-3:#efece7;
+  --ink:#1c1a17;--ink-2:#57524b;--ink-muted:#8a837a;--hairline:#ebe8e3;
+  --primary:#ea6100;--primary-hover:#cc5500;--primary-soft:#fff1e6;--on-primary:#fff;
+  --coral:#ff6a5f;--coral-soft:#ffe9e6;--peach:#f59042;--peach-soft:#fff0e2;
+  --lav:#8b78e0;--lav-soft:#efeaff;--sky:#3f92e3;--sky-soft:#e6f1fd;--mint:#2ba86f;--mint-soft:#e2f5ec;
+  --good:#1aae39;--warn:#c47a00;--crit:#e5484d;--crit-soft:#fdeaea;
+  --shadow-sm:0 1px 2px rgba(28,26,23,.06),0 1px 3px rgba(28,26,23,.05);
+  --shadow-md:0 4px 12px rgba(28,26,23,.08),0 2px 4px rgba(28,26,23,.05);
+  --shadow-lg:0 12px 34px rgba(28,26,23,.14),0 4px 10px rgba(28,26,23,.08);
+}
+:root[data-theme="dark"]{
+  --canvas:#171512;--surface:#221f1a;--surface-2:#2a2620;--surface-3:#332e27;
+  --ink:#f7f4ee;--ink-2:#cbc4b9;--ink-muted:#948d82;--hairline:#37312a;
+  --primary:#ff8636;--primary-hover:#ff9a55;--primary-soft:#3a2413;--on-primary:#1c1206;
+  --coral:#ff8177;--coral-soft:#3a221f;--peach:#f5a463;--peach-soft:#382517;
+  --lav:#a794f2;--lav-soft:#241f38;--sky:#6aabee;--sky-soft:#16253a;--mint:#4cc088;--mint-soft:#15291f;
+  --good:#3fd15f;--warn:#e0a53a;--crit:#ff6b6f;--crit-soft:#3a1e1f;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.4);--shadow-md:0 4px 14px rgba(0,0,0,.45);--shadow-lg:0 16px 40px rgba(0,0,0,.55);
+}
+*{box-sizing:border-box}
+#app{font-family:var(--font);color:var(--ink);background:var(--canvas);min-height:100vh;-webkit-font-smoothing:antialiased;letter-spacing:-.01em;line-height:1.5;position:relative}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,textarea,select{font-family:inherit;color:inherit}
+h1,h2,h3,p{margin:0;text-wrap:balance}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:4px}
+.muted{color:var(--ink-muted)}.sec{color:var(--ink-2)}
+.tnum{font-variant-numeric:tabular-nums}
+.icn{width:16px;height:16px;display:inline-block;flex:none}.icn svg{width:100%;height:100%;display:block}
+
+.floaters{position:fixed;top:14px;right:14px;display:flex;gap:8px;z-index:60}
+.chipbtn{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:var(--r-full);background:var(--surface);border:1px solid var(--hairline);box-shadow:var(--shadow-sm);font-size:13px;font-weight:500;color:var(--ink-2);transition:.15s}
+.chipbtn:hover{color:var(--ink);border-color:var(--ink-muted)}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 20px;border-radius:var(--r-md);font-size:15px;font-weight:600;transition:.15s;white-space:nowrap}
+.btn.lg{height:50px;padding:0 26px;font-size:16px}.btn.sm{height:34px;padding:0 12px;font-size:13px;border-radius:var(--r-sm)}
+.btn-primary{background:var(--primary);color:var(--on-primary);box-shadow:var(--shadow-sm)}.btn-primary:hover{background:var(--primary-hover)}
+.btn-ghost{background:var(--surface-2);color:var(--ink-2)}.btn-ghost:hover{background:var(--surface-3);color:var(--ink)}
+.btn-outline{background:var(--surface);border:1px solid var(--hairline);color:var(--ink)}.btn-outline:hover{border-color:var(--ink-muted)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.linkish{color:var(--ink-muted);font-size:13px;font-weight:500;text-decoration:underline;text-underline-offset:3px}.linkish:hover{color:var(--ink-2)}
+
+/* split (signin/onboarding) */
+.split{display:grid;grid-template-columns:1.05fr 1fr;min-height:100vh}
+.split-brand{background:var(--grad);color:#fff;padding:48px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden}
+.bmark{font-size:20px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:10px;position:relative;z-index:2}
+.blogo{width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.22);display:grid;place-items:center;backdrop-filter:blur(4px)}
+.split-brand h1{font-size:40px;line-height:1.08;font-weight:800;letter-spacing:-.025em;max-width:12ch;position:relative;z-index:2}
+.split-brand .sub{font-size:17px;opacity:.92;max-width:34ch;margin-top:16px;position:relative;z-index:2}
+.brand-orb{position:absolute;border-radius:50%;filter:blur(2px);opacity:.35}
+.orb1{width:280px;height:280px;background:#ffd9a0;right:-70px;top:-60px}.orb2{width:200px;height:200px;background:#b9a7f0;left:-50px;bottom:40px;opacity:.4}
+.brand-foot{position:relative;z-index:2;display:flex;gap:20px;font-size:13px;opacity:.9;flex-wrap:wrap}.brand-foot span{display:flex;align-items:center;gap:7px}
+.split-main{display:flex;align-items:center;justify-content:center;padding:40px}.pane{width:100%;max-width:400px}
+.dots{display:flex;gap:6px;margin-bottom:28px}.dots i{height:5px;border-radius:3px;background:var(--hairline);flex:1;transition:.3s}.dots i.on{background:var(--primary)}
+.h-step{font-size:26px;font-weight:700;letter-spacing:-.02em}.p-step{color:var(--ink-2);margin-top:8px;font-size:15px}
+.choices{display:flex;flex-direction:column;gap:12px;margin-top:28px}
+.choice{display:flex;align-items:center;gap:16px;padding:18px;border-radius:var(--r-md);background:var(--surface);border:1.5px solid var(--hairline);text-align:left;transition:.15s;box-shadow:var(--shadow-sm)}
+.choice:hover{border-color:var(--primary);transform:translateY(-1px);box-shadow:var(--shadow-md)}
+.choice .ci{width:46px;height:46px;border-radius:11px;display:grid;place-items:center;flex:none;color:#fff}
+.choice h3{font-size:17px;font-weight:650}.choice p{font-size:13.5px;color:var(--ink-muted);margin-top:2px}.choice .arw{margin-left:auto;opacity:.4}
+.tpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:24px}
+.tpl{position:relative;text-align:left;border-radius:var(--r-md);background:var(--surface);border:1.5px solid var(--hairline);padding:15px;transition:.15s;box-shadow:var(--shadow-sm);overflow:hidden}
+.tpl:hover{border-color:var(--primary);transform:translateY(-2px);box-shadow:var(--shadow-md)}
+.tpl.ai{grid-column:1/-1;background-image:linear-gradient(135deg,var(--lav-soft),var(--peach-soft));border-color:transparent}
+.tpl .tico{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:#fff;margin-bottom:10px}
+.tpl h3{font-size:15px;font-weight:650}.tpl .td{font-size:12.5px;color:var(--ink-muted);margin-top:3px;line-height:1.4}
+.tpl .prev{margin-top:11px;display:flex;flex-direction:column;gap:4px}
+.tpl .prev .ph{font-size:10.5px;font-weight:600;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.05em}
+.tpl .prev .pt{font-size:12px;color:var(--ink-2);display:flex;align-items:center;gap:6px}
+.tpl .prev .pt .dot{width:11px;height:11px;border-radius:3px;border:1.5px solid var(--ink-muted);flex:none}
+.ai-badge{position:absolute;top:12px;right:12px;font-size:11px;font-weight:700;color:var(--lav)}
+.field{margin-top:18px}.field label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--ink-2)}
+.inp{width:100%;height:46px;padding:0 14px;border-radius:var(--r-md);background:var(--surface);border:1.5px solid var(--hairline);font-size:15px;transition:.15s}
+.inp:focus{border-color:var(--primary);outline:none}textarea.inp{height:auto;padding:12px 14px;resize:vertical;min-height:72px;line-height:1.5}
+.hint{font-size:12.5px;color:var(--ink-muted);margin-top:6px}
+.emailchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.echip{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border-radius:var(--r-full);padding:4px 6px 4px 10px;font-size:12.5px}
+.echip button{width:16px;height:16px;border-radius:50%;background:var(--surface-3);color:var(--ink-muted);display:grid;place-items:center;font-size:11px}
+.ai-build{margin-top:26px;display:flex;flex-direction:column;align-items:center;gap:16px;padding:28px;border-radius:var(--r-md);background:var(--lav-soft)}
+.ai-spinner{width:44px;height:44px;border-radius:50%;background:var(--grad);-webkit-mask:radial-gradient(farthest-side,transparent 58%,#000 60%);mask:radial-gradient(farthest-side,transparent 58%,#000 60%);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ai-draft-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--hairline);margin-top:7px;font-size:13.5px}
+.ai-draft-row .drm{margin-left:auto;color:var(--ink-muted)}
+.ai-phase-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--lav);margin:14px 0 2px}
+.invite-hero{width:64px;height:64px;border-radius:16px;background:var(--grad);display:grid;place-items:center;color:#fff;margin-bottom:20px}
+
+/* shell */
+.shell{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+.side{background:var(--grad);color:#fff;padding:14px;display:flex;flex-direction:column;gap:3px;position:relative}
+.side-ws{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--r-md);background:rgba(255,255,255,.16);cursor:pointer;transition:.15s}
+.side-ws:hover{background:rgba(255,255,255,.24)}
+.ws-ava{width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.28);display:grid;place-items:center;font-weight:800;font-size:14px;flex:none}
+.ws-name{font-weight:650;font-size:14px;line-height:1.15}.ws-kind{font-size:11px;opacity:.85}
+.side-sec{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.72;padding:14px 10px 5px}
+.nav-i{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:var(--r-sm);font-size:14px;font-weight:500;opacity:.92;transition:.12s;cursor:pointer}
+.nav-i:hover{background:rgba(255,255,255,.15);opacity:1}.nav-i.on{background:rgba(255,255,255,.22);opacity:1;font-weight:600}
+.nav-i .badge{margin-left:auto;background:rgba(255,255,255,.28);border-radius:var(--r-full);font-size:11px;padding:1px 7px;font-weight:700}
+.side-invite{margin-top:auto;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;border-radius:var(--r-md);background:rgba(255,255,255,.16);font-size:13px;font-weight:600;transition:.15s}
+.side-invite:hover{background:rgba(255,255,255,.26)}
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{min-height:58px;border-bottom:1px solid var(--hairline);background:var(--surface);display:flex;align-items:center;gap:14px;padding:0 22px;position:sticky;top:0;z-index:20}
+.hamb{display:none}
+.crumb{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink-2)}.crumb b{color:var(--ink);font-weight:650}.crumb .sep{opacity:.5}
+.searchbar{margin-left:8px;flex:1;max-width:340px;height:36px;border-radius:var(--r-md);background:var(--surface-2);display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--ink-muted);font-size:13.5px;cursor:text}
+.tb-actions{margin-left:auto;display:flex;align-items:center;gap:6px}
+.iconbtn{width:36px;height:36px;border-radius:var(--r-sm);display:grid;place-items:center;color:var(--ink-2);transition:.12s;position:relative}
+.iconbtn:hover{background:var(--surface-2);color:var(--ink)}
+.iconbtn .dotb{position:absolute;top:7px;right:7px;width:7px;height:7px;border-radius:50%;background:var(--coral);border:1.5px solid var(--surface)}
+.ava{width:30px;height:30px;border-radius:50%;background:var(--peach);color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px;flex:none}
+.content{padding:26px 30px 96px;max-width:1080px;width:100%;margin:0 auto}
+.content.wide{max-width:1240px}
+
+.offline-bar{background:var(--warn);color:#fff;font-size:13px;font-weight:600;padding:7px 22px;display:flex;align-items:center;gap:9px}
+.readonly-bar{background:var(--sky-soft);color:var(--sky);font-size:13px;font-weight:600;padding:7px 22px;display:flex;align-items:center;gap:9px;border-bottom:1px solid var(--hairline)}
+
+.hi{font-size:30px;font-weight:750;letter-spacing:-.025em}
+.hi.sm{font-size:24px}
+.wave{display:inline-block;animation:wave 2s ease-in-out 1}@keyframes wave{0%,100%{transform:rotate(0)}25%{transform:rotate(16deg)}75%{transform:rotate(-8deg)}}
+.subhi{color:var(--ink-2);margin-top:6px;font-size:15px}
+.nudge{margin-top:18px;display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--r-md);background:var(--primary-soft);border:1px solid color-mix(in srgb,var(--primary) 25%,transparent)}
+.nudge .pct{font-weight:700;color:var(--primary);font-size:13px;white-space:nowrap}
+.nudge-steps{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--ink-2)}
+.nudge-steps .s{display:flex;align-items:center;gap:6px}.nudge-steps .done{color:var(--ink-muted);text-decoration:line-through}
+.card{background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r-md);box-shadow:var(--shadow-sm);overflow:hidden}
+.block{margin-top:22px}
+.block-h{display:flex;align-items:center;gap:9px;margin-bottom:11px}
+.block-h h2{font-size:16px;font-weight:700}.block-h .ct{font-size:12px;color:var(--ink-muted);background:var(--surface-2);padding:1px 8px;border-radius:var(--r-full);font-weight:600}
+.vt{display:flex;gap:4px;background:var(--surface-2);border-radius:var(--r-full);padding:3px}
+.vt button{font-size:12.5px;font-weight:600;color:var(--ink-muted);padding:5px 12px;border-radius:var(--r-full);transition:.12s}.vt button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-sm)}
+.trow{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--hairline);transition:.1s;cursor:pointer}
+.trow:last-child{border-bottom:none}.trow:hover{background:var(--surface-2)}
+.check{width:19px;height:19px;border-radius:6px;border:1.8px solid var(--ink-muted);flex:none;display:grid;place-items:center;transition:.12s;color:transparent}
+.check:hover{border-color:var(--primary)}
+.trow.done .check{background:var(--good);border-color:var(--good);color:#fff}.trow.done .ttl{color:var(--ink-muted);text-decoration:line-through}
+.ttl{font-size:14px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tmeta{display:flex;align-items:center;gap:7px;flex:none}
+.pill{font-size:11px;font-weight:600;padding:2px 9px;border-radius:var(--r-full);white-space:nowrap}
+.pill.due{background:var(--surface-2);color:var(--ink-2)}.pill.due.over{background:var(--crit-soft);color:var(--crit)}.pill.due.soon{background:var(--peach-soft);color:var(--warn)}
+.pill.prio-high{background:var(--crit-soft);color:var(--crit)}.pill.prio-low{background:var(--sky-soft);color:var(--sky)}
+.pill.sample{background:var(--lav-soft);color:var(--lav)}
+.pill.ws{background:var(--surface-2);color:var(--ink-2)}
+.mini-ava{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:10.5px;font-weight:700;color:#fff;flex:none}
+.tag-phase{font-size:11px;font-weight:600;color:var(--ink-muted)}
+.phase-hd{padding:9px 14px 5px;display:flex;align-items:center;gap:7px;border-bottom:1px solid var(--hairline);background:var(--surface-2)}
+.qc{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--hairline);background:var(--surface-2)}
+.qc .plus{width:19px;height:19px;color:var(--primary);flex:none}
+.qc input{flex:1;background:none;border:none;font-size:14px;outline:none}.qc input::placeholder{color:var(--ink-muted)}
+.qc-preview{display:flex;gap:6px;padding:0 14px 10px;flex-wrap:wrap}.qc-preview:empty{display:none}
+.parse-chip{font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:var(--r-full);display:inline-flex;gap:5px;align-items:center}
+.coach{position:absolute;z-index:40;background:var(--ink);color:var(--canvas);padding:10px 13px;border-radius:var(--r-md);font-size:13px;font-weight:500;max-width:230px;box-shadow:var(--shadow-lg);line-height:1.4}
+.coach:after{content:"";position:absolute;top:-6px;left:26px;width:12px;height:12px;background:var(--ink);transform:rotate(45deg)}
+.coach button{margin-top:8px;font-size:12px;font-weight:700;color:var(--primary)}
+
+/* board */
+.board{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:20px}
+.col{background:var(--surface-2);border-radius:var(--r-md);padding:12px;min-height:200px}
+.col-h{display:flex;align-items:center;gap:8px;margin-bottom:11px;font-size:13px;font-weight:700}.col-h .cdot{width:9px;height:9px;border-radius:50%}.col-h .cc{margin-left:auto;color:var(--ink-muted);font-weight:600;font-size:12px}
+.bcard{background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r-sm);padding:11px 12px;box-shadow:var(--shadow-sm);margin-bottom:8px;cursor:pointer;transition:.12s}
+.bcard:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);border-color:var(--ink-muted)}
+.bcard .bt{font-size:13.5px;font-weight:550;line-height:1.35}.bcard .bm{display:flex;align-items:center;gap:6px;margin-top:9px;flex-wrap:wrap}
+.bcard .adv{margin-top:9px;font-size:11.5px;font-weight:600;color:var(--primary);display:inline-flex;align-items:center;gap:4px}
+
+/* overview */
+.ov-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
+.stat{background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r-md);padding:14px;box-shadow:var(--shadow-sm)}
+.stat .sv{font-size:26px;font-weight:750;letter-spacing:-.02em;margin-top:2px}.stat .sl{font-size:12px;color:var(--ink-muted);font-weight:600}
+.phase-prog{margin-top:10px;padding:14px}.pp-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--hairline)}.pp-row:last-child{border:none}
+.pp-name{font-size:13.5px;font-weight:600;width:150px;flex:none}.pp-bar{flex:1;height:8px;border-radius:4px;background:var(--surface-3);overflow:hidden}.pp-bar i{display:block;height:100%;background:var(--mint);border-radius:4px}
+.pp-meta{font-size:12px;color:var(--ink-muted);width:120px;text-align:right;flex:none}
+
+/* generic list rows / projects / docs / members */
+.lrow{display:flex;align-items:center;gap:13px;padding:13px 15px;border-bottom:1px solid var(--hairline);cursor:pointer;transition:.1s}.lrow:last-child{border:none}.lrow:hover{background:var(--surface-2)}
+.lrow .li{width:38px;height:38px;border-radius:9px;display:grid;place-items:center;color:#fff;flex:none}
+.lrow h3{font-size:14.5px;font-weight:600}.lrow p{font-size:12.5px;color:var(--ink-muted);margin-top:1px}
+.lrow .lr{margin-left:auto;display:flex;align-items:center;gap:10px}
+.role-sel{height:30px;border-radius:var(--r-sm);border:1px solid var(--hairline);background:var(--surface);font-size:12.5px;padding:0 8px}
+.inbox-i{display:flex;gap:12px;padding:13px 15px;border-bottom:1px solid var(--hairline);cursor:pointer;transition:.1s}.inbox-i:hover{background:var(--surface-2)}.inbox-i.unread{background:var(--primary-soft)}
+.inbox-i .ii{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:none;color:#fff}
+.inbox-i .it{font-size:13.5px}.inbox-i .it b{font-weight:650}.inbox-i time{font-size:12px;color:var(--ink-muted);margin-left:auto;flex:none}
+
+/* planner */
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:18px}
+.day{background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r-md);min-height:150px;padding:8px}
+.day .dh{font-size:12px;font-weight:700;color:var(--ink-muted);margin-bottom:8px;display:flex;justify-content:space-between}
+.day.today .dh{color:var(--primary)}.day.today{border-color:var(--primary)}
+.dtask{font-size:11.5px;font-weight:550;padding:5px 7px;border-radius:6px;margin-bottom:5px;background:var(--sky-soft);color:var(--sky);line-height:1.25;cursor:pointer}
+.dtask.high{background:var(--crit-soft);color:var(--crit)}
+
+/* doc reader */
+.doc-read{padding:34px 40px;max-width:720px}
+.doc-read h1{font-size:30px;font-weight:750;letter-spacing:-.02em;margin-bottom:6px}
+.doc-read h2{font-size:19px;font-weight:700;margin:22px 0 8px}.doc-read p{font-size:15px;color:var(--ink-2);margin:10px 0;line-height:1.6}
+.doc-read li{font-size:15px;color:var(--ink-2);margin:5px 0}
+
+/* skeleton */
+.sk{background:linear-gradient(90deg,var(--surface-2) 25%,var(--surface-3) 37%,var(--surface-2) 63%);background-size:400% 100%;animation:shim 1.3s infinite;border-radius:6px}
+@keyframes shim{0%{background-position:100% 0}100%{background-position:-100% 0}}
+.sk-row{height:44px;margin:0;border-bottom:1px solid var(--hairline)}
+.sk-line{height:13px;margin:9px 14px}
+
+/* empty / forbidden */
+.empty{text-align:center;padding:44px 20px;color:var(--ink-muted)}
+.empty .ei{width:56px;height:56px;border-radius:15px;background:var(--surface-2);display:grid;place-items:center;margin:0 auto 14px;color:var(--ink-muted)}
+.empty h3{font-size:16px;font-weight:650;color:var(--ink-2)}.empty p{font-size:13.5px;margin-top:5px;max-width:34ch;margin-inline:auto}
+.forbidden .ei{background:var(--crit-soft);color:var(--crit)}
+
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(20,18,15,.42);z-index:80;opacity:0;animation:fade .2s forwards}
+@keyframes fade{to{opacity:1}}
+.drawer{position:fixed;top:0;right:0;height:100vh;width:min(500px,96vw);background:var(--surface);z-index:81;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;transform:translateX(100%);animation:slide .25s forwards;overflow:hidden}
+@keyframes slide{to{transform:translateX(0)}}
+.dr-head{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--hairline)}
+.dr-body{padding:18px;overflow-y:auto;flex:1}
+.dr-title{font-size:20px;font-weight:700;letter-spacing:-.02em;line-height:1.25;width:100%;border:none;background:none;resize:none}
+.dr-props{display:flex;flex-direction:column;gap:2px;margin-top:14px}
+.prop{display:flex;align-items:center;gap:12px;padding:8px 0;font-size:13.5px}
+.prop .pk{width:120px;color:var(--ink-muted);display:flex;align-items:center;gap:8px;flex:none}
+.status-sel{display:inline-flex;gap:5px}
+.stat-opt{font-size:12px;font-weight:600;padding:4px 11px;border-radius:var(--r-full);background:var(--surface-2);color:var(--ink-2);transition:.12s}.stat-opt.on{color:#fff}
+.dr-sec-h{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-muted);margin:22px 0 10px}
+.subt{display:flex;align-items:center;gap:9px;padding:7px 0;font-size:13.5px}
+.subt .check{width:17px;height:17px}
+.chk{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:13.5px}
+.chk .box{width:16px;height:16px;border-radius:4px;border:1.6px solid var(--ink-muted);display:grid;place-items:center;color:transparent;cursor:pointer;flex:none}
+.chk.done .box{background:var(--good);border-color:var(--good);color:#fff}.chk.done span{text-decoration:line-through;color:var(--ink-muted)}
+.act-item{display:flex;gap:10px;font-size:13px;color:var(--ink-2);padding:6px 0}
+.act-item .adot{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;flex:none;color:#fff;font-size:10px;font-weight:700}
+.act-item time{color:var(--ink-muted);font-size:12px}
+.commentbox{margin-top:12px;display:flex;gap:9px}
+.commentbox input{flex:1;height:38px;border-radius:var(--r-md);border:1.5px solid var(--hairline);background:var(--surface);padding:0 12px;font-size:13.5px}
+
+/* modal */
+.modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:82;background:var(--surface);border-radius:12px;box-shadow:var(--shadow-lg);width:min(480px,94vw);max-height:88vh;overflow:hidden;display:flex;flex-direction:column;animation:pop .18s}
+@keyframes pop{from{opacity:0;transform:translate(-50%,-46%)}}
+.modal-h{display:flex;align-items:center;padding:16px 18px;border-bottom:1px solid var(--hairline)}
+.modal-h h2{font-size:17px;font-weight:700}.modal-b{padding:18px;overflow-y:auto}
+.share-gen{display:flex;align-items:center;gap:11px;padding:11px;border-radius:var(--r-md);background:var(--surface-2);margin-bottom:12px}
+.lvl-sel{height:32px;border-radius:var(--r-sm);border:1px solid var(--hairline);background:var(--surface);font-size:12.5px;padding:0 8px;margin-left:auto}
+.share-row{display:flex;align-items:center;gap:10px;padding:9px 0;font-size:13.5px}
+.grant-tag{font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:var(--r-full);text-transform:uppercase;letter-spacing:.03em}
+.grant-inh{background:var(--sky-soft);color:var(--sky)}.grant-team{background:var(--lav-soft);color:var(--lav)}.grant-dir{background:var(--mint-soft);color:var(--mint)}
+
+/* dropdown (switcher) */
+.dropdown{position:absolute;z-index:70;background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r-md);box-shadow:var(--shadow-lg);width:264px;padding:6px;left:14px;top:56px}
+.dd-sec{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-muted);padding:8px 8px 4px}
+.dd-i{display:flex;align-items:center;gap:9px;padding:8px;border-radius:var(--r-sm);font-size:13.5px;cursor:pointer}.dd-i:hover{background:var(--surface-2)}.dd-i.on{background:var(--surface-2)}
+.dd-i .di{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;font-weight:800;font-size:12px;color:#fff;flex:none}
+.dd-add{display:flex;align-items:center;gap:9px;padding:9px 8px;border-top:1px solid var(--hairline);margin-top:4px;font-size:13px;font-weight:600;color:var(--primary);cursor:pointer}
+
+/* activation tracker + prototype map */
+.dockpanel{position:fixed;z-index:55;background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r-md);box-shadow:var(--shadow-lg);overflow:hidden}
+.acttrack{left:16px;bottom:16px;width:258px}
+.pmap{right:16px;bottom:16px;width:250px}
+.dp-h{display:flex;align-items:center;gap:8px;padding:10px 12px;font-size:12.5px;font-weight:700;cursor:pointer;background:var(--surface-2)}
+.dp-h .st{margin-left:auto;font-size:10.5px;padding:2px 8px;border-radius:var(--r-full);font-weight:700}
+.acttrack-b{padding:10px 12px;display:flex;flex-direction:column;gap:7px}
+.actrow{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--ink-muted)}
+.actrow .ab{width:18px;height:18px;border-radius:5px;border:1.6px solid var(--hairline);display:grid;place-items:center;flex:none;color:transparent}
+.actrow.on{color:var(--ink)}.actrow.on .ab{background:var(--good);border-color:var(--good);color:#fff}
+.actrow .k{font-weight:700;color:var(--ink-2);margin-right:2px}
+.act-note{font-size:10.5px;color:var(--ink-muted);padding:0 12px 10px;line-height:1.4}
+.dp.min .dp-b{display:none}
+.pmap-b{padding:6px;max-height:52vh;overflow-y:auto}
+.pmap-sec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-muted);padding:8px 8px 3px}
+.pmap-i{display:block;width:100%;text-align:left;padding:6px 8px;border-radius:var(--r-sm);font-size:12.5px;color:var(--ink-2);cursor:pointer}
+.pmap-i:hover{background:var(--surface-2);color:var(--ink)}
+.pmap-i.on{background:var(--primary-soft);color:var(--primary);font-weight:600}
+.pmap-i .tg{float:right;font-size:10px;padding:0 6px;border-radius:var(--r-full);background:var(--surface-3);color:var(--ink-muted)}
+.pmap-i.act .tg{background:var(--mint-soft);color:var(--mint)}
+
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:90;background:var(--ink);color:var(--canvas);padding:11px 18px;border-radius:var(--r-full);font-size:13.5px;font-weight:600;box-shadow:var(--shadow-lg);display:flex;align-items:center;gap:9px;animation:toastin .25s}
+@keyframes toastin{from{opacity:0;transform:translate(-50%,10px)}}
+
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important}}
+@media (max-width:1023px){
+  .ov-grid{grid-template-columns:1fr 1fr}
+}
+@media (max-width:900px){
+  .split{grid-template-columns:1fr}.split-brand{display:none}
+  .shell{grid-template-columns:1fr}
+  .side{position:fixed;left:0;top:0;bottom:0;width:262px;z-index:75;transform:translateX(-100%);transition:transform .22s}
+  .side.open{transform:translateX(0)}
+  .hamb{display:grid}
+  .tpl-grid,.board,.week{grid-template-columns:1fr}
+  .week .day{min-height:auto}
+  .content{padding:20px 16px 100px}
+  .searchbar{display:none}
+  .pmap{display:none}
+  .ov-grid{grid-template-columns:1fr 1fr}
+}
+.backdrop-nav{display:none}
+@media (max-width:900px){.backdrop-nav.open{display:block;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:74}}
+</style>
+
+<div id="app">
+  <div class="floaters">
+    <button class="chipbtn" data-action="restart" title="Restart"><span class="icn" id="ic-r"></span></button>
+    <button class="chipbtn" data-action="lang-toggle"><span class="icn" id="ic-globe"></span><span id="lang-label">EN</span></button>
+    <button class="chipbtn" data-action="theme-toggle"><span class="icn" id="ic-theme"></span></button>
+  </div>
+  <div id="stage"></div>
+</div>
+
+<script>
+(function(){
+"use strict";
+const app=document.getElementById("app"),stage=document.getElementById("stage");
+const I={
+ globe:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 2.5 15.3 0 18M12 3c-2.5 2.7-2.5 15.3 0 18"/></svg>',
+ sun:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>',
+ moon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A8 8 0 1111.2 3a6.5 6.5 0 009.8 9.8z"/></svg>',
+ user:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6"/></svg>',
+ users:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.4"/><path d="M2.5 20c0-3.4 2.9-5 6.5-5s6.5 1.6 6.5 5"/><path d="M16 5.2A3.4 3.4 0 0119 11M18 20c0-2.6-.9-4.1-2.4-5"/></svg>',
+ arrow:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+ spark:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.8 4.6L18.5 9.4 13.8 11.2 12 16l-1.8-4.8L5.5 9.4 10.2 7.6 12 3z"/></svg>',
+ check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12.5l4.5 4.5L19 7"/></svg>',
+ plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>',
+ search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+ bell:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9a6 6 0 1112 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 20a2 2 0 004 0"/></svg>',
+ home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11l8-7 8 7"/><path d="M6 10v9h12v-9"/></svg>',
+ layers:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></svg>',
+ inbox:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13h5l1.5 3h5L21 13"/><path d="M3 13V6a2 2 0 012-2h14a2 2 0 012 2v7"/></svg>',
+ cal:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>',
+ flag:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>',
+ x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+ chev:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>',
+ chevd:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>',
+ bolt:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 3L5 13h6l-1 8 8-11h-6l1-7z"/></svg>',
+ gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2 2M17 17l2 2M19.1 4.9l-2 2M7 17l-2 2"/></svg>',
+ doc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>',
+ tg:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 4L3 11l5 2 2 6 3-4 5 4 3-15z"/></svg>',
+ lock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>',
+ eye:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>',
+ wifi:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 8.5a16 16 0 0120 0M5 12a11 11 0 0114 0M8.5 15.5a6 6 0 017 0"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg>',
+ map:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>',
+ hamb:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
+ target:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/></svg>',
+ building:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M8 7h2M14 7h2M8 11h2M14 11h2M8 15h2M14 15h2"/></svg>'
+};
+function setF(){document.getElementById("ic-r").innerHTML=I.arrow;document.getElementById("ic-globe").innerHTML=I.globe;document.getElementById("ic-theme").innerHTML=theme==="dark"?I.sun:I.moon;document.getElementById("lang-label").textContent=t("langbtn");}
+
+/* ---------- i18n ---------- */
+const T={vi:{
+ langbtn:"EN",
+ brand_h:"Từ ý tưởng tới việc-đã-giao trong 5 phút.",brand_sub:"Không gian làm việc có AI lập kế hoạch, giao việc và theo dõi từng phase — cho cá nhân và cả team.",
+ bf1:"Bảo mật theo workspace",bf2:"Song ngữ Việt / Anh",bf3:"AI lập kế hoạch",
+ signin_h:"Bắt đầu nào",signin_p:"Đăng nhập để tạo không gian của bạn. Không cần thẻ, không cần cài đặt.",
+ cont_google:"Tiếp tục với Google",cont_github:"Tiếp tục với GitHub",provider_note:"Chúng tôi không lưu mật khẩu — đăng nhập an toàn qua nhà cung cấp.",
+ have_invite:"Tôi được mời vào một không gian",
+ step_mode_h:"Bạn dùng VierocClick cho việc gì?",step_mode_p:"Chọn để chúng tôi dựng đúng không gian. Đổi lại sau lúc nào cũng được.",
+ mode_personal:"Cá nhân",mode_personal_s:"Lập kế hoạch và theo dõi việc của riêng bạn.",mode_team:"Nhóm",mode_team_s:"Làm việc cùng người khác, giao việc và theo dõi tiến độ.",
+ skip:"Bỏ qua, tôi tự dựng sau",
+ step_tpl_h:"Chọn điểm bắt đầu",step_tpl_p:"Mỗi mẫu tạo sẵn các phase và việc mẫu để bạn không phải bắt đầu từ trang trắng.",
+ ai_card:"Để AI dựng giúp",ai_card_s:"Tả dự án bằng một câu — AI phác kế hoạch cho bạn duyệt.",ai_badge:"MỚI",
+ step_name_h:"Đặt tên và bắt đầu",step_name_p:"Gần xong rồi. Bạn sửa được mọi thứ sau.",
+ ws_label:"Tên không gian làm việc",proj_label:"Tên dự án đầu tiên",invite_label:"Mời thành viên (tùy chọn)",invite_ph:"Dán email, cách nhau bằng dấu phẩy…",invite_hint:"Chưa có tài khoản cũng không sao — họ nhận lời mời qua email.",
+ create_go:"Tạo và bắt đầu",back:"Quay lại",
+ ai_h:"Tả dự án của bạn",ai_p:"Một hai câu là đủ. AI sẽ đề xuất phase và việc — bạn duyệt trước khi áp dụng.",ai_ph:"VD: Tôi cần ra mắt website bán hàng trong 6 tuần",
+ ai_build:"Dựng kế hoạch",ai_building:"Đang phác kế hoạch cho bạn…",ai_alt:"Chọn mẫu có sẵn thay vì AI",
+ ai_review_h:"AI đề xuất kế hoạch này",ai_review_p:"Sửa hoặc bỏ việc nào bạn không cần, rồi áp dụng. Không gì được lưu tới khi bạn bấm.",ai_apply:"Dùng kế hoạch này",ai_regen:"Tả lại",
+ inv_title:"{who} mời bạn vào",inv_join:"Tham gia không gian",inv_sub:"Bạn sẽ vào thẳng chỗ làm việc — không cần thiết lập gì.",
+ inv_expired_h:"Lời mời đã hết hạn",inv_expired_p:"Link mời này không còn hiệu lực. Nhờ người mời gửi lại giúp bạn.",inv_expired_cta:"Yêu cầu mời lại",
+ greet:"Chào {n}, không gian của bạn đã sẵn sàng",greet_sub:"Đây là việc cần chú ý hôm nay. Thêm việc của riêng bạn bất cứ lúc nào.",
+ greet_inv:"Chào mừng đến {w}",greet_inv_sub:"Đây là việc liên quan đến bạn trong không gian này.",
+ nudge_pct:"{a}/{b} bước để bắt đầu tốt",ns_task:"Thêm 1 việc của bạn",ns_due:"Đặt 1 hạn chót",ns_invite:"Mời 1 người",
+ today:"Hôm nay & sắp tới",all_tasks:"Tất cả công việc",assigned_me:"Được giao cho bạn",
+ view_list:"Danh sách",view_board:"Bảng",view_overview:"Tổng quan",more_views:"Thêm view",
+ qc_ph:"Thêm việc… thử: Gửi báo giá @Minh mai !cao",
+ coach:"Thêm việc của bạn ở đây — gõ là xong. Thử tên người sau @ và mốc thời gian như “mai”.",coach_ok:"Đã hiểu",
+ col_todo:"Cần làm",col_doing:"Đang làm",col_done:"Xong",advance:"Chuyển sang",sample:"mẫu",clear_samples:"Xóa việc mẫu",
+ nav_mywork:"Việc của tôi",nav_inbox:"Hộp thư",nav_planner:"Lịch việc",nav_home:"Trang chủ",nav_projects:"Dự án",nav_docs:"Tài liệu",nav_settings:"Cài đặt",
+ invite_side:"Mời thành viên",search:"Tìm việc, dự án, người…",
+ drawer_status:"Trạng thái",drawer_assignee:"Người làm",drawer_due:"Hạn chót",drawer_prio:"Ưu tiên",drawer_phase:"Phase",
+ prio_high:"Cao",prio_normal:"Bình thường",prio_low:"Thấp",none:"—",
+ subtasks:"Việc con",checklist:"Checklist",description:"Mô tả",activity:"Hoạt động",comment_ph:"Viết bình luận…",add_sub:"Thêm việc con…",
+ desc_ph:"Thêm mô tả, ghi chú, tiêu chí hoàn thành…",
+ act_created:"đã tạo việc này",act_status:"đổi trạng thái sang {s}",act_comment:"đã bình luận",
+ act_title:"Bản mẫu · theo dõi Activation",act_a1:"có việc thật",act_a2:"lập kế hoạch (hạn/người)",act_a3:"thực thi (đổi status)",act_a4:"bám / lan tỏa (mời)",
+ act_done:"ĐÃ ACTIVATED",act_pending:"chưa đủ",act_note:"Quy tắc Q5: A1 bắt buộc ∧ ≥2 của {A2,A3,A4}. Công cụ đo, ẩn với người dùng thật.",
+ toast_created:"Đã tạo việc",toast_applied:"Đã áp dụng kế hoạch",toast_invited:"Đã gửi lời mời",toast_status:"Đã cập nhật trạng thái",toast_share:"Đã cập nhật chia sẻ",toast_comment:"Đã gửi bình luận",toast_synced:"Đã đồng bộ khi có mạng lại",toast_offpend:"Đã lưu tạm — sẽ đồng bộ khi có mạng",toast_tg:"Đã kết nối Telegram (mẫu)",toast_org:"Đã tạo tổ chức",
+ tg_connect:"Kết nối Telegram để nhận & cập nhật việc trên điện thoại",
+ wskind_personal:"Không gian cá nhân",wskind_team:"Không gian nhóm",you:"Bạn",
+ empty_here:"Chưa có gì ở đây",empty_inbox_h:"Hộp thư trống",empty_inbox_p:"Khi có người giao việc, nhắc bạn hoặc trả lời, thông báo sẽ hiện ở đây.",
+ empty_assigned_h:"Chưa có việc nào giao cho bạn",empty_assigned_p:"Xem các dự án trong không gian để tìm việc tham gia.",
+ empty_docs_h:"Chưa có tài liệu",empty_docs_p:"Tạo tài liệu để ghi lại quyết định, ghi chú họp và wiki cho nhóm.",
+ offline_msg:"Mất kết nối — thay đổi được lưu tạm và sẽ đồng bộ khi có mạng lại.",
+ readonly_msg:"Bạn có quyền xem không gian này. Một số thao tác bị ẩn.",
+ forbidden_h:"Bạn chưa có quyền xem dự án này",forbidden_p:"Dự án này ở chế độ riêng tư. Nhờ người quản lý chia sẻ cho bạn.",request_access:"Yêu cầu quyền truy cập",
+ ov_progress:"Tiến độ",ov_open:"Việc mở",ov_overdue:"Quá hạn",ov_done:"Hoàn thành",phase_progress:"Tiến độ theo Phase",
+ projects_h:"Dự án",new_project:"Dự án mới",private:"Riêng tư",members_n:"{n} thành viên",
+ docs_h:"Tài liệu",new_doc:"Tài liệu mới",
+ mywork_h:"Việc của tôi",mywork_sub:"Tổng hợp mọi việc của bạn trên tất cả không gian.",overdue:"Quá hạn",upcoming:"Sắp tới",
+ planner_h:"Lịch việc",planner_sub:"Việc của bạn xếp theo hạn chót. Kết nối lịch ngoài để đồng bộ hai chiều.",connect_cal:"Kết nối Google / Outlook Calendar",
+ settings_h:"Cài đặt không gian",set_general:"Chung",set_members:"Thành viên",set_ws_name:"Tên không gian",set_danger:"Vùng nguy hiểm",delete_ws:"Xóa không gian",role_owner:"Chủ sở hữu",role_admin:"Quản trị",role_member:"Thành viên",role_guest:"Khách",
+ share_h:"Chia sẻ",share_general:"Quyền chung",share_gen_view:"Mọi thành viên trong không gian có thể xem",share_add_ph:"Thêm người bằng email…",lvl_view:"Xem",lvl_comment:"Bình luận",lvl_edit:"Sửa",lvl_full:"Toàn quyền",grant_inherited:"kế thừa",grant_team:"nhóm",grant_direct:"trực tiếp",guest_note:"Khách chỉ thấy những gì được chia sẻ trực tiếp.",
+ invite_h:"Mời vào không gian",invite_role:"Vai trò",send_invites:"Gửi lời mời",
+ tg_h:"Kết nối Telegram",tg_p:"Nhận nhắc việc và cập nhật ngay trên điện thoại — như một app mobile tạm thời.",tg_step1:"Mở bot @VierocClickBot",tg_step2:"Gửi lệnh /start",tg_step3:"Nhập mã bên dưới",tg_connect_btn:"Đã kết nối",
+ org_h:"Tạo tổ chức",org_p:"Gom nhiều không gian dưới một tổ chức. Không gian giữ nguyên dữ liệu và quyền — tổ chức chỉ là lớp umbrella.",org_name:"Tên tổ chức",org_create:"Tạo tổ chức",org_note:"Tư cách thành viên tổ chức KHÔNG tự cấp quyền vào project. Quyền vẫn ở cấp không gian.",
+ sw_workspaces:"Không gian",sw_org:"Tổ chức",sw_create_org:"Tạo tổ chức mới",sw_standalone:"Cá nhân / Độc lập",
+ pmap_title:"Bản đồ màn hình",pmap_ob:"Onboarding",pmap_app:"Ứng dụng",pmap_proj:"Dự án",pmap_modal:"Hộp thoại",pmap_state:"Trạng thái",
+ pm_signin:"Đăng nhập",pm_personal:"Onboarding cá nhân",pm_team:"Onboarding nhóm",pm_ai:"AI dựng kế hoạch",pm_invited:"Người được mời",pm_invexp:"Lời mời hết hạn",
+ pm_home:"Trang chủ",pm_mywork:"Việc của tôi",pm_inbox:"Hộp thư",pm_planner:"Lịch việc",pm_projects:"Dự án",pm_docs:"Tài liệu",pm_settings:"Cài đặt",
+ pm_overview:"Tổng quan dự án",pm_list:"Danh sách",pm_board:"Bảng",pm_drawer:"Chi tiết việc",
+ pm_share:"Chia sẻ",pm_invite:"Mời",pm_tg:"Telegram",pm_org:"Tạo tổ chức",pm_switch:"Đổi không gian",
+ pm_loading:"Đang tải (skeleton)",pm_empty:"Hộp thư trống",pm_forbidden:"Không có quyền",pm_readonly:"Chế độ chỉ xem",pm_offline:"Mất mạng",
+ pm_reset:"Về đăng nhập",read_doc_title:"Ghi chú họp khởi động",
+ ana_h:"Đọc kế hoạch chi tiết trong doc"
+},en:{
+ langbtn:"VI",
+ brand_h:"From idea to work-assigned in 5 minutes.",brand_sub:"A workspace where AI plans, assigns and tracks every phase — for individuals and whole teams.",
+ bf1:"Workspace-scoped security",bf2:"Bilingual VI / EN",bf3:"AI planning",
+ signin_h:"Let's get started",signin_p:"Sign in to create your space. No card, no setup.",
+ cont_google:"Continue with Google",cont_github:"Continue with GitHub",provider_note:"We never store passwords — secure sign-in via your provider.",
+ have_invite:"I was invited to a space",
+ step_mode_h:"What will you use VierocClick for?",step_mode_p:"So we set up the right space. Change this anytime.",
+ mode_personal:"Just me",mode_personal_s:"Plan and track your own work.",mode_team:"My team",mode_team_s:"Work with others, assign tasks, track progress.",
+ skip:"Skip, I'll set up later",
+ step_tpl_h:"Choose a starting point",step_tpl_p:"Each template seeds phases and sample tasks so you never face a blank page.",
+ ai_card:"Let AI build it",ai_card_s:"Describe your project in a sentence — AI drafts a plan for you to review.",ai_badge:"NEW",
+ step_name_h:"Name it and start",step_name_p:"Almost there. You can change everything later.",
+ ws_label:"Workspace name",proj_label:"First project name",invite_label:"Invite teammates (optional)",invite_ph:"Paste emails, comma-separated…",invite_hint:"No account yet? No problem — they'll get an email invite.",
+ create_go:"Create and start",back:"Back",
+ ai_h:"Describe your project",ai_p:"A sentence or two is enough. AI suggests phases and tasks — you review before applying.",ai_ph:"e.g. Launch an online store in 6 weeks",
+ ai_build:"Draft the plan",ai_building:"Drafting your plan…",ai_alt:"Pick a ready template instead",
+ ai_review_h:"AI suggests this plan",ai_review_p:"Edit or drop anything you don't need, then apply. Nothing is saved until you click.",ai_apply:"Use this plan",ai_regen:"Describe again",
+ inv_title:"{who} invited you to",inv_join:"Join the space",inv_sub:"You'll land straight in the workspace — no setup needed.",
+ inv_expired_h:"This invitation has expired",inv_expired_p:"This invite link is no longer valid. Ask the person who invited you to resend it.",inv_expired_cta:"Request a new invite",
+ greet:"Hi {n}, your space is ready",greet_sub:"Here's what needs attention today. Add your own tasks anytime.",
+ greet_inv:"Welcome to {w}",greet_inv_sub:"Here's what involves you in this space.",
+ nudge_pct:"{a}/{b} steps to a great start",ns_task:"Add 1 of your tasks",ns_due:"Set 1 due date",ns_invite:"Invite 1 person",
+ today:"Today & upcoming",all_tasks:"All work",assigned_me:"Assigned to you",
+ view_list:"List",view_board:"Board",view_overview:"Overview",more_views:"More views",
+ qc_ph:"Add a task… try: Send quote @Minh tomorrow !high",
+ coach:"Add your own task here — just type. Try a name after @ and a time like “tomorrow”.",coach_ok:"Got it",
+ col_todo:"To do",col_doing:"In progress",col_done:"Done",advance:"Move to",sample:"sample",clear_samples:"Clear sample tasks",
+ nav_mywork:"My Work",nav_inbox:"Inbox",nav_planner:"Planner",nav_home:"Home",nav_projects:"Projects",nav_docs:"Docs",nav_settings:"Settings",
+ invite_side:"Invite people",search:"Search tasks, projects, people…",
+ drawer_status:"Status",drawer_assignee:"Assignee",drawer_due:"Due",drawer_prio:"Priority",drawer_phase:"Phase",
+ prio_high:"High",prio_normal:"Normal",prio_low:"Low",none:"—",
+ subtasks:"Subtasks",checklist:"Checklist",description:"Description",activity:"Activity",comment_ph:"Write a comment…",add_sub:"Add a subtask…",
+ desc_ph:"Add a description, notes, acceptance criteria…",
+ act_created:"created this task",act_status:"moved status to {s}",act_comment:"commented",
+ act_title:"Prototype · Activation tracker",act_a1:"real task",act_a2:"planning (due/assignee)",act_a3:"execution (status change)",act_a4:"stick / spread (invite)",
+ act_done:"ACTIVATED",act_pending:"not yet",act_note:"Q5 rule: A1 required ∧ ≥2 of {A2,A3,A4}. Instrumentation, hidden from real users.",
+ toast_created:"Task created",toast_applied:"Plan applied",toast_invited:"Invite sent",toast_status:"Status updated",toast_share:"Sharing updated",toast_comment:"Comment posted",toast_synced:"Synced back online",toast_offpend:"Saved locally — will sync when online",toast_tg:"Telegram connected (demo)",toast_org:"Organization created",
+ tg_connect:"Connect Telegram to get & update tasks on your phone",
+ wskind_personal:"Personal space",wskind_team:"Team space",you:"You",
+ empty_here:"Nothing here yet",empty_inbox_h:"Inbox zero",empty_inbox_p:"When someone assigns you work, mentions you or replies, it shows up here.",
+ empty_assigned_h:"Nothing assigned to you yet",empty_assigned_p:"Browse the workspace projects to find work to join.",
+ empty_docs_h:"No documents yet",empty_docs_p:"Create a doc to capture decisions, meeting notes and your team wiki.",
+ offline_msg:"You're offline — changes are saved locally and will sync when you're back.",
+ readonly_msg:"You have view access to this space. Some actions are hidden.",
+ forbidden_h:"You don't have access to this project",forbidden_p:"This project is private. Ask a manager to share it with you.",request_access:"Request access",
+ ov_progress:"Progress",ov_open:"Open",ov_overdue:"Overdue",ov_done:"Completed",phase_progress:"Progress by Phase",
+ projects_h:"Projects",new_project:"New project",private:"Private",members_n:"{n} members",
+ docs_h:"Docs",new_doc:"New doc",
+ mywork_h:"My Work",mywork_sub:"Everything on your plate, across all your spaces.",overdue:"Overdue",upcoming:"Upcoming",
+ planner_h:"Planner",planner_sub:"Your tasks laid out by due date. Connect an external calendar for two-way sync.",connect_cal:"Connect Google / Outlook Calendar",
+ settings_h:"Workspace settings",set_general:"General",set_members:"Members",set_ws_name:"Workspace name",set_danger:"Danger zone",delete_ws:"Delete workspace",role_owner:"Owner",role_admin:"Admin",role_member:"Member",role_guest:"Guest",
+ share_h:"Share",share_general:"General access",share_gen_view:"Everyone in the workspace can view",share_add_ph:"Add people by email…",lvl_view:"View",lvl_comment:"Comment",lvl_edit:"Edit",lvl_full:"Full",grant_inherited:"inherited",grant_team:"team",grant_direct:"direct",guest_note:"Guests only see what's shared directly with them.",
+ invite_h:"Invite to workspace",invite_role:"Role",send_invites:"Send invites",
+ tg_h:"Connect Telegram",tg_p:"Get task reminders and update work on your phone — a lightweight mobile companion.",tg_step1:"Open @VierocClickBot",tg_step2:"Send /start",tg_step3:"Enter the code below",tg_connect_btn:"I've connected",
+ org_h:"Create organization",org_p:"Group multiple workspaces under one org. Workspaces keep their data and permissions — the org is just an umbrella.",org_name:"Organization name",org_create:"Create organization",org_note:"Org membership does NOT grant project access. Access stays at the workspace level.",
+ sw_workspaces:"Workspaces",sw_org:"Organization",sw_create_org:"Create organization",sw_standalone:"Personal / Standalone",
+ pmap_title:"Screen map",pmap_ob:"Onboarding",pmap_app:"App",pmap_proj:"Project",pmap_modal:"Dialogs",pmap_state:"States",
+ pm_signin:"Sign in",pm_personal:"Personal onboarding",pm_team:"Team onboarding",pm_ai:"AI planning",pm_invited:"Invited member",pm_invexp:"Invite expired",
+ pm_home:"Home",pm_mywork:"My Work",pm_inbox:"Inbox",pm_planner:"Planner",pm_projects:"Projects",pm_docs:"Docs",pm_settings:"Settings",
+ pm_overview:"Project overview",pm_list:"List",pm_board:"Board",pm_drawer:"Task detail",
+ pm_share:"Share",pm_invite:"Invite",pm_tg:"Telegram",pm_org:"Create org",pm_switch:"Switch workspace",
+ pm_loading:"Loading (skeleton)",pm_empty:"Empty inbox",pm_forbidden:"Forbidden",pm_readonly:"Read-only mode",pm_offline:"Offline",
+ pm_reset:"Back to sign-in",read_doc_title:"Kickoff meeting notes",
+ ana_h:"Read the full plan in the doc"
+}};
+function t(k,v){let s=(T[lang]&&T[lang][k]!==undefined)?T[lang][k]:k;if(v)for(const p in v)s=s.replace("{"+p+"}",v[p]);return s;}
+
+/* ---------- data ---------- */
+const AV=["--coral","--peach","--lav","--sky","--mint"];
+function personDot(n){let h=0;for(let i=0;i<n.length;i++)h=n.charCodeAt(i)+((h<<5)-h);return AV[Math.abs(h)%AV.length];}
+const PEOPLE=["Minh","Lan","An","Huy"];
+const TEMPLATES={
+ "personal-planning":{icon:I.home,color:"--mint",name:{vi:"Kế hoạch cá nhân",en:"Personal planning"},desc:{vi:"Việc đời sống, mục tiêu và thói quen.",en:"Life tasks, goals and habits."},proj:{vi:"Kế hoạch của tôi",en:"My planning"},phases:[
+   {vi:"Tuần này",en:"This week",tasks:[{vi:"Lập danh sách việc tuần này",en:"List this week's tasks",d:0},{vi:"Chọn 3 việc quan trọng nhất",en:"Pick top 3 priorities",d:0,p:"high"},{vi:"Review cuối tuần",en:"Weekly review",d:6}]},
+   {vi:"Mục tiêu tháng",en:"Monthly goal",tasks:[{vi:"Đặt 1 mục tiêu lớn của tháng",en:"Set one big monthly goal",d:1},{vi:"Chia mục tiêu thành 3 bước",en:"Break it into 3 steps",d:2}]}]},
+ "study":{icon:I.doc,color:"--sky",name:{vi:"Học tập",en:"Study"},desc:{vi:"Deadline, môn học và dự án nhóm.",en:"Deadlines, courses and group work."},proj:{vi:"Học kỳ này",en:"This semester"},phases:[
+   {vi:"Deadline sắp tới",en:"Upcoming deadlines",tasks:[{vi:"Nộp bài tập môn ___",en:"Submit assignment for ___",d:3,p:"high"},{vi:"Ôn kiểm tra ___",en:"Study for ___ test",d:5}]},
+   {vi:"Môn học đang theo",en:"Current courses",tasks:[{vi:"Ghi chú bài giảng tuần này",en:"Take lecture notes",d:0},{vi:"Đọc tài liệu chương ___",en:"Read chapter ___",d:2}]}]},
+ "freelance-client":{icon:I.bolt,color:"--peach",name:{vi:"Freelance / khách hàng",en:"Freelance / client"},desc:{vi:"Chạy một job từ brief tới thanh toán.",en:"Run a job from brief to payment."},proj:{vi:"Dự án khách hàng",en:"Client project"},phases:[
+   {vi:"Brief & báo giá",en:"Brief & quote",tasks:[{vi:"Nhận brief từ khách",en:"Get client brief",d:0},{vi:"Gửi báo giá / hợp đồng",en:"Send quote / contract",d:1,p:"high"}]},
+   {vi:"Thực hiện",en:"Execution",tasks:[{vi:"Bản nháp đầu tiên",en:"First draft",d:4},{vi:"Gửi khách review",en:"Send for review",d:5}]},
+   {vi:"Bàn giao & thanh toán",en:"Delivery & payment",tasks:[{vi:"Bàn giao file cuối",en:"Deliver final files",d:10},{vi:"Gửi hóa đơn / theo dõi",en:"Send invoice / follow up",d:11,p:"high"}]}]},
+ "small-team-project":{icon:I.users,color:"--coral",name:{vi:"Dự án nhóm nhỏ",en:"Small team project"},desc:{vi:"Dựng chỗ làm việc chung cho nhóm.",en:"Set up a shared team workspace."},proj:{vi:"Dự án nhóm",en:"Team project"},phases:[
+   {vi:"Khởi động",en:"Kickoff",tasks:[{vi:"Chốt mục tiêu & phạm vi",en:"Agree goal & scope",d:1,p:"high",a:0},{vi:"Phân vai trong nhóm",en:"Assign roles",d:1,a:1}]},
+   {vi:"Thực thi",en:"Execution",tasks:[{vi:"Hạng mục A",en:"Workstream A",d:5,a:0},{vi:"Hạng mục B",en:"Workstream B",d:5,a:1},{vi:"Đồng bộ tiến độ giữa kỳ",en:"Mid-point sync",d:4}]},
+   {vi:"Hoàn tất",en:"Wrap up",tasks:[{vi:"Rà soát chất lượng",en:"Quality review",d:9},{vi:"Tổng kết & bàn giao",en:"Recap & handover",d:10}]}]},
+ "blank":{icon:I.plus,color:"--lav",name:{vi:"Bắt đầu trống",en:"Blank"},desc:{vi:"Một dự án trống với 1 việc mở đầu.",en:"An empty project with 1 starter task."},proj:{vi:"Dự án của tôi",en:"My project"},phases:[
+   {vi:"Việc cần làm",en:"To do",tasks:[{vi:"Bấm để sửa — đây là task đầu tiên của bạn",en:"Click to edit — this is your first task",d:1}]}]}
+};
+const AI_PLAN={proj:{vi:"Website bán hàng",en:"Online store launch"},phases:[
+ {vi:"Chuẩn bị",en:"Prep",tasks:[{vi:"Chốt danh mục sản phẩm",en:"Finalize product catalog",d:2,p:"high"},{vi:"Viết nội dung & ảnh sản phẩm",en:"Write copy & product photos",d:5}]},
+ {vi:"Dựng website",en:"Build site",tasks:[{vi:"Dựng trang chủ & trang sản phẩm",en:"Build home & product pages",d:12},{vi:"Tích hợp thanh toán",en:"Integrate payments",d:18,p:"high"}]},
+ {vi:"Ra mắt",en:"Launch",tasks:[{vi:"Kiểm thử đơn hàng thử",en:"Test checkout flow",d:26},{vi:"Chạy chiến dịch ra mắt",en:"Run launch campaign",d:30,p:"high"}]}]};
+
+let lang="vi";
+let theme=window.matchMedia&&window.matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light";
+document.documentElement.setAttribute("data-theme",theme);
+const S={screen:"signin",nav:"home",projView:"list",mode:null,invitedMode:false,guest:false,offline:false,
+ wsName:"",projName:"",tasks:[],invitedEmails:[],org:null,drawer:null,modal:null,switcherOpen:false,
+ coach:true,nudgeOpen:true,act:{a1:false,a2:false,a3:false,a4:false},actMin:false,pmapMin:false,
+ loading:false,mobileNav:false,comments:{},subtasks:{},checklist:{}};
+let tid=1,cid=1;
+
+/* ---------- helpers ---------- */
+function daysFromNow(d){const dt=new Date();dt.setDate(dt.getDate()+d);dt.setHours(9,0,0,0);return dt;}
+function dueMeta(date){if(!date)return null;const today=new Date();today.setHours(0,0,0,0);const dd=new Date(date);dd.setHours(0,0,0,0);
+ const diff=Math.round((dd-today)/86400000);const mon=lang==="vi"?["Th1","Th2","Th3","Th4","Th5","Th6","Th7","Th8","Th9","Th10","Th11","Th12"]:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+ let cls="",label;if(diff<0){cls="over";label=lang==="vi"?"Quá hạn":"Overdue";}else if(diff===0){cls="soon";label=lang==="vi"?"Hôm nay":"Today";}else if(diff===1){cls="soon";label=lang==="vi"?"Ngày mai":"Tomorrow";}else{label=dd.getDate()+" "+mon[dd.getMonth()];}
+ return{cls,label};}
+function initials(n){return (n||"?").split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase();}
+function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function cv(c){return "var("+c+")";}function cs(c){return "var("+c+"-soft)";}
+function seedTemplate(tpl){S.tasks=[];tid=1;const def=TEMPLATES[tpl];def.phases.forEach(ph=>ph.tasks.forEach(tk=>{
+  let a=null;if(S.mode==="team"&&typeof tk.a==="number")a=PEOPLE[tk.a];
+  S.tasks.push({id:tid++,titleVi:tk.vi,titleEn:tk.en,title:tk[lang],phaseVi:ph.vi,phaseEn:ph.en,phase:ph[lang],status:"todo",due:daysFromNow(tk.d),priority:tk.p||"normal",assignee:a,sample:tpl!=="blank"});}));}
+function seedAI(){S.tasks=[];tid=1;S.projName=AI_PLAN.proj[lang];AI_PLAN.phases.forEach(ph=>ph.tasks.forEach(tk=>{
+  S.tasks.push({id:tid++,titleVi:tk.vi,titleEn:tk.en,title:tk[lang],phaseVi:ph.vi,phaseEn:ph.en,phase:ph[lang],status:"todo",due:daysFromNow(tk.d),priority:tk.p||"normal",assignee:null,sample:true});}));}
+function seedInvited(){S.mode="team";S.invitedMode=true;S.wsName=lang==="vi"?"Nhóm Marketing":"Marketing Team";S.projName=lang==="vi"?"Chiến dịch Quý 3":"Q3 Campaign";S.tasks=[];tid=1;
+ const items=[["Viết nội dung bài đăng","Write post copy",1,"high","You"],["Duyệt thiết kế banner","Review banner design",2,"normal","You"],["Lên lịch đăng bài","Schedule posts",4,"normal","Lan"],["Báo cáo hiệu quả tuần","Weekly performance report",5,"normal","You"]];
+ const ph=lang==="vi"?"Đang chạy":"In flight";items.forEach(it=>S.tasks.push({id:tid++,titleVi:it[0],titleEn:it[1],title:lang==="vi"?it[0]:it[1],phaseVi:"Đang chạy",phaseEn:"In flight",phase:ph,status:"todo",due:daysFromNow(it[2]),priority:it[3],assignee:it[4]==="You"?t("you"):it[4],sample:false}));}
+function retitle(){S.tasks.forEach(x=>{if(x.titleVi){x.title=lang==="vi"?x.titleVi:x.titleEn;x.phase=lang==="vi"?x.phaseVi:x.phaseEn;}if(x.assignee&&(x.assignee==="Bạn"||x.assignee==="You"))x.assignee=t("you");});}
+function parseQuick(str){let title=str,assignee=null,priority="normal",due=null;const am=str.match(/@(\p{L}+)/u);if(am){assignee=am[1];title=title.replace(am[0],"");}
+ if(/!(cao|high|p1)/i.test(str)){priority="high";title=title.replace(/!(cao|high|p1)/i,"");}else if(/!(thấp|thap|low|p3)/i.test(str)){priority="low";title=title.replace(/!(thấp|thap|low|p3)/i,"");}
+ const map={"hôm nay":0,"homnay":0,"today":0,"ngày mai":1,"mai":1,"tomorrow":1};let md=false;
+ for(const k in map){if(new RegExp("(^|\\s)"+k+"($|\\s)","i").test(str)){due=daysFromNow(map[k]);title=title.replace(new RegExp(k,"i"),"");md=true;break;}}
+ if(!md){const wd=str.match(/\b(t[2-7]|thứ [2-7]|mon|tue|wed|thu|fri|sat|sun)\b/i);if(wd){const mm={t2:1,t3:2,t4:3,t5:4,t6:5,t7:6,mon:1,tue:2,wed:3,thu:4,fri:5,sat:6,sun:0};let key=wd[1].toLowerCase().replace("thứ ","t");let target=mm[key.slice(0,3)]!==undefined?mm[key.slice(0,3)]:mm[key];if(target!=null){const now=new Date();let add=(target-now.getDay()+7)%7;if(add===0)add=7;due=daysFromNow(add);title=title.replace(wd[0],"");md=true;}}}
+ if(!md){const dm=str.match(/\b(\d{1,2})\/(\d{1,2})\b/);if(dm){const now=new Date();let dt=new Date(now.getFullYear(),parseInt(dm[2])-1,parseInt(dm[1]));if(dt<now)dt.setFullYear(now.getFullYear()+1);due=dt;title=title.replace(dm[0],"");}}
+ return{title:title.replace(/\s+/g," ").trim(),assignee,priority,due};}
+function canWrite(){return !S.guest;}
+function actBadge(){return S.act.a1 && [S.act.a2,S.act.a3,S.act.a4].filter(Boolean).length>=2;}
+
+/* ---------- render ---------- */
+function render(){
+  setF();
+  const s=S.screen;
+  if(s==="signin")stage.innerHTML=vSignin();
+  else if(s==="invite-accept")stage.innerHTML=vInvite(false);
+  else if(s==="invite-expired")stage.innerHTML=vInvite(true);
+  else if(s.startsWith("ob-")||s==="ai-describe"||s==="ai-review")stage.innerHTML=vOnboarding();
+  else stage.innerHTML=vShell();
+  clearOverlays();
+  if(s==="app"){
+    renderPmap();
+    if(["home","projects-view"].includes(navScreenKind())&&(S.projView==="list"||S.nav==="home"))renderAct();
+    if(S.coach&&S.nav==="home"&&!S.loading&&canWrite())placeCoach();
+    if(S.drawer)renderDrawer();
+    if(S.switcherOpen)renderSwitcher();
+  }
+  if(S.modal)renderModal();
+}
+function navScreenKind(){return S.nav;}
+function clearOverlays(){["coach-el","acttrack-el","pmap-el","drawer-scrim","drawer-el","modal-scrim","modal-el","switcher-el","nav-backdrop"].forEach(id=>{const e=document.getElementById(id);if(e)e.remove();});}
+
+/* ---------- signin ---------- */
+function brandPanel(){return `<div class="split-brand"><div class="brand-orb orb1"></div><div class="brand-orb orb2"></div>
+   <div class="bmark"><span class="blogo">V</span> VierocClick</div>
+   <div><h1>${t("brand_h")}</h1><p class="sub">${t("brand_sub")}</p></div>
+   <div class="brand-foot"><span><span class="icn">${I.check}</span>${t("bf1")}</span><span><span class="icn">${I.globe}</span>${t("bf2")}</span><span><span class="icn">${I.spark}</span>${t("bf3")}</span></div></div>`;}
+function vSignin(){return `<div class="split">${brandPanel()}<div class="split-main"><div class="pane">
+   <h2 class="h-step">${t("signin_h")}</h2><p class="p-step">${t("signin_p")}</p>
+   <div style="display:flex;flex-direction:column;gap:10px;margin-top:26px">
+     <button class="btn btn-primary lg" data-action="signin">${t("cont_google")}<span class="icn">${I.arrow}</span></button>
+     <button class="btn btn-outline lg" data-action="signin">${t("cont_github")}</button></div>
+   <p class="hint" style="margin-top:16px;display:flex;gap:7px;align-items:center"><span class="icn" style="color:var(--mint)">${I.check}</span>${t("provider_note")}</p>
+   <div style="margin-top:22px;padding-top:18px;border-top:1px solid var(--hairline);text-align:center"><button class="linkish" data-action="jump" data-arg="invited">${t("have_invite")}</button></div>
+ </div></div></div>`;}
+function vInvite(expired){const who=lang==="vi"?"Lan Nguyễn":"Lan Nguyen";const ws=lang==="vi"?"Nhóm Marketing":"Marketing Team";
+ return `<div class="split">${brandPanel()}<div class="split-main"><div class="pane" style="text-align:center">
+  <div class="invite-hero" style="margin-inline:auto">${expired?I.lock:I.users}</div>
+  ${expired?`<h2 class="h-step">${t("inv_expired_h")}</h2><p class="p-step">${t("inv_expired_p")}</p>
+     <div style="margin-top:24px"><button class="btn btn-primary" data-action="noop">${t("inv_expired_cta")}</button></div>`
+   :`<h2 class="h-step">${t("inv_title",{who})} <span style="color:var(--primary)">${ws}</span></h2><p class="p-step">${t("inv_sub")}</p>
+     <div style="margin-top:24px;display:flex;flex-direction:column;gap:10px"><button class="btn btn-primary lg" data-action="accept-invite">${t("inv_join")}<span class="icn">${I.arrow}</span></button></div>`}
+  <div style="margin-top:22px"><button class="linkish" data-action="jump" data-arg="signin">← ${t("back")}</button></div>
+ </div></div></div>`;}
+
+/* ---------- onboarding ---------- */
+function stepIdx(){return {"ob-mode":0,"ob-template":1,"ai-describe":1,"ai-review":1,"ob-name":2}[S.screen]||0;}
+function vOnboarding(){const idx=stepIdx();const dots=`<div class="dots">${[0,1,2].map(i=>`<i class="${i<=idx?'on':''}"></i>`).join("")}</div>`;
+ let b="";if(S.screen==="ob-mode")b=obMode();else if(S.screen==="ob-template")b=obTpl();else if(S.screen==="ai-describe")b=obAI();else if(S.screen==="ai-review")b=obAIRev();else if(S.screen==="ob-name")b=obName();
+ const wide=(S.screen==="ob-template"||S.screen==="ai-review");
+ return `<div class="split">${brandPanel()}<div class="split-main"><div class="pane" style="max-width:${wide?'520px':'400px'}">${dots}${b}</div></div></div>`;}
+function obMode(){return `<h2 class="h-step">${t("step_mode_h")}</h2><p class="p-step">${t("step_mode_p")}</p><div class="choices">
+  <button class="choice" data-action="pick-mode" data-arg="personal"><span class="ci" style="background:var(--grad)">${I.user}</span><span><h3>${t("mode_personal")}</h3><p>${t("mode_personal_s")}</p></span><span class="arw icn">${I.chev}</span></button>
+  <button class="choice" data-action="pick-mode" data-arg="team"><span class="ci" style="background:var(--coral)">${I.users}</span><span><h3>${t("mode_team")}</h3><p>${t("mode_team_s")}</p></span><span class="arw icn">${I.chev}</span></button>
+ </div><div style="margin-top:20px;text-align:center"><button class="linkish" data-action="skip-ob">${t("skip")}</button></div>`;}
+function prev(def){let r=`<div class="ph">${def.phases[0][lang]}</div>`;def.phases[0].tasks.slice(0,2).forEach(tk=>r+=`<div class="pt"><span class="dot"></span>${tk[lang]}</div>`);if(def.phases[1])r+=`<div class="ph" style="margin-top:4px">${def.phases[1][lang]}</div>`;return `<div class="prev">${r}</div>`;}
+function obTpl(){const order=S.mode==="team"?["small-team-project","freelance-client","personal-planning","blank"]:["personal-planning","study","freelance-client","blank"];
+ const cards=order.map(k=>{const d=TEMPLATES[k];return `<button class="tpl" data-action="pick-template" data-arg="${k}"><span class="tico" style="background:${cv(d.color)}">${d.icon}</span><h3>${d.name[lang]}</h3><div class="td">${d.desc[lang]}</div>${prev(d)}</button>`;}).join("");
+ return `<h2 class="h-step">${t("step_tpl_h")}</h2><p class="p-step">${t("step_tpl_p")}</p><div class="tpl-grid">${cards}
+  <button class="tpl ai" data-action="jump" data-arg="ai"><span class="ai-badge">${t("ai_badge")}</span><span class="tico" style="background:var(--lav)">${I.spark}</span><h3>✨ ${t("ai_card")}</h3><div class="td">${t("ai_card_s")}</div></button></div>
+  <div style="margin-top:16px"><button class="linkish" data-action="goto" data-arg="ob-mode">← ${t("back")}</button></div>`;}
+function obAI(){return `<h2 class="h-step">${t("ai_h")}</h2><p class="p-step">${t("ai_p")}</p><div class="field"><textarea class="inp" data-field="aitext" placeholder="${t("ai_ph")}" rows="3">${esc(S.aiText||"")}</textarea></div>
+  <div style="display:flex;gap:10px;margin-top:18px"><button class="btn btn-primary" data-action="ai-build"><span class="icn">${I.spark}</span>${t("ai_build")}</button><button class="btn btn-ghost" data-action="goto" data-arg="ob-template">${t("ai_alt")}</button></div>`;}
+function obAIRev(){let html="",curr=null;S.tasks.forEach(tk=>{if(tk.phase!==curr){curr=tk.phase;html+=`<div class="ai-phase-lbl">${curr}</div>`;}const dm=dueMeta(tk.due);html+=`<div class="ai-draft-row">${I.check.replace('width="24"','')}<span>${tk.title}</span><span class="drm tnum">${dm?dm.label:""}</span></div>`;});
+ return `<h2 class="h-step">${t("ai_review_h")}</h2><p class="p-step">${t("ai_review_p")}</p><div style="margin-top:6px;max-height:52vh;overflow:auto;padding-right:4px">${html}</div>
+  <div style="display:flex;gap:10px;margin-top:18px"><button class="btn btn-primary" data-action="ai-apply"><span class="icn">${I.check}</span>${t("ai_apply")}</button><button class="btn btn-ghost" data-action="jump" data-arg="ai">${t("ai_regen")}</button></div>`;}
+function obName(){let inv="";if(S.mode==="team"){inv=`<div class="field"><label>${t("invite_label")}</label><input class="inp" data-field="inviteinp" placeholder="${t("invite_ph")}"/><div class="emailchips">${(S.invitedEmails||[]).map((e,i)=>`<span class="echip">${esc(e)}<button data-action="rm-email" data-arg="${i}">×</button></span>`).join("")}</div><p class="hint">${t("invite_hint")}</p></div>`;}
+ return `<h2 class="h-step">${t("step_name_h")}</h2><p class="p-step">${t("step_name_p")}</p>
+  <div class="field"><label>${t("ws_label")}</label><input class="inp" data-field="wsName" value="${esc(S.wsName)}"/></div>
+  <div class="field"><label>${t("proj_label")}</label><input class="inp" data-field="projName" value="${esc(S.projName)}"/></div>${inv}
+  <div style="margin-top:22px;display:flex;align-items:center;gap:14px"><button class="btn btn-primary lg" data-action="create-project">${t("create_go")}<span class="icn">${I.arrow}</span></button><button class="linkish" data-action="goto" data-arg="${S.aiText&&!S.tpl?'ai-review':'ob-template'}">← ${t("back")}</button></div>`;}
+
+/* ---------- shell ---------- */
+function vShell(){const wsInit=initials(S.wsName||"W");
+ const gnav=[["mywork",I.check,"nav_mywork"],["inbox",I.inbox,"nav_inbox"],["planner",I.cal,"nav_planner"]];
+ const wnav=[["home",I.home,"nav_home"],["projects",I.layers,"nav_projects"],["docs",I.doc,"nav_docs"],["settings",I.gear,"nav_settings"]];
+ const orgline=S.org?`<div class="side-sec" style="display:flex;align-items:center;gap:6px"><span class="icn" style="width:12px;height:12px">${I.building}</span>${esc(S.org)}</div>`:"";
+ const side=`<aside class="side ${S.mobileNav?'open':''}">
+   <div class="side-ws" data-action="toggle-switcher"><span class="ws-ava">${wsInit}</span><span><span class="ws-name">${esc(S.wsName)}</span><br><span class="ws-kind">${S.mode==="team"?t("wskind_team"):t("wskind_personal")}</span></span><span class="icn" style="margin-left:auto;opacity:.8">${I.chevd}</span></div>
+   <div class="side-sec">${lang==="vi"?"Chung":"General"}</div>
+   ${gnav.map(g=>`<div class="nav-i ${S.nav===g[0]?'on':''}" data-action="nav" data-arg="${g[0]}"><span class="icn">${g[1]}</span>${t(g[2])}${g[0]==="inbox"?`<span class="badge">3</span>`:""}</div>`).join("")}
+   ${orgline||`<div class="side-sec">${esc(S.wsName)}</div>`}
+   ${orgline?`<div class="side-sec">${esc(S.wsName)}</div>`:""}
+   ${wnav.map(n=>`<div class="nav-i ${S.nav===n[0]?'on':''}" data-action="nav" data-arg="${n[0]}"><span class="icn">${n[1]}</span>${t(n[2])}</div>`).join("")}
+   ${canWrite()?`<button class="side-invite" data-action="modal" data-arg="invite"><span class="icn">${I.users}</span>${t("invite_side")}</button>`:""}
+ </aside>`;
+ const crumb=crumbFor();
+ return `<div class="shell">${side}<div class="backdrop-nav ${S.mobileNav?'open':''}" data-action="close-mobilenav" id="nav-backdrop"></div>
+  <div class="main">
+   ${S.offline?`<div class="offline-bar"><span class="icn">${I.wifi}</span>${t("offline_msg")}</div>`:""}
+   <div class="topbar">
+     <button class="iconbtn hamb" data-action="toggle-mobilenav"><span class="icn">${I.hamb}</span></button>
+     <div class="crumb">${crumb}</div>
+     <div class="searchbar"><span class="icn">${I.search}</span>${t("search")}</div>
+     <div class="tb-actions">
+       <button class="iconbtn" data-action="modal" data-arg="telegram" title="Telegram">${I.tg}</button>
+       <button class="iconbtn" data-action="nav" data-arg="inbox">${I.bell}<span class="dotb"></span></button>
+       <span class="ava">${t("you")[0]}</span></div>
+   </div>
+   ${S.guest?`<div class="readonly-bar"><span class="icn">${I.eye}</span>${t("readonly_msg")}</div>`:""}
+   <div class="content ${["mywork","planner"].includes(S.nav)?'wide':''}">${S.loading?skeleton():contentFor()}</div>
+  </div></div>`;}
+function crumbFor(){
+ if(["home","projects-view","overview"].includes(S.nav)||S.nav==="home")return `<b>${esc(S.projName)}</b><span class="sep icn">${I.chev}</span><span>${S.projView==="board"?t("view_board"):S.projView==="overview"?t("view_overview"):t("view_list")}</span>`;
+ const map={mywork:"nav_mywork",inbox:"nav_inbox",planner:"nav_planner",projects:"nav_projects",docs:"nav_docs",settings:"nav_settings"};
+ return `<b>${t(map[S.nav]||"nav_home")}</b>`;}
+function contentFor(){switch(S.nav){
+ case"home":return vHome();
+ case"mywork":return vMyWork();
+ case"inbox":return vInbox();
+ case"planner":return vPlanner();
+ case"projects":return vProjects();
+ case"docs":return vDocs();
+ case"settings":return vSettings();
+ case"forbidden":return vForbidden();
+ case"doc-read":return vDocRead();
+ default:return vHome();}}
+
+/* home + project views */
+function nudge(){if(!S.nudgeOpen||S.invitedMode)return"";const done={task:S.act.a1,due:S.act.a2,invite:(S.invitedEmails&&S.invitedEmails.length>0)};
+ let steps=[["task","ns_task",done.task],["due","ns_due",done.due]];if(S.mode==="team")steps.push(["invite","ns_invite",done.invite]);
+ const total=steps.length,dc=steps.filter(s=>s[2]).length;if(dc>=total)return"";
+ return `<div class="nudge"><span class="pct">${t("nudge_pct",{a:dc,b:total})}</span><span class="nudge-steps">${steps.map(s=>`<span class="s ${s[2]?'done':''}"><span class="icn" style="width:14px;height:14px;color:${s[2]?'var(--good)':'var(--ink-muted)'}">${s[2]?I.check:I.plus}</span>${t(s[1])}</span>`).join("")}</span><button class="iconbtn" style="width:26px;height:26px" data-action="close-nudge"><span class="icn">${I.x}</span></button></div>`;}
+function vHome(){
+ if(S.projView==="board")return vBoard();
+ if(S.projView==="overview")return vOverview();
+ const name=t("you");
+ const mine=S.invitedMode?S.tasks.filter(x=>x.assignee===t("you")):null;
+ const soon=(mine||S.tasks).filter(x=>x.status!=="done"&&x.due).filter(x=>Math.round((new Date(x.due).setHours(0,0,0,0)-new Date().setHours(0,0,0,0))/86400000)<=3).sort((a,b)=>a.due-b.due).slice(0,5);
+ const head=S.invitedMode?`<h1 class="hi">${t("greet_inv",{w:esc(S.wsName)})} <span class="wave">👋</span></h1><p class="subhi">${t("greet_inv_sub")}</p>`
+   :`<h1 class="hi">${t("greet",{n:name})} <span class="wave">🎉</span></h1><p class="subhi">${t("greet_sub")}</p>`;
+ const todayLabel=S.invitedMode?t("assigned_me"):t("today");
+ const soonBlock=`<div class="block"><div class="block-h"><span class="icn" style="color:var(--peach)">${I.cal}</span><h2>${todayLabel}</h2><span class="ct tnum">${soon.length}</span>${viewTabs()}</div>
+   <div class="card">${canWrite()&&!S.invitedMode?qcRow():""}${soon.length?soon.map(taskRow).join(""):emptyBlock(S.invitedMode?"empty_assigned_h":"empty_here",S.invitedMode?"empty_assigned_p":null)}</div></div>`;
+ const all=`<div class="block"><div class="block-h"><span class="icn" style="color:var(--sky)">${I.layers}</span><h2>${t("all_tasks")}</h2><span class="ct tnum">${S.tasks.length}</span><span style="margin-left:auto"></span>${S.tasks.some(x=>x.sample)&&canWrite()?`<button class="btn sm btn-ghost" data-action="clear-samples">${t("clear_samples")}</button>`:""}</div><div class="card">${byPhase()}</div></div>`;
+ return head+nudge()+soonBlock+all;}
+function viewTabs(){return `<div class="vt" style="margin-left:auto"><button class="${S.projView==='overview'?'on':''}" data-action="pview" data-arg="overview">${t("view_overview")}</button><button class="${S.projView==='list'||S.nav==='home'?'on':''}" data-action="pview" data-arg="list">${t("view_list")}</button><button class="${S.projView==='board'?'on':''}" data-action="pview" data-arg="board">${t("view_board")}</button></div>`;}
+function qcRow(){return `<div class="qc"><span class="icn plus">${I.plus}</span><input id="qcinp" data-field="qc" placeholder="${t("qc_ph")}" autocomplete="off"/></div><div class="qc-preview" id="qcpreview"></div>`;}
+function taskRow(x){const dm=dueMeta(x.due);return `<div class="trow ${x.status==='done'?'done':''}" data-action="open-task" data-arg="${x.id}">
+  <button class="check" data-action="toggle-done" data-arg="${x.id}" data-stop="1" ${canWrite()?"":"disabled"}>${I.check}</button>
+  <span class="ttl">${esc(x.title)}</span><span class="tmeta">
+   ${x.priority==='high'?`<span class="pill prio-high">${t("prio_high")}</span>`:x.priority==='low'?`<span class="pill prio-low">${t("prio_low")}</span>`:""}
+   ${dm?`<span class="pill due ${dm.cls} tnum">${dm.label}</span>`:""}
+   ${x.assignee?`<span class="mini-ava" style="background:${cv(personDot(x.assignee))}">${initials(x.assignee)}</span>`:""}</span></div>`;}
+function byPhase(){let h="",curr=null;S.tasks.forEach(x=>{if(x.phase!==curr){curr=x.phase;h+=`<div class="phase-hd"><span class="tag-phase">${curr}</span><span class="ct tnum" style="font-size:11px">${S.tasks.filter(z=>z.phase===curr).length}</span></div>`;}h+=taskRow(x);});return h||emptyBlock("empty_here");}
+function emptyBlock(hk,pk){return `<div class="empty"><div class="ei icn">${I.check}</div><h3>${t(hk)}</h3>${pk?`<p>${t(pk)}</p>`:""}</div>`;}
+function vBoard(){const cols=[["todo","col_todo","--ink-muted"],["doing","col_doing","--sky"],["done","col_done","--good"]];
+ const b=cols.map(c=>{const items=S.tasks.filter(x=>x.status===c[0]);return `<div class="col"><div class="col-h"><span class="cdot" style="background:${cv(c[2])}"></span>${t(c[1])}<span class="cc tnum">${items.length}</span></div>
+   ${items.map(x=>{const dm=dueMeta(x.due);const next=c[0]==="todo"?"doing":c[0]==="doing"?"done":null;return `<div class="bcard" data-action="open-task" data-arg="${x.id}"><div class="bt">${esc(x.title)}</div><div class="bm">${x.priority==='high'?`<span class="pill prio-high">${t("prio_high")}</span>`:""}${dm?`<span class="pill due ${dm.cls} tnum">${dm.label}</span>`:""}${x.sample?`<span class="pill sample">${t("sample")}</span>`:""}${x.assignee?`<span class="mini-ava" style="background:${cv(personDot(x.assignee))}">${initials(x.assignee)}</span>`:""}</div>${next&&canWrite()?`<div class="adv" data-action="advance" data-arg="${x.id}" data-stop="1"><span class="icn" style="width:13px;height:13px">${I.arrow}</span>${t("advance")} ${t(next==='doing'?'col_doing':'col_done')}</div>`:""}</div>`;}).join("")||`<div style="padding:14px 4px;color:var(--ink-muted);font-size:12.5px">${t("empty_here")}</div>`}</div>`;}).join("");
+ return `<div style="display:flex;align-items:center;gap:12px"><h1 class="hi sm">${esc(S.projName)}</h1><div style="margin-left:auto">${viewTabs()}</div></div><div class="board">${b}</div>`;}
+function vOverview(){const total=S.tasks.length,done=S.tasks.filter(x=>x.status==="done").length,over=S.tasks.filter(x=>x.status!=="done"&&x.due&&new Date(x.due)<new Date().setHours(0,0,0,0)).length,open=total-done;const prog=total?Math.round(done/total*100):0;
+ const phases=[...new Set(S.tasks.map(x=>x.phase))];
+ return `<div style="display:flex;align-items:center;gap:12px"><h1 class="hi sm">${esc(S.projName)}</h1><div style="margin-left:auto">${viewTabs()}</div></div>
+  <div class="ov-grid">
+   <div class="stat"><div class="sl">${t("ov_progress")}</div><div class="sv" style="color:var(--mint)">${prog}%</div></div>
+   <div class="stat"><div class="sl">${t("ov_open")}</div><div class="sv">${open}</div></div>
+   <div class="stat"><div class="sl">${t("ov_overdue")}</div><div class="sv" style="color:${over?'var(--crit)':'var(--ink)'}">${over}</div></div>
+   <div class="stat"><div class="sl">${t("ov_done")}</div><div class="sv">${done}</div></div></div>
+  <div class="block"><div class="block-h"><span class="icn" style="color:var(--lav)">${I.layers}</span><h2>${t("phase_progress")}</h2></div>
+   <div class="card phase-prog">${phases.map(ph=>{const items=S.tasks.filter(x=>x.phase===ph);const d=items.filter(x=>x.status==="done").length;const pc=items.length?Math.round(d/items.length*100):0;return `<div class="pp-row"><span class="pp-name">${ph}</span><span class="pp-bar"><i style="width:${pc}%"></i></span><span class="pp-meta tnum">${d}/${items.length} · ${pc}%</span></div>`;}).join("")}</div></div>`;}
+
+/* my work (cross-workspace) */
+function vMyWork(){const other=lang==="vi"?"Nhóm Marketing":"Marketing Team";
+ const rows=[];S.tasks.filter(x=>x.status!=="done"&&x.due).slice(0,4).forEach(x=>rows.push({x,ws:S.wsName}));
+ const extra=[["Trả lời email khách","Reply to client email",0,"high"],["Chuẩn bị slide họp","Prep meeting slides",1,"normal"]];
+ extra.forEach(e=>rows.push({x:{id:"ext"+e[0],title:lang==="vi"?e[0]:e[1],due:daysFromNow(e[2]),priority:e[3],status:"todo",assignee:t("you")},ws:other}));
+ const overdue=rows.filter(r=>new Date(r.x.due)<new Date().setHours(0,0,0,0));
+ const upcoming=rows.filter(r=>new Date(r.x.due)>=new Date().setHours(0,0,0,0)).sort((a,b)=>a.x.due-b.x.due);
+ function grp(title,arr){return arr.length?`<div class="block"><div class="block-h"><h2>${title}</h2><span class="ct tnum">${arr.length}</span></div><div class="card">${arr.map(r=>{const dm=dueMeta(r.x.due);return `<div class="trow"><button class="check">${I.check}</button><span class="ttl">${esc(r.x.title)}</span><span class="tmeta"><span class="pill ws">${esc(r.ws)}</span>${r.x.priority==='high'?`<span class="pill prio-high">${t("prio_high")}</span>`:""}${dm?`<span class="pill due ${dm.cls} tnum">${dm.label}</span>`:""}</span></div>`;}).join("")}</div></div>`:"";}
+ return `<h1 class="hi sm">${t("mywork_h")}</h1><p class="subhi">${t("mywork_sub")}</p>${grp(t("overdue"),overdue)}${grp(t("upcoming"),upcoming)}`;}
+
+/* inbox */
+function vInbox(){const items=[
+  {t:"assign",who:"Lan",c:"--coral",txt:lang==="vi"?"đã giao cho bạn <b>Viết nội dung bài đăng</b>":"assigned you <b>Write post copy</b>",tm:lang==="vi"?"5 phút trước":"5m ago",u:true},
+  {t:"mention",who:"An",c:"--sky",txt:lang==="vi"?"nhắc bạn trong <b>Tích hợp thanh toán</b>":"mentioned you in <b>Integrate payments</b>",tm:lang==="vi"?"1 giờ trước":"1h ago",u:true},
+  {t:"comment",who:"Huy",c:"--mint",txt:lang==="vi"?"trả lời bình luận của bạn":"replied to your comment",tm:lang==="vi"?"3 giờ trước":"3h ago",u:true},
+  {t:"grant",who:"Minh",c:"--lav",txt:lang==="vi"?"chia sẻ <b>Dự án khách hàng</b> với bạn":"shared <b>Client project</b> with you",tm:lang==="vi"?"Hôm qua":"Yesterday",u:false}];
+ if(S.inboxEmpty)return `<h1 class="hi sm">${t("nav_inbox")}</h1>${emptyBlock("empty_inbox_h","empty_inbox_p").replace('class="empty"','class="empty" style="margin-top:20px"')}`;
+ const ic={assign:I.check,mention:I.bell,comment:I.doc,grant:I.users};
+ return `<h1 class="hi sm">${t("nav_inbox")}</h1><div class="card" style="margin-top:18px">${items.map(m=>`<div class="inbox-i ${m.u?'unread':''}"><span class="ii" style="background:${cv(m.c)}"><span class="icn" style="width:16px;height:16px">${ic[m.t]}</span></span><span class="it"><b>${m.who}</b> ${m.txt}</span><time>${m.tm}</time></div>`).join("")}</div>`;}
+
+/* planner */
+function vPlanner(){const days=lang==="vi"?["T2","T3","T4","T5","T6","T7","CN"]:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+ const today=new Date();const monday=new Date(today);monday.setDate(today.getDate()-((today.getDay()+6)%7));
+ let grid="";for(let i=0;i<7;i++){const d=new Date(monday);d.setDate(monday.getDate()+i);const isToday=d.toDateString()===today.toDateString();
+   const dayTasks=S.tasks.filter(x=>x.due&&new Date(x.due).toDateString()===d.toDateString());
+   grid+=`<div class="day ${isToday?'today':''}"><div class="dh"><span>${days[i]}</span><span>${d.getDate()}</span></div>${dayTasks.map(x=>`<div class="dtask ${x.priority==='high'?'high':''}" data-action="open-task" data-arg="${x.id}">${esc(x.title)}</div>`).join("")}</div>`;}
+ return `<h1 class="hi sm">${t("planner_h")}</h1><p class="subhi">${t("planner_sub")}</p><div style="margin-top:14px"><button class="btn sm btn-outline" data-action="noop"><span class="icn">${I.cal}</span>${t("connect_cal")}</button></div><div class="week">${grid}</div>`;}
+
+/* projects */
+function vProjects(){const projs=[{n:S.projName,c:TEMPLATES[S.tpl]?TEMPLATES[S.tpl].color:"--peach",ic:TEMPLATES[S.tpl]?TEMPLATES[S.tpl].icon:I.bolt,m:S.mode==="team"?4:1,priv:false},
+   {n:lang==="vi"?"Kế hoạch nội bộ":"Internal roadmap",c:"--sky",ic:I.layers,m:3,priv:false},
+   {n:lang==="vi"?"Tài chính (riêng tư)":"Finance (private)",c:"--lav",ic:I.lock,m:2,priv:true}];
+ return `<div style="display:flex;align-items:center"><h1 class="hi sm">${t("projects_h")}</h1>${canWrite()?`<button class="btn sm btn-primary" style="margin-left:auto" data-action="noop"><span class="icn">${I.plus}</span>${t("new_project")}</button>`:""}</div>
+  <div class="card" style="margin-top:18px">${projs.map(p=>`<div class="lrow" data-action="${p.priv?'open-forbidden':'open-project'}"><span class="li" style="background:${cv(p.c)}"><span class="icn">${p.ic}</span></span><div><h3>${esc(p.n)} ${p.priv?`<span class="pill" style="background:var(--lav-soft);color:var(--lav)">${t("private")}</span>`:""}</h3><p>${t("members_n",{n:p.m})}</p></div><div class="lr"><button class="iconbtn" data-action="modal" data-arg="share" data-stop="1"><span class="icn">${I.users}</span></button><span class="icn" style="opacity:.4">${I.chev}</span></div></div>`).join("")}</div>`;}
+function vForbidden(){return `<div class="empty forbidden" style="padding-top:70px"><div class="ei icn">${I.lock}</div><h3>${t("forbidden_h")}</h3><p>${t("forbidden_p")}</p><div style="margin-top:16px"><button class="btn btn-outline" data-action="nav" data-arg="projects">← ${t("nav_projects")}</button> <button class="btn btn-primary" data-action="noop">${t("request_access")}</button></div></div>`;}
+
+/* docs */
+function vDocs(){if(S.docsEmpty)return `<div style="display:flex;align-items:center"><h1 class="hi sm">${t("docs_h")}</h1></div>${emptyBlock("empty_docs_h","empty_docs_p").replace('class="empty"','class="empty" style="margin-top:20px"')}`;
+ const docs=[[t("read_doc_title"),"Lan",I.doc,"--sky"],[lang==="vi"?"Quyết định kỹ thuật":"Technical decisions",t("you"),I.doc,"--mint"],[lang==="vi"?"Wiki nhóm":"Team wiki","An",I.doc,"--peach"]];
+ return `<div style="display:flex;align-items:center"><h1 class="hi sm">${t("docs_h")}</h1>${canWrite()?`<button class="btn sm btn-primary" style="margin-left:auto" data-action="noop"><span class="icn">${I.plus}</span>${t("new_doc")}</button>`:""}</div>
+  <div class="card" style="margin-top:18px">${docs.map(d=>`<div class="lrow" data-action="open-doc"><span class="li" style="background:${cv(d[3])}"><span class="icn">${d[2]}</span></span><div><h3>${esc(d[0])}</h3><p>${lang==="vi"?"Cập nhật bởi":"Updated by"} ${d[1]}</p></div><span class="icn lr" style="opacity:.4">${I.chev}</span></div>`).join("")}</div>`;}
+function vDocRead(){return `<button class="linkish" data-action="nav" data-arg="docs">← ${t("docs_h")}</button><div class="card" style="margin-top:14px"><div class="doc-read">
+  <h1>${t("read_doc_title")}</h1><p class="muted">${lang==="vi"?"Cập nhật bởi Lan · hôm nay":"Updated by Lan · today"}</p>
+  <h2>${lang==="vi"?"Mục tiêu":"Goals"}</h2><p>${lang==="vi"?"Ra mắt sản phẩm trong 6 tuần với đầy đủ luồng thanh toán và trang sản phẩm.":"Launch the product in 6 weeks with full checkout and product pages."}</p>
+  <h2>${lang==="vi"?"Quyết định":"Decisions"}</h2><ul><li>${lang==="vi"?"Dùng thanh toán qua cổng nội địa trước.":"Use a local payment gateway first."}</li><li>${lang==="vi"?"Ưu tiên desktop, mobile sau.":"Desktop-first, mobile later."}</li></ul>
+  <h2>${lang==="vi"?"Việc tiếp theo":"Next steps"}</h2><p>${lang==="vi"?"Xem các phase trong dự án để theo dõi tiến độ.":"See the project phases to track progress."}</p></div></div>`;}
+
+/* settings */
+function vSettings(){const members=[[t("you"),"role_owner","--peach"],["Minh","role_member","--coral"],["Lan","role_member","--sky"],["An","role_guest","--mint"]];
+ return `<h1 class="hi sm">${t("settings_h")}</h1>
+  <div class="block"><div class="block-h"><h2>${t("set_general")}</h2></div><div class="card" style="padding:16px"><label style="font-size:13px;font-weight:600;color:var(--ink-2)">${t("set_ws_name")}</label><input class="inp" style="margin-top:6px;max-width:360px" value="${esc(S.wsName)}" ${canWrite()?"":"disabled"}/></div></div>
+  <div class="block"><div class="block-h"><h2>${t("set_members")}</h2><span class="ct tnum">${members.length}</span>${canWrite()?`<button class="btn sm btn-ghost" style="margin-left:auto" data-action="modal" data-arg="invite"><span class="icn">${I.plus}</span>${t("invite_side")}</button>`:""}</div>
+    <div class="card">${members.map(m=>`<div class="lrow" style="cursor:default"><span class="mini-ava" style="width:34px;height:34px;background:${cv(m[2])}">${initials(m[0])}</span><div><h3>${esc(m[0])}</h3><p>${m[0]===t("you")?"you@example.com":m[0].toLowerCase()+"@example.com"}</p></div><div class="lr"><select class="role-sel" ${canWrite()?"":"disabled"}><option ${m[1]==='role_owner'?'selected':''}>${t("role_owner")}</option><option ${m[1]==='role_admin'?'selected':''}>${t("role_admin")}</option><option ${m[1]==='role_member'?'selected':''}>${t("role_member")}</option><option ${m[1]==='role_guest'?'selected':''}>${t("role_guest")}</option></select></div></div>`).join("")}</div></div>
+  ${canWrite()?`<div class="block"><div class="block-h"><h2 style="color:var(--crit)">${t("set_danger")}</h2></div><div class="card" style="padding:16px;border-color:var(--crit-soft)"><button class="btn btn-outline" style="color:var(--crit);border-color:var(--crit)" data-action="noop">${t("delete_ws")}</button></div></div>`:""}`;}
+
+/* skeleton */
+function skeleton(){return `<div class="sk sk-line" style="width:220px;height:26px;margin:6px 0 20px"></div><div class="card">${Array.from({length:6}).map(()=>`<div class="sk sk-row"></div>`).join("")}</div>`;}
+
+/* coach */
+function placeCoach(){requestAnimationFrame(()=>{const qc=document.getElementById("qcinp");if(!qc)return;const r=qc.getBoundingClientRect();const el=document.createElement("div");el.className="coach";el.id="coach-el";el.style.top=(r.bottom+12)+"px";el.style.left=(r.left-4)+"px";el.innerHTML=`${t("coach")}<br><button data-action="dismiss-coach">${t("coach_ok")} →</button>`;app.appendChild(el);});}
+
+/* activation tracker */
+function renderAct(){const done=actBadge();const rows=[["a1","act_a1","A1"],["a2","act_a2","A2"],["a3","act_a3","A3"],["a4","act_a4","A4"]];
+ const el=document.createElement("div");el.className="dockpanel dp acttrack"+(S.actMin?" min":"");el.id="acttrack-el";
+ el.innerHTML=`<div class="dp-h" data-action="toggle-act"><span class="icn" style="width:15px;height:15px;color:var(--lav)">${I.bolt}</span>${t("act_title")}<span class="st" style="background:${done?'var(--mint-soft)':'var(--surface-3)'};color:${done?'var(--good)':'var(--ink-muted)'}">${done?t("act_done"):t("act_pending")}</span></div>
+  <div class="dp-b"><div class="acttrack-b">${rows.map(r=>`<div class="actrow ${S.act[r[0]]?'on':''}"><span class="ab icn" style="width:18px;height:18px">${I.check}</span><span class="k">${r[2]}</span>${t(r[1])}</div>`).join("")}</div><div class="act-note">${t("act_note")}</div></div>`;
+ app.appendChild(el);}
+
+/* prototype map */
+function renderPmap(){const cur=S.screen==="app"?S.nav+(S.nav==="home"?"/"+S.projView:""):S.screen;
+ const groups=[
+  [t("pmap_app"),[["home","pm_home"],["mywork","pm_mywork"],["inbox","pm_inbox"],["planner","pm_planner"],["projects","pm_projects"],["docs","pm_docs"],["settings","pm_settings"]]],
+  [t("pmap_proj"),[["overview","pm_overview"],["list","pm_list"],["board","pm_board"],["drawer","pm_drawer"]]],
+  [t("pmap_modal"),[["share","pm_share"],["invite","pm_invite"],["telegram","pm_tg"],["createorg","pm_org"],["switch","pm_switch"]]],
+  [t("pmap_state"),[["loading","pm_loading"],["emptyinbox","pm_empty"],["forbidden","pm_forbidden"],["readonly","pm_readonly","toggle",S.guest],["offline","pm_offline","toggle",S.offline]]],
+  [t("pmap_ob"),[["signin","pm_signin"],["personal","pm_personal"],["team","pm_team"],["ai","pm_ai"],["invited","pm_invited"],["invexp","pm_invexp"]]]
+ ];
+ const el=document.createElement("div");el.className="dockpanel dp pmap"+(S.pmapMin?" min":"");el.id="pmap-el";
+ el.innerHTML=`<div class="dp-h" data-action="toggle-pmap"><span class="icn" style="width:15px;height:15px;color:var(--primary)">${I.map}</span>${t("pmap_title")}<span class="icn" style="width:14px;height:14px;margin-left:auto;opacity:.6">${S.pmapMin?I.chev:I.chevd}</span></div>
+  <div class="dp-b"><div class="pmap-b">${groups.map(g=>`<div class="pmap-sec">${g[0]}</div>`+g[1].map(it=>{const isTog=it[2]==="toggle";const on=isTog&&it[3];return `<button class="pmap-i ${isTog&&on?'act':''}" data-action="jump" data-arg="${it[0]}">${t(it[1])}${isTog?`<span class="tg">${on?'ON':'OFF'}</span>`:""}</button>`;}).join("")).join("")}</div></div>`;
+ app.appendChild(el);}
+
+/* drawer */
+function renderDrawer(){const x=S.tasks.find(z=>z.id===S.drawer);if(!x)return;
+ const scrim=document.createElement("div");scrim.className="scrim";scrim.id="drawer-scrim";scrim.setAttribute("data-action","close-drawer");
+ const dm=dueMeta(x.due);const stat=[["todo","col_todo","--ink-muted"],["doing","col_doing","--sky"],["done","col_done","--good"]];
+ const subs=S.subtasks[x.id]||[];const chk=S.checklist[x.id]||[{txt:lang==="vi"?"Tiêu chí hoàn thành":"Acceptance criteria",done:false}];
+ const cmts=S.comments[x.id]||[];
+ const acts=[{who:t("you"),txt:t("act_created"),tm:lang==="vi"?"vừa xong":"just now",c:"--peach"}];
+ cmts.forEach(c=>acts.push({who:t("you"),txt:t("act_comment")+': "'+esc(c)+'"',tm:lang==="vi"?"vừa xong":"just now",c:"--peach"}));
+ const dr=document.createElement("div");dr.className="drawer";dr.id="drawer-el";
+ dr.innerHTML=`<div class="dr-head"><span class="tag-phase">${x.phase}</span>${canWrite()?`<button class="iconbtn" data-action="modal" data-arg="share" title="${t("share_h")}"><span class="icn">${I.users}</span></button>`:""}<button class="iconbtn" style="margin-left:${canWrite()?'0':'auto'}" data-action="close-drawer"><span class="icn">${I.x}</span></button></div>
+  <div class="dr-body">
+   <div class="dr-title">${esc(x.title)}</div>
+   <div class="dr-props">
+    <div class="prop"><span class="pk"><span class="icn" style="width:15px;height:15px">${I.bolt}</span>${t("drawer_status")}</span><span class="status-sel">${stat.map(s=>`<button class="stat-opt ${x.status===s[0]?'on':''}" style="${x.status===s[0]?'background:'+cv(s[2]):''}" data-action="set-status" data-arg="${x.id}:${s[0]}" ${canWrite()?"":"disabled"}>${t(s[1])}</button>`).join("")}</span></div>
+    <div class="prop"><span class="pk"><span class="icn" style="width:15px;height:15px">${I.user}</span>${t("drawer_assignee")}</span>${x.assignee?`<span style="display:flex;align-items:center;gap:7px"><span class="mini-ava" style="background:${cv(personDot(x.assignee))}">${initials(x.assignee)}</span>${esc(x.assignee)}</span>`:canWrite()?`<button class="btn sm btn-ghost" data-action="assign-me" data-arg="${x.id}">+ ${t("you")}</button>`:t("none")}</div>
+    <div class="prop"><span class="pk"><span class="icn" style="width:15px;height:15px">${I.cal}</span>${t("drawer_due")}</span><span class="pill due ${dm?dm.cls:''} tnum">${dm?dm.label:t("none")}</span></div>
+    <div class="prop"><span class="pk"><span class="icn" style="width:15px;height:15px">${I.flag}</span>${t("drawer_prio")}</span><span>${x.priority==='high'?t("prio_high"):x.priority==='low'?t("prio_low"):t("prio_normal")}</span></div>
+   </div>
+   <div class="dr-sec-h">${t("description")}</div><textarea class="inp" placeholder="${t("desc_ph")}" rows="2" ${canWrite()?"":"disabled"}></textarea>
+   <div class="dr-sec-h">${t("checklist")}</div>${chk.map((c,i)=>`<div class="chk ${c.done?'done':''}"><span class="box icn" data-action="toggle-chk" data-arg="${x.id}:${i}">${I.check}</span><span>${esc(c.txt)}</span></div>`).join("")}
+   <div class="dr-sec-h">${t("subtasks")}</div>${subs.map(s=>`<div class="subt"><button class="check ${s.done?'':''}">${s.done?I.check:""}</button><span>${esc(s.txt)}</span></div>`).join("")}${canWrite()?`<input class="inp" data-field="subinp" data-tid="${x.id}" placeholder="${t("add_sub")}" style="margin-top:6px"/>`:""}
+   <div class="dr-sec-h">${t("activity")}</div>${acts.map(a=>`<div class="act-item"><span class="adot" style="background:${cv(a.c)}">${initials(a.who)}</span><span><b style="font-weight:600">${a.who}</b> ${a.txt} · <time>${a.tm}</time></span></div>`).join("")}
+   ${canWrite()?`<div class="commentbox"><span class="mini-ava" style="background:var(--peach)">${t("you")[0]}</span><input data-field="cmt" data-tid="${x.id}" placeholder="${t("comment_ph")}"/></div>`:""}
+  </div>`;
+ app.appendChild(scrim);app.appendChild(dr);}
+
+/* switcher dropdown */
+function renderSwitcher(){const el=document.createElement("div");el.className="dropdown";el.id="switcher-el";
+ const orgSec=S.org?`<div class="dd-sec"><span class="icn" style="width:11px;height:11px;display:inline-block;vertical-align:-1px">${I.building}</span> ${esc(S.org)}</div><div class="dd-i on"><span class="di" style="background:var(--grad)">${initials(S.wsName)}</span>${esc(S.wsName)}</div>`
+  :`<div class="dd-sec">${t("sw_standalone")}</div><div class="dd-i on"><span class="di" style="background:var(--grad)">${initials(S.wsName)}</span>${esc(S.wsName)}</div>`;
+ el.innerHTML=`${orgSec}<div class="dd-i"><span class="di" style="background:var(--sky)">MK</span>${lang==="vi"?"Nhóm Marketing":"Marketing Team"}</div>
+   ${S.org?"":`<div class="dd-add" data-action="modal" data-arg="createorg"><span class="icn">${I.building}</span>${t("sw_create_org")}</div>`}`;
+ app.appendChild(el);}
+
+/* modal */
+function renderModal(){const scrim=document.createElement("div");scrim.className="scrim";scrim.id="modal-scrim";scrim.setAttribute("data-action","close-modal");
+ let body="";
+ if(S.modal==="share")body=modalShare();else if(S.modal==="invite")body=modalInvite();else if(S.modal==="telegram")body=modalTelegram();else if(S.modal==="createorg")body=modalOrg();
+ const el=document.createElement("div");el.className="modal";el.id="modal-el";el.innerHTML=body;
+ app.appendChild(scrim);app.appendChild(el);}
+function mh(title){return `<div class="modal-h"><h2>${title}</h2><button class="iconbtn" style="margin-left:auto" data-action="close-modal"><span class="icn">${I.x}</span></button></div>`;}
+function lvlSel(v){return `<select class="lvl-sel"><option ${v==='view'?'selected':''}>${t("lvl_view")}</option><option ${v==='comment'?'selected':''}>${t("lvl_comment")}</option><option ${v==='edit'?'selected':''}>${t("lvl_edit")}</option><option ${v==='full'?'selected':''}>${t("lvl_full")}</option></select>`;}
+function modalShare(){return `${mh(t("share_h"))}<div class="modal-b">
+  <input class="inp" placeholder="${t("share_add_ph")}"/>
+  <div class="share-gen"><span class="icn" style="color:var(--sky)">${I.users}</span><div><div style="font-size:13.5px;font-weight:600">${t("share_general")}</div><div class="muted" style="font-size:12px">${t("share_gen_view")}</div></div>${lvlSel("view")}</div>
+  <div class="share-row"><span class="mini-ava" style="background:var(--peach)">${t("you")[0]}</span><div><div style="font-weight:600">${t("you")}</div></div><span class="grant-tag grant-dir" style="margin-left:auto">${t("grant_direct")}</span>${lvlSel("full")}</div>
+  <div class="share-row"><span class="mini-ava" style="background:var(--coral)">M</span><div><div style="font-weight:600">Minh</div></div><span class="grant-tag grant-inh" style="margin-left:auto">${t("grant_inherited")}</span>${lvlSel("edit")}</div>
+  <div class="share-row"><span class="mini-ava" style="background:var(--lav)">${I.users.replace('width="24"','')}</span><div><div style="font-weight:600">${lang==="vi"?"Nhóm Thiết kế":"Design team"}</div></div><span class="grant-tag grant-team" style="margin-left:auto">${t("grant_team")}</span>${lvlSel("comment")}</div>
+  <p class="hint" style="margin-top:10px"><span class="icn" style="width:13px;height:13px;color:var(--lav);display:inline-block;vertical-align:-2px">${I.lock}</span> ${t("guest_note")}</p>
+  <div style="margin-top:16px;display:flex;justify-content:flex-end"><button class="btn btn-primary sm" data-action="save-share">${lang==="vi"?"Xong":"Done"}</button></div></div>`;}
+function modalInvite(){return `${mh(t("invite_h"))}<div class="modal-b">
+  <div class="field" style="margin-top:0"><label>${t("invite_label")}</label><textarea class="inp" placeholder="${t("invite_ph")}" rows="2"></textarea></div>
+  <div class="field"><label>${t("invite_role")}</label><select class="inp"><option>${t("role_member")}</option><option>${t("role_admin")}</option><option>${t("role_guest")}</option></select></div>
+  <div style="margin-top:18px;display:flex;justify-content:flex-end"><button class="btn btn-primary" data-action="do-invite">${t("send_invites")}</button></div></div>`;}
+function modalTelegram(){return `${mh(t("tg_h"))}<div class="modal-b" style="text-align:center">
+  <div class="invite-hero" style="margin-inline:auto;background:#2aabee">${I.tg}</div>
+  <p class="sec" style="font-size:14px">${t("tg_p")}</p>
+  <div style="text-align:left;margin-top:16px;display:flex;flex-direction:column;gap:8px">
+   <div class="share-row"><span class="mini-ava" style="background:var(--sky)">1</span>${t("tg_step1")}</div>
+   <div class="share-row"><span class="mini-ava" style="background:var(--sky)">2</span>${t("tg_step2")}</div>
+   <div class="share-row"><span class="mini-ava" style="background:var(--sky)">3</span>${t("tg_step3")}</div></div>
+  <div class="inp" style="display:flex;align-items:center;justify-content:center;font-weight:700;letter-spacing:.2em;font-size:18px;margin-top:8px">VRC-4821</div>
+  <div style="margin-top:16px"><button class="btn btn-primary" data-action="do-tg">${t("tg_connect_btn")}</button></div></div>`;}
+function modalOrg(){return `${mh(t("org_h"))}<div class="modal-b">
+  <p class="sec" style="font-size:14px">${t("org_p")}</p>
+  <div class="field"><label>${t("org_name")}</label><input class="inp" data-field="orgname" placeholder="${lang==="vi"?"VD: Công ty Vieroc":"e.g. Vieroc Inc."}"/></div>
+  <p class="hint"><span class="icn" style="width:13px;height:13px;color:var(--warn);display:inline-block;vertical-align:-2px">${I.lock}</span> ${t("org_note")}</p>
+  <div style="margin-top:18px;display:flex;justify-content:flex-end"><button class="btn btn-primary" data-action="do-org">${t("org_create")}</button></div></div>`;}
+
+/* toast */
+let tt=null;function toast(m){const o=document.getElementById("toast-el");if(o)o.remove();const el=document.createElement("div");el.className="toast";el.id="toast-el";el.innerHTML=`<span class="icn" style="color:var(--mint);width:15px;height:15px">${I.check}</span>${m}`;app.appendChild(el);clearTimeout(tt);tt=setTimeout(()=>el.remove(),2000);}
+
+/* ---------- navigation helper ---------- */
+function goApp(nav){S.screen="app";S.nav=nav;S.switcherOpen=false;S.mobileNav=false;render();}
+function withLoading(fn){S.loading=true;render();setTimeout(()=>{S.loading=false;fn();render();},480);}
+
+/* ---------- jump (prototype map) ---------- */
+function jump(target){
+ S.modal=null;S.drawer=null;S.switcherOpen=false;
+ switch(target){
+  case"signin":resetAll();return;
+  case"personal":resetAll();S.mode="personal";S.wsName=lang==="vi"?"Không gian của bạn":"Your space";S.screen="ob-template";break;
+  case"team":resetAll();S.mode="team";S.wsName=lang==="vi"?"Nhóm của bạn":"Your team";S.screen="ob-template";break;
+  case"ai":S.screen="ai-describe";break;
+  case"invited":S.screen="invite-accept";break;
+  case"invexp":S.screen="invite-expired";break;
+  case"home":ensureApp();goApp("home");return;
+  case"mywork":case"inbox":case"planner":case"projects":case"docs":case"settings":ensureApp();goApp(target);return;
+  case"overview":ensureApp();S.nav="home";S.projView="overview";goApp("home");return;
+  case"list":ensureApp();S.nav="home";S.projView="list";goApp("home");return;
+  case"board":ensureApp();S.nav="home";S.projView="board";goApp("home");return;
+  case"drawer":ensureApp();S.nav="home";S.projView="list";S.screen="app";if(S.tasks[0])S.drawer=S.tasks[0].id;render();return;
+  case"share":ensureApp();S.screen="app";S.modal="share";render();return;
+  case"invite":ensureApp();S.screen="app";S.modal="invite";render();return;
+  case"telegram":ensureApp();S.screen="app";S.modal="telegram";render();return;
+  case"createorg":ensureApp();S.screen="app";S.modal="createorg";render();return;
+  case"switch":ensureApp();S.screen="app";S.switcherOpen=true;render();return;
+  case"loading":ensureApp();S.screen="app";S.nav="home";withLoading(()=>{});return;
+  case"emptyinbox":ensureApp();S.inboxEmpty=true;goApp("inbox");return;
+  case"forbidden":ensureApp();goApp("forbidden");return;
+  case"readonly":S.guest=!S.guest;ensureApp();S.screen="app";render();return;
+  case"offline":S.offline=!S.offline;if(!S.offline)toast(t("toast_synced"));ensureApp();S.screen="app";render();return;
+ }
+ render();
+}
+function ensureApp(){if(!S.tasks.length){S.mode=S.mode||"team";S.wsName=S.wsName||(lang==="vi"?"Nhóm của bạn":"Your team");S.tpl="freelance-client";S.projName=TEMPLATES["freelance-client"].proj[lang];seedTemplate("freelance-client");}}
+
+/* ---------- events ---------- */
+app.addEventListener("click",e=>{const el=e.target.closest("[data-action]");if(!el)return;const a=el.getAttribute("data-action"),arg=el.getAttribute("data-arg");if(el.getAttribute("data-stop"))e.stopPropagation();
+ switch(a){
+  case"lang-toggle":lang=lang==="vi"?"en":"vi";retitle();render();break;
+  case"theme-toggle":theme=theme==="dark"?"light":"dark";document.documentElement.setAttribute("data-theme",theme);render();break;
+  case"restart":resetAll();break;
+  case"signin":S.screen="ob-mode";render();break;
+  case"accept-invite":seedInvited();goApp("home");break;
+  case"pick-mode":S.mode=arg;S.wsName=arg==="personal"?(lang==="vi"?"Không gian của bạn":"Your space"):(lang==="vi"?"Nhóm của bạn":"Your team");S.screen="ob-template";render();break;
+  case"skip-ob":S.mode="personal";S.wsName=lang==="vi"?"Không gian của bạn":"Your space";S.tpl="blank";S.projName=TEMPLATES.blank.proj[lang];seedTemplate("blank");goApp("home");break;
+  case"pick-template":S.tpl=arg;S.aiText="";S.projName=TEMPLATES[arg].proj[lang];seedTemplate(arg);S.screen="ob-name";render();break;
+  case"goto":S.screen=arg;render();break;
+  case"jump":jump(arg);break;
+  case"ai-build":S.screen="ai-loading";{const p=stage.querySelector(".pane");if(p)p.innerHTML=`<div class="dots"><i class="on"></i><i class="on"></i><i></i></div><div class="ai-build"><div class="ai-spinner"></div><div style="font-weight:600">${t("ai_building")}</div><div class="muted" style="font-size:13px;text-align:center">${esc(S.aiText||t("ai_ph"))}</div></div>`;}setTimeout(()=>{seedAI();S.tpl=null;S.screen="ai-review";render();},1500);break;
+  case"ai-apply":S.screen="ob-name";render();break;
+  case"rm-email":S.invitedEmails.splice(parseInt(arg),1);render();break;
+  case"create-project":goApp("home");break;
+  case"nav":S.mobileNav=false;if(arg===S.nav){render();break;}S.nav=arg;S.switcherOpen=false;if(arg==="inbox")S.inboxEmpty=false;withLoading(()=>{if(arg==="home")S.projView="list";});break;
+  case"pview":S.projView=arg;render();break;
+  case"toggle-done":toggleDone(parseInt(arg));break;
+  case"advance":advance(parseInt(arg));break;
+  case"open-task":S.drawer=parseInt(arg);render();break;
+  case"close-drawer":S.drawer=null;render();break;
+  case"set-status":{const[id,st]=arg.split(":");setStatus(parseInt(id),st);break;}
+  case"assign-me":{const x=S.tasks.find(z=>z.id===parseInt(arg));if(x){x.assignee=t("you");S.act.a2=true;}render();break;}
+  case"toggle-chk":{const[id,i]=arg.split(":");const l=S.checklist[id]||[{txt:lang==="vi"?"Tiêu chí hoàn thành":"Acceptance criteria",done:false}];l[i].done=!l[i].done;S.checklist[id]=l;render();break;}
+  case"clear-samples":S.tasks=S.tasks.filter(x=>!x.sample);S.drawer=null;render();break;
+  case"dismiss-coach":S.coach=false;render();break;
+  case"toggle-act":S.actMin=!S.actMin;render();break;
+  case"toggle-pmap":S.pmapMin=!S.pmapMin;render();break;
+  case"close-nudge":S.nudgeOpen=false;render();break;
+  case"toggle-switcher":S.switcherOpen=!S.switcherOpen;render();break;
+  case"toggle-mobilenav":S.mobileNav=!S.mobileNav;render();break;
+  case"close-mobilenav":S.mobileNav=false;render();break;
+  case"modal":S.modal=arg;S.drawer=(arg==="share"&&S.drawer)?S.drawer:S.drawer;render();break;
+  case"close-modal":S.modal=null;render();break;
+  case"open-project":goApp("home");break;
+  case"open-forbidden":goApp("forbidden");break;
+  case"open-doc":S.nav="doc-read";render();break;
+  case"save-share":S.modal=null;toast(t("toast_share"));render();break;
+  case"do-invite":S.modal=null;S.invitedEmails=(S.invitedEmails||[]).concat(["teammate@example.com"]);S.act.a4=true;toast(t("toast_invited"));render();break;
+  case"do-tg":S.modal=null;toast(t("toast_tg"));render();break;
+  case"do-org":{const v=(document.querySelector('[data-field="orgname"]')||{}).value;S.org=v||(lang==="vi"?"Tổ chức của bạn":"Your organization");S.modal=null;toast(t("toast_org"));render();break;}
+  case"noop":break;
+ }});
+app.addEventListener("input",e=>{const el=e.target.closest("[data-field]");if(!el)return;const f=el.getAttribute("data-field");
+ if(f==="wsName")S.wsName=el.value;else if(f==="projName")S.projName=el.value;else if(f==="aitext")S.aiText=el.value;
+ else if(f==="qc"){if(S.coach){S.coach=false;const c=document.getElementById("coach-el");if(c)c.remove();}qcPreview(el.value);}});
+app.addEventListener("keydown",e=>{const el=e.target.closest("[data-field]");if(!el)return;const f=el.getAttribute("data-field");
+ if(f==="qc"&&e.key==="Enter"){e.preventDefault();commitQuick(el);}
+ if(f==="inviteinp"&&(e.key==="Enter"||e.key===",")){e.preventDefault();const v=el.value.trim().replace(/,$/,"");if(v){S.invitedEmails=(S.invitedEmails||[]).concat([v]);el.value="";render();requestAnimationFrame(()=>{const i=document.querySelector('[data-field="inviteinp"]');if(i)i.focus();});}}
+ if(f==="cmt"&&e.key==="Enter"){e.preventDefault();const id=el.getAttribute("data-tid");const v=el.value.trim();if(v){S.comments[id]=(S.comments[id]||[]).concat([v]);el.value="";toast(t("toast_comment"));render();}}
+ if(f==="subinp"&&e.key==="Enter"){e.preventDefault();const id=el.getAttribute("data-tid");const v=el.value.trim();if(v){S.subtasks[id]=(S.subtasks[id]||[]).concat([{txt:v,done:false}]);el.value="";render();}}});
+
+function qcPreview(val){const box=document.getElementById("qcpreview");if(!box)return;const p=parseQuick(val);let c="";
+ if(p.assignee)c+=`<span class="parse-chip" style="background:${cs(personDot(p.assignee))};color:${cv(personDot(p.assignee))}"><span class="icn" style="width:12px;height:12px">${I.user}</span>${p.assignee}</span>`;
+ if(p.due){const dm=dueMeta(p.due);c+=`<span class="parse-chip" style="background:var(--peach-soft);color:var(--warn)"><span class="icn" style="width:12px;height:12px">${I.cal}</span>${dm.label}</span>`;}
+ if(p.priority==="high")c+=`<span class="parse-chip prio-high">${t("prio_high")}</span>`;if(p.priority==="low")c+=`<span class="parse-chip prio-low">${t("prio_low")}</span>`;
+ box.innerHTML=c;}
+function commitQuick(el){const val=el.value.trim();if(!val)return;const p=parseQuick(val);if(!p.title)p.title=val;
+ const first=S.tasks[0];const task={id:tid++,title:p.title,titleVi:p.title,titleEn:p.title,phase:first?first.phase:(lang==="vi"?"Việc cần làm":"To do"),phaseVi:first?first.phaseVi:"Việc cần làm",phaseEn:first?first.phaseEn:"To do",status:"todo",due:p.due,priority:p.priority,assignee:p.assignee,sample:false};
+ S.tasks.unshift(task);S.act.a1=true;if(p.due||p.assignee)S.act.a2=true;el.value="";const box=document.getElementById("qcpreview");if(box)box.innerHTML="";
+ toast(S.offline?t("toast_offpend"):t("toast_created"));render();requestAnimationFrame(()=>{const q=document.getElementById("qcinp");if(q)q.focus();});}
+function toggleDone(id){const x=S.tasks.find(z=>z.id===id);if(!x||!canWrite())return;x.status=x.status==="done"?"todo":"done";S.act.a3=true;toast(S.offline?t("toast_offpend"):t("toast_status"));render();}
+function advance(id){const x=S.tasks.find(z=>z.id===id);if(!x||!canWrite())return;x.status=x.status==="todo"?"doing":"done";S.act.a3=true;toast(S.offline?t("toast_offpend"):t("toast_status"));render();}
+function setStatus(id,st){const x=S.tasks.find(z=>z.id===id);if(!x||!canWrite())return;x.status=st;S.act.a3=true;render();}
+function resetAll(){Object.assign(S,{screen:"signin",nav:"home",projView:"list",mode:null,invitedMode:false,guest:false,offline:false,wsName:"",projName:"",tasks:[],invitedEmails:[],org:null,drawer:null,modal:null,switcherOpen:false,coach:true,nudgeOpen:true,act:{a1:false,a2:false,a3:false,a4:false},loading:false,mobileNav:false,comments:{},subtasks:{},checklist:{},inboxEmpty:false,docsEmpty:false,aiText:""});render();}
+
+render();
+})();
+</script>

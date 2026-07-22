@@ -47,6 +47,13 @@ const config: Config = {
           foreground: "hsl(var(--brand-foreground))",
           soft: "hsl(var(--brand-soft))",
         },
+        // Pastel accent family (redesign §3.4). `<name>` = accent, `<name>-soft`
+        // = surface tint. e.g. bg-coral-soft text-coral.
+        coral: { DEFAULT: "hsl(var(--coral))", soft: "hsl(var(--coral-soft))" },
+        peach: { DEFAULT: "hsl(var(--peach))", soft: "hsl(var(--peach-soft))" },
+        lavender: { DEFAULT: "hsl(var(--lavender))", soft: "hsl(var(--lavender-soft))" },
+        sky: { DEFAULT: "hsl(var(--sky))", soft: "hsl(var(--sky-soft))" },
+        mint: { DEFAULT: "hsl(var(--mint))", soft: "hsl(var(--mint-soft))" },
       },
       borderRadius: {
         xl: "calc(var(--radius) + 4px)",

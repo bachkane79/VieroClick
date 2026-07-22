@@ -2,12 +2,21 @@ import { pgTable, pgEnum, text, uuid, numeric, integer, jsonb, unique } from "dr
 import { timestamptz } from "./_helpers";
 import { users } from "./users";
 
+// Personal vs team workspace. Chosen in the onboarding wizard (personal = solo
+// space, team = collaborative). Purely informational for the shell/onboarding;
+// it does not affect authorization. Attaching a personal workspace to an org
+// requires flipping this to "team" first (see the B2C redesign spec §4.1).
+export const workspaceKindEnum = pgEnum("workspace_kind", ["personal", "team"]);
+
 export const workspaceRoleEnum = pgEnum("workspace_role", [
   "owner",
   "admin",
   "leader",
   "member",
   "viewer",
+  // Weakest tier: guests can never access a Space (project) unless explicitly
+  // shared, cannot re-share, and are capped by per-item grants (§4.2).
+  "guest",
 ]);
 
 export const workspaces = pgTable("workspaces", {
@@ -17,6 +26,7 @@ export const workspaces = pgTable("workspaces", {
   ownerId: uuid("owner_id")
     .notNull()
     .references(() => users.id),
+  kind: workspaceKindEnum("kind").notNull().default("personal"),
   // Optional umbrella org (see schema/organizations.ts). Null = standalone team.
   // No FK reference here to avoid a circular import (organizations imports users
   // only); the column is a plain uuid enforced at the DB level by the migration.
