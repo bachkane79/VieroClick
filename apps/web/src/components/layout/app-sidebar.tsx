@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useParams, useRouter } from "next/navigation";
@@ -33,7 +33,6 @@ import {
   Gauge,
   Globe,
   Hash,
-  HelpCircle,
   Home,
   Inbox,
   KanbanSquare,
@@ -95,76 +94,11 @@ function deriveTab(pathname: string): RailTab | null {
   return null;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
-   macOS-Dock magnification for the rail. As the pointer travels the rail,
-   each item scales by its distance to the cursor (nearest = largest, the
-   neighbours ease down), growing toward the panel. Disabled under
-   prefers-reduced-motion (§9.4). Only `transform` animates — no layout shift.
-   ───────────────────────────────────────────────────────────────────────── */
-function useDock(count: number) {
-  const navRef = useRef<HTMLElement>(null);
-  const itemRefs = useRef<Array<HTMLElement | null>>([]);
-  const centers = useRef<number[]>([]);
-  const [pointerY, setPointerY] = useState<number | null>(null);
-  const [reduce, setReduce] = useState(false);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const on = () => setReduce(mq.matches);
-    on();
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, []);
-
-  function measure() {
-    const nav = navRef.current;
-    if (!nav) return;
-    const top = nav.getBoundingClientRect().top;
-    centers.current = itemRefs.current.map((el) =>
-      el ? el.getBoundingClientRect().top - top + el.offsetHeight / 2 : 0
-    );
-  }
-
-  function onMove(e: React.MouseEvent) {
-    if (reduce) return;
-    if (centers.current.length !== count) measure();
-    const nav = navRef.current;
-    if (!nav) return;
-    setPointerY(e.clientY - nav.getBoundingClientRect().top);
-  }
-
-  function style(i: number): React.CSSProperties {
-    if (reduce || pointerY === null) return {};
-    const R = 88; // influence radius (px)
-    const MAX = 0.55; // extra scale at the cursor
-    const d = Math.abs(pointerY - (centers.current[i] ?? i * 56));
-    const f = Math.max(0, 1 - d / R);
-    const eased = f * f;
-    const scale = 1 + MAX * eased;
-    return {
-      transform: `translateX(${9 * eased}px) scale(${scale})`,
-      transformOrigin: "left center",
-      zIndex: eased > 0.05 ? 10 : undefined,
-    };
-  }
-
-  return {
-    navRef,
-    setItemRef: (i: number) => (el: HTMLElement | null) => {
-      itemRefs.current[i] = el;
-    },
-    onMove,
-    onLeave: () => setPointerY(null),
-    style,
-    reduce,
-  };
-}
-
 /**
  * Application shell (left) — ClickUp-style dark icon rail + a collapsible
- * "scale-out" context panel. The rail carries the macOS-Dock magnification;
- * the panel header's create (+) and collapse controls reveal on hover. The
- * TopBar above owns the workspace switcher, search and Ask AI.
+ * "scale-out" context panel. The rail stays calm and stable (primary nav);
+ * the macOS-Dock magnification now lives on the TopBar. The panel header's
+ * create (+) and collapse controls reveal on hover.
  */
 export function AppSidebar({ user, workspaces }: Props) {
   const pathname = usePathname();
@@ -183,8 +117,6 @@ export function AppSidebar({ user, workspaces }: Props) {
   const [teams, setTeams] = useState<TeamItem[] | null>(null);
   const [docs, setDocs] = useState<DocItem[] | null>(null);
   const [chatDir, setChatDir] = useState<ChatDir | null>(null);
-
-  const dock = useDock(6);
 
   const activeWorkspace = workspaces.find((w) => w.slug === currentSlug) ?? workspaces[0];
   const ws = activeWorkspace?.slug;
@@ -365,13 +297,9 @@ export function AppSidebar({ user, workspaces }: Props) {
           />
         </Link>
 
-        <nav
-          ref={dock.navRef}
-          onMouseMove={dock.onMove}
-          onMouseLeave={dock.onLeave}
-          className="relative flex flex-1 flex-col items-center gap-1 overflow-visible"
-        >
-          {RAIL.map((item, i) => {
+        <nav className="relative flex flex-1 flex-col items-center gap-1">
+
+          {RAIL.map((item) => {
             const Icon = item.icon;
             const active = item.key !== "more" && tab === item.key;
             const disabled = !ws && item.key !== "home";
@@ -402,13 +330,7 @@ export function AppSidebar({ user, workspaces }: Props) {
               return (
                 <DropdownMenu.Root key="more">
                   <DropdownMenu.Trigger asChild>
-                    <button
-                      ref={dock.setItemRef(i)}
-                      style={dock.style(i)}
-                      disabled={disabled}
-                      title={item.label}
-                      className={cls}
-                    >
+                    <button disabled={disabled} title={item.label} className={cls}>
                       {inner}
                     </button>
                   </DropdownMenu.Trigger>
@@ -468,8 +390,6 @@ export function AppSidebar({ user, workspaces }: Props) {
               return (
                 <Link
                   key={item.key}
-                  ref={dock.setItemRef(i)}
-                  style={dock.style(i)}
                   href={disabled ? "#" : item.href}
                   onClick={() => openTab(item.key as RailTab)}
                   title={item.label}
@@ -482,8 +402,6 @@ export function AppSidebar({ user, workspaces }: Props) {
             return (
               <button
                 key={item.key}
-                ref={dock.setItemRef(i)}
-                style={dock.style(i)}
                 type="button"
                 disabled={disabled}
                 onClick={() => openTab(item.key as RailTab)}
@@ -497,19 +415,11 @@ export function AppSidebar({ user, workspaces }: Props) {
         </nav>
 
         <div className="mt-auto flex flex-col items-center gap-1.5 pt-2">
-          <button
-            type="button"
-            title={t(locale, "sb.help")}
-            onClick={() => window.dispatchEvent(new Event("vc:open-command"))}
-            className="dock-item grid h-9 w-9 place-items-center rounded-lg text-white/60 hover:bg-white/10 hover:text-white"
-          >
-            <HelpCircle className="h-[18px] w-[18px]" />
-          </button>
           <Link
             href={ws ? `${wsBase}/settings` : "/dashboard"}
             title={t(locale, "sb.settings")}
             className={cn(
-              "dock-item grid h-9 w-9 place-items-center rounded-lg",
+              "grid h-9 w-9 place-items-center rounded-lg transition-colors",
               pathname.endsWith("/settings")
                 ? "bg-white/15 text-white"
                 : "text-white/60 hover:bg-white/10 hover:text-white"
