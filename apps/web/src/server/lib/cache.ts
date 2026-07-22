@@ -1,5 +1,5 @@
 import "server-only";
-import { getRedis } from "./redis";
+import { getRedis, isRedisReady } from "./redis";
 
 // Redis-backed cache. Replaces the old globalThis Map (no TTL, no cross-instance
 // sharing). Keeps the exact same exported signatures used by ~40 call sites
@@ -19,6 +19,7 @@ import { getRedis } from "./redis";
 const DEFAULT_CACHE_TTL_SECONDS = 600; // 10 min — explicit invalidation on writes is the primary mechanism; this is a safety net.
 
 export async function getFromCache<T>(key: string): Promise<T | undefined> {
+  if (!isRedisReady()) return undefined;
   try {
     const raw = await getRedis().get(key);
     return raw === null ? undefined : (JSON.parse(raw) as T);
@@ -29,6 +30,7 @@ export async function getFromCache<T>(key: string): Promise<T | undefined> {
 }
 
 export async function setToCache<T>(key: string, value: T, ttlSeconds = DEFAULT_CACHE_TTL_SECONDS): Promise<void> {
+  if (!isRedisReady()) return;
   try {
     await getRedis().set(key, JSON.stringify(value), "EX", ttlSeconds);
   } catch (err) {
@@ -37,6 +39,7 @@ export async function setToCache<T>(key: string, value: T, ttlSeconds = DEFAULT_
 }
 
 export async function invalidateCache(key: string): Promise<void> {
+  if (!isRedisReady()) return;
   try {
     await getRedis().unlink(key);
   } catch (err) {
@@ -51,6 +54,7 @@ export async function invalidateCache(key: string): Promise<void> {
  * the whole Redis instance on a large keyspace.
  */
 export async function invalidateCachePattern(pattern: string): Promise<void> {
+  if (!isRedisReady()) return;
   const redis = getRedis();
   const glob = `${pattern}*`;
   try {
@@ -72,6 +76,7 @@ export async function getOrSetCache<T>(
   fn: () => Promise<T>,
   opts?: { ttlSeconds?: number }
 ): Promise<T> {
+  if (!isRedisReady()) return fn();
   const redis = getRedis();
   try {
     const cached = await redis.get(key);
@@ -94,6 +99,7 @@ export async function getOrSetCache<T>(
 }
 
 export async function clearAllCache(): Promise<void> {
+  if (!isRedisReady()) return;
   try {
     await getRedis().flushdb();
   } catch (err) {
