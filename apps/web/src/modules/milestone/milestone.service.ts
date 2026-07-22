@@ -37,7 +37,7 @@ export async function createMilestone(p: {
     );
 
     await events.milestoneCreated(tx, ctx, milestone);
-    invalidateCache(`milestones:${p.projectId}`);
+    await invalidateCache(`milestones:${p.projectId}`);
 
     return milestone;
   });
@@ -67,7 +67,7 @@ export async function updateMilestone(p: {
     if (!updated) throw new NotFoundError("Milestone");
 
     await events.milestoneUpdated(tx, ctx, existing, updated);
-    invalidateCache(`milestones:${p.projectId}`);
+    await invalidateCache(`milestones:${p.projectId}`);
 
     return updated;
   });
@@ -86,7 +86,7 @@ export async function deleteMilestone(p: {
 
   return db.transaction(async (tx) => {
     await repo.remove(p.milestoneId, tx);
-    invalidateCache(`milestones:${p.projectId}`);
+    await invalidateCache(`milestones:${p.projectId}`);
     return { id: p.milestoneId };
   });
 }

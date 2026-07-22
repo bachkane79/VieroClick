@@ -1,3 +1,4 @@
+CREATE EXTENSION IF NOT EXISTS vector;--> statement-breakpoint
 CREATE TYPE "public"."workspace_role" AS ENUM('owner', 'admin', 'leader', 'member', 'viewer');--> statement-breakpoint
 CREATE TYPE "public"."project_role" AS ENUM('project_lead', 'tech_lead', 'member', 'reviewer', 'stakeholder');--> statement-breakpoint
 CREATE TYPE "public"."project_status" AS ENUM('draft', 'active', 'paused', 'completed', 'archived');--> statement-breakpoint

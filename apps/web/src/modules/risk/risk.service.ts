@@ -36,7 +36,7 @@ export async function createRisk(p: { workspaceId: string; projectId: string; in
     );
 
     await events.riskCreated(tx, ctx, risk);
-    invalidateCache(`risks:${p.projectId}`);
+    await invalidateCache(`risks:${p.projectId}`);
 
     return risk;
   });
@@ -69,7 +69,7 @@ export async function updateRisk(p: {
     if (!updated) throw new NotFoundError("Risk");
 
     await events.riskUpdated(tx, ctx, existing, updated);
-    invalidateCache(`risks:${p.projectId}`);
+    await invalidateCache(`risks:${p.projectId}`);
 
     return updated;
   });
@@ -84,7 +84,7 @@ export async function deleteRisk(p: { workspaceId: string; projectId: string; ri
 
   return db.transaction(async (tx) => {
     await repo.remove(p.riskId, tx);
-    invalidateCache(`risks:${p.projectId}`);
+    await invalidateCache(`risks:${p.projectId}`);
     return { id: p.riskId };
   });
 }

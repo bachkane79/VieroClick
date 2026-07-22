@@ -39,7 +39,7 @@ export async function createWbsNode(p: {
     );
 
     await events.wbsNodeCreated(tx, ctx, node);
-    invalidateCache(`wbs:${p.projectId}`);
+    await invalidateCache(`wbs:${p.projectId}`);
 
     return node;
   });
@@ -71,7 +71,7 @@ export async function updateWbsNode(p: {
     if (!updated) throw new NotFoundError("WBS node");
 
     await events.wbsNodeUpdated(tx, ctx, existing, updated);
-    invalidateCache(`wbs:${p.projectId}`);
+    await invalidateCache(`wbs:${p.projectId}`);
 
     return updated;
   });
@@ -91,7 +91,7 @@ export async function deleteWbsNode(p: {
   return db.transaction(async (tx) => {
     await events.wbsNodeDeleted(tx, ctx, existing);
     await repo.remove(p.nodeId, tx);
-    invalidateCache(`wbs:${p.projectId}`);
+    await invalidateCache(`wbs:${p.projectId}`);
     return { id: p.nodeId };
   });
 }

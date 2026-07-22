@@ -1,6 +1,8 @@
+// LEGACY — its schema changes are already captured by packages/db/src/schema/
+// and the 3 journaled migrations (0000-0002). Kept for history only; do not run.
 // Idempotent migration: Organization (optional umbrella), workspace Docs/Wiki,
-// and Team Hub announcements. Run against the app's DB:
-//   node --env-file=apps/web/.env.local packages/db/scripts/apply-org-collab.mjs
+// and Team Hub announcements. Historical run command:
+//   node --env-file=.env.local packages/db/migrations/_legacy/apply-org-collab.mjs
 import { Pool, neonConfig } from "@neondatabase/serverless";
 import ws from "ws";
 neonConfig.webSocketConstructor = globalThis.WebSocket ?? ws;

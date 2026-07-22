@@ -4,7 +4,7 @@ import { useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Button, cn, Input } from "@vieroc/ui";
 import { ArrowUpDown, Bookmark, Check, Filter, Group, Search, X } from "lucide-react";
-import type { GroupBy, SortDir, SortField } from "../task-grouping";
+import type { GroupBy, SortField } from "../task-grouping";
 import { PRIORITY_ORDER } from "../status-colors";
 import type { MemberOptionView, TaskStatusView } from "../task.view";
 import type { SavedView, useViewPrefs } from "./use-view-prefs";

@@ -35,7 +35,7 @@ export async function createWorkspacePost(p: { workspaceId: string; input: unkno
       },
       tx
     );
-    invalidateCache(CACHE(p.workspaceId));
+    await invalidateCache(CACHE(p.workspaceId));
     return post;
   });
 }
@@ -52,7 +52,7 @@ export async function setWorkspacePostPinned(p: {
 
   return db.transaction(async (tx) => {
     await repo.setPinned(p.postId, p.pinned, tx);
-    invalidateCache(CACHE(p.workspaceId));
+    await invalidateCache(CACHE(p.workspaceId));
     return { id: p.postId, pinned: p.pinned };
   });
 }
@@ -68,7 +68,7 @@ export async function deleteWorkspacePost(p: { workspaceId: string; postId: stri
 
   return db.transaction(async (tx) => {
     await repo.remove(p.postId, tx);
-    invalidateCache(CACHE(p.workspaceId));
+    await invalidateCache(CACHE(p.workspaceId));
     return { id: p.postId };
   });
 }

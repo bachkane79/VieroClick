@@ -16,27 +16,28 @@ import { and, eq, gte } from "drizzle-orm";
 import * as repo from "./member-score.repo";
 import type { MemberScores } from "./member-score.repo";
 
-// Exponential-moving-average weight for new observations (0..1). Higher = reacts
-// faster; lower = smoother. 0.4 gives recent work ~40% pull per recompute.
-const ALPHA = 0.4;
 const RECENT_DAYS = 14;
 const EXPECTED_UPDATES_PER_WINDOW = 10; // ~working days in a 2-week window
 
-function num(value: unknown): number {
+// Exponential-moving-average weight for new observations (0..1). Higher = reacts
+// faster; lower = smoother. 0.4 gives recent work ~40% pull per recompute.
+const ALPHA = 0.4;
+
+export function num(value: unknown): number {
   const n = typeof value === "string" ? parseFloat(value) : typeof value === "number" ? value : 0;
   return Number.isFinite(n) ? n : 0;
 }
 
-function isoDate(d: Date): string {
+export function isoDate(d: Date): string {
   return d.toISOString().split("T")[0]!;
 }
 
-function clamp01(x: number): number {
+export function clamp01(x: number): number {
   return Math.max(0, Math.min(1, x));
 }
 
 /** Blend a fresh signal into the prior score. Null signal → keep prior; no prior → seed. */
-function blend(prev: number, signal: number | null): number {
+export function blend(prev: number, signal: number | null): number {
   if (signal === null) return prev;
   const next = prev <= 0 ? signal : ALPHA * signal + (1 - ALPHA) * prev;
   return Math.round(next * 100) / 100;

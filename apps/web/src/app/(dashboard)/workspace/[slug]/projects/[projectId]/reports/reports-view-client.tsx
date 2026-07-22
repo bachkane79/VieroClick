@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Textarea } from "@vieroc/ui";
 import { toast } from "sonner";
-import { TrendingUp, Plus, CheckCircle, AlertTriangle, FileText, ChevronDown, ChevronRight } from "lucide-react";
+import { TrendingUp, Plus, CheckCircle, FileText } from "lucide-react";
 import { approveReportAction, createReportAction } from "@/modules/report/report.actions";
 
 interface ReportRow {

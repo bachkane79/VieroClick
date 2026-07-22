@@ -57,7 +57,7 @@ export async function POST(request: Request) {
 
     // Invalidate the cached report list so the agent-created report shows up
     // (listReports uses an in-memory cache keyed by project).
-    invalidateCache(`reports:${projectId}`);
+    await invalidateCache(`reports:${projectId}`);
 
     return NextResponse.json(report, { status: 201 });
   } catch (err: any) {

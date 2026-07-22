@@ -43,7 +43,7 @@ type Mode = "personal" | "team";
 
 const RESUME_KEY = "vc-onboarding-state";
 
-export function OnboardingWizard({ displayName }: { displayName: string }) {
+export function OnboardingWizard({ displayName: _displayName }: { displayName: string }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("mode");
   const [mode, setMode] = useState<Mode>("personal");

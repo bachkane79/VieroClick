@@ -46,7 +46,7 @@ export function CalendarViewClient({
   members,
   dependencies,
   attachments,
-  phases,
+  phases: _phases,
 }: Props) {
   const locale = useLocale();
   const { effectiveTasks } = useOptimisticTasks(tasks);

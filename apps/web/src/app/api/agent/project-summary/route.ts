@@ -11,7 +11,7 @@ import {
   workspaceMembers,
   users,
 } from "@vieroc/db";
-import { and, desc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { isAgentRequest } from "@/server/lib/agent-auth";
 import { computeHealthDetails } from "@/modules/project/project.service";
 import { computeTeamMetrics } from "@/modules/member-score/member-score.service";

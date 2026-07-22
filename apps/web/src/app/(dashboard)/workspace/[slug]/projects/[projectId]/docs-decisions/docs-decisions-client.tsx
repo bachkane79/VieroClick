@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Textarea } from "@vieroc/ui";
 import { toast } from "sonner";
-import { FileText, Plus, Trash2, BookOpen, AlertCircle, Sparkles, CheckSquare } from "lucide-react";
+import { FileText, Plus, Trash2, BookOpen, AlertCircle, Sparkles } from "lucide-react";
 import { createDocAction, deleteDocAction } from "@/modules/project-doc/project-doc.actions";
 import { logDecisionAction, deleteDecisionAction } from "@/modules/decision-log/decision-log.actions";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";

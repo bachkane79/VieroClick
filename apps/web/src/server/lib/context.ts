@@ -46,7 +46,7 @@ export async function getUserId(): Promise<string> {
           if (decoded?.userId || decoded?.sub) {
             break;
           }
-        } catch (e) {
+        } catch {
           // try next salt
         }
       }
@@ -81,8 +81,14 @@ export async function getUserId(): Promise<string> {
 export async function requireActor(workspaceId: string, projectId?: string): Promise<ActorContext> {
   const userId = await getUserId();
   const cacheKey = `actor:${userId}:${workspaceId}:${projectId ?? "none"}`;
+  // Short TTL: this is the highest-risk cache key (resolved permissions).
+  // Explicit invalidation on role/membership changes is the primary
+  // mechanism (see workspace.service.ts); this TTL is just a safety net.
+  const ACTOR_CACHE_TTL_SECONDS = 45;
 
-  return getOrSetCache(cacheKey, async () => {
+  return getOrSetCache(
+    cacheKey,
+    async () => {
     const [member] = await db
       .select({ id: workspaceMembers.id, role: workspaceMembers.role })
       .from(workspaceMembers)
@@ -128,5 +134,7 @@ export async function requireActor(workspaceId: string, projectId?: string): Pro
       projectId: projectId ?? null,
       projectRole,
     };
-  });
+    },
+    { ttlSeconds: ACTOR_CACHE_TTL_SECONDS }
+  );
 }

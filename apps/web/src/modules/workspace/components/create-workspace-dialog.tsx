@@ -47,7 +47,7 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
       } else {
         toast.error(res.error ?? "Failed to create workspace");
       }
-    } catch (err) {
+    } catch {
       toast.error("An unexpected error occurred");
     } finally {
       setSubmitting(false);

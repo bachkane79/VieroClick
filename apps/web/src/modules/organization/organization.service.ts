@@ -104,7 +104,7 @@ export async function attachWorkspaceToOrg(p: { workspaceId: string; organizatio
   });
 
   // The sidebar reads workspace→org grouping from these persistent caches.
-  invalidateCache(`my_workspaces:${userId}`);
-  invalidateCachePattern(`workspace_by_slug:${userId}:`);
+  await invalidateCache(`my_workspaces:${userId}`);
+  await invalidateCachePattern(`workspace_by_slug:${userId}:`);
   return result;
 }

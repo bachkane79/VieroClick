@@ -79,7 +79,7 @@ export function WorkspaceSettingsForm({ workspace, initialMembers }: Props) {
       } else {
         toast.error(res.error ?? "Failed to update workspace");
       }
-    } catch (err) {
+    } catch {
       toast.error("An error occurred");
     } finally {
       setSavingGeneral(false);
@@ -119,7 +119,7 @@ export function WorkspaceSettingsForm({ workspace, initialMembers }: Props) {
       } else {
         toast.error(res.error ?? "Failed to invite member");
       }
-    } catch (err) {
+    } catch {
       toast.error("An error occurred during invitation");
     } finally {
       setInviting(false);
@@ -144,7 +144,7 @@ export function WorkspaceSettingsForm({ workspace, initialMembers }: Props) {
       } else {
         toast.error(res.error ?? "Failed to update member role");
       }
-    } catch (err) {
+    } catch {
       toast.error("An error occurred");
     } finally {
       setUpdatingMemberId(null);
@@ -171,7 +171,7 @@ export function WorkspaceSettingsForm({ workspace, initialMembers }: Props) {
       } else {
         toast.error(res.error ?? "Failed to remove member");
       }
-    } catch (err) {
+    } catch {
       toast.error("An error occurred");
     } finally {
       setUpdatingMemberId(null);

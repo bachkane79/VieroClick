@@ -14,7 +14,17 @@ function createDb() {
     throw new Error("DATABASE_URL is required");
   }
 
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    // Conservative default: this runs as a long-lived Node process (Docker),
+    // not per-invocation serverless, and Neon caps concurrent connections per
+    // plan. Raise via env if real traffic justifies it; prefer switching
+    // DATABASE_URL to Neon's pooled endpoint over raising max further.
+    max: Number(process.env.DB_POOL_MAX ?? 10),
+    idleTimeoutMillis: Number(process.env.DB_POOL_IDLE_TIMEOUT_MS ?? 30000),
+    connectionTimeoutMillis: Number(process.env.DB_POOL_CONN_TIMEOUT_MS ?? 10000),
+  });
+  // TODO(WP-G3): expose pool health metrics (pool.totalCount/idleCount) via the readiness endpoint.
   return drizzle(pool, { schema });
 }
 

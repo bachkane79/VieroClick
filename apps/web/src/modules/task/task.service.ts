@@ -249,7 +249,7 @@ export async function createTask(p: { workspaceId: string; projectId: string; in
       ]);
     }
 
-    invalidateCache(`board:${p.projectId}`);
+    await invalidateCache(`board:${p.projectId}`);
     return task;
   });
 }
@@ -398,7 +398,7 @@ export async function updateTask(p: {
       await safeRecomputeScore(ctx.workspaceId, updated.assigneeMemberId, tx);
     }
 
-    invalidateCache(`board:${p.projectId}`);
+    await invalidateCache(`board:${p.projectId}`);
     return updated;
   });
 }
@@ -459,7 +459,7 @@ export async function reviewTask(p: {
       }
       // 4.1: closing a task feeds the assignee's operational scores.
       await safeRecomputeScore(ctx.workspaceId, updated.assigneeMemberId, tx);
-      invalidateCache(`board:${p.projectId}`);
+      await invalidateCache(`board:${p.projectId}`);
       return updated;
     }
 
@@ -492,7 +492,7 @@ export async function reviewTask(p: {
         },
       ]);
     }
-    invalidateCache(`board:${p.projectId}`);
+    await invalidateCache(`board:${p.projectId}`);
     return updated;
   });
 }
@@ -525,7 +525,7 @@ export async function setTaskAssignees(p: {
   const ctx = await requireActor(p.workspaceId, p.projectId);
   assertCanManageTasks(ctx);
 
-  const existing = await getTaskInProject(p.taskId, p.projectId);
+  await getTaskInProject(p.taskId, p.projectId);
   const memberIds = [...new Set(p.memberIds)].slice(0, 20);
   const primary = memberIds[0] ?? null;
   const previous = new Set(await repo.listAssigneeIds(p.taskId));
@@ -553,7 +553,7 @@ export async function setTaskAssignees(p: {
       );
     }
 
-    invalidateCache(`board:${p.projectId}`);
+    await invalidateCache(`board:${p.projectId}`);
     return { ...updated, assigneeMemberIds: memberIds };
   });
 }
@@ -655,7 +655,7 @@ export async function addTaskDependency(p: {
     );
 
     await dependencyEvents.dependencyAdded(tx, ctx, blocked.id, blocker.id);
-    invalidateCache(`board:${p.projectId}`);
+    await invalidateCache(`board:${p.projectId}`);
     return dependency;
   });
 }
@@ -674,7 +674,7 @@ export async function removeTaskDependency(p: {
   return db.transaction(async (tx) => {
     await dependencyEvents.dependencyRemoved(tx, ctx, existing.blockedTaskId, existing.blockerTaskId);
     await repo.removeDependency(p.dependencyId, tx);
-    invalidateCache(`board:${p.projectId}`);
+    await invalidateCache(`board:${p.projectId}`);
     return { id: p.dependencyId };
   });
 }
@@ -688,7 +688,7 @@ export async function deleteTask(p: { workspaceId: string; projectId: string; ta
   return db.transaction(async (tx) => {
     await events.taskDeleted(tx, ctx, existing);
     await repo.remove(p.taskId, tx);
-    invalidateCache(`board:${p.projectId}`);
+    await invalidateCache(`board:${p.projectId}`);
     return { id: p.taskId };
   });
 }
