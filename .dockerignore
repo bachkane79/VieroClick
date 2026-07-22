@@ -1,6 +1,7 @@
 .git
 .codex
 node_modules
+**/node_modules
 .pnpm-store
 .turbo
 apps/web/.next
