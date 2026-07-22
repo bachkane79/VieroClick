@@ -10,6 +10,7 @@ import {
   jsonb,
   unique,
   uniqueIndex,
+  check,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
@@ -114,7 +115,10 @@ export const taskDependencies = pgTable(
     dependencyType: text("dependency_type").notNull().default("finish_to_start"),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
   },
-  (t) => [unique().on(t.blockerTaskId, t.blockedTaskId)]
+  (t) => [
+    unique().on(t.blockerTaskId, t.blockedTaskId),
+    check("no_self_dependency", sql`${t.blockerTaskId} <> ${t.blockedTaskId}`),
+  ]
 );
 
 // Multi-assignee join table. `tasks.assigneeMemberId` remains the PRIMARY/lead

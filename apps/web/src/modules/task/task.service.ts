@@ -17,6 +17,7 @@ import { createTaskSchema, updateTaskSchema, moveTaskSchema, reviewTaskSchema } 
 import { assertCanManageTasks, assertCanReviewTask, assertCanUpdateTask } from "./task.policy";
 import * as repo from "./task.repo";
 import * as events from "./task.events";
+import { wouldCreateCycle } from "@/modules/task-dependency/task-dependency.pure";
 
 /** Best-effort score recompute — never let a scoring hiccup fail the task mutation. */
 async function safeRecomputeScore(workspaceId: string, memberId: string | null, exec: Executor) {
@@ -301,6 +302,12 @@ export async function updateTask(p: {
     if (data.position !== undefined) values.position = data.position;
     if (data.isMilestone !== undefined) values.isMilestone = data.isMilestone;
     if (data.milestoneId !== undefined) values.milestoneId = data.milestoneId ?? null;
+    if (data.parentTaskId !== undefined) {
+      if (data.parentTaskId === existing.id) {
+        throw new ValidationError("A task cannot be its own parent");
+      }
+      values.parentTaskId = data.parentTaskId ?? null;
+    }
   } else if (data.statusId !== undefined) {
     values.statusId = data.statusId;
   }
@@ -338,6 +345,26 @@ export async function updateTask(p: {
   const dueDateChanged = manager && data.dueDate !== undefined && data.dueDate !== existing.dueDate;
 
   return db.transaction(async (tx) => {
+    if (
+      values.parentTaskId !== undefined &&
+      values.parentTaskId !== null &&
+      values.parentTaskId !== existing.parentTaskId
+    ) {
+      const projectTasks = await repo.listByProject(p.projectId, tx);
+      const parentEdges = projectTasks
+        .filter((t): t is typeof t & { parentTaskId: string } => t.parentTaskId !== null)
+        .map((t) => ({ blockerTaskId: t.parentTaskId, blockedTaskId: t.id }));
+      const cycleCheck = wouldCreateCycle(parentEdges, {
+        blockerTaskId: values.parentTaskId,
+        blockedTaskId: p.taskId,
+      });
+      if (cycleCheck.cycle) {
+        throw new ValidationError(
+          `Cannot set parent: would create a cycle (${cycleCheck.path.join(" → ")} → ${values.parentTaskId})`
+        );
+      }
+    }
+
     const updated = await repo.update(p.taskId, values, tx);
     if (!updated) throw new NotFoundError("Task");
 

@@ -13,6 +13,7 @@
     "db:push": "node scripts/guard-migrate.mjs push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/seed.ts",
+    "test:wp-d2": "tsx src/scripts/test-wp-d2-cycle-detection.ts",
     "db:setup-rls-role": "node scripts/setup-rls-role.mjs"
   },
   "dependencies": {

@@ -6,6 +6,7 @@ import { createTaskDependencySchema } from "./task-dependency.schema";
 import { assertCanManageTasks } from "./task-dependency.policy";
 import * as repo from "./task-dependency.repo";
 import * as events from "./task-dependency.events";
+import { wouldCreateCycle } from "./task-dependency.pure";
 
 /** Read: all dependencies for a project. Requires workspace membership. */
 export async function listDependencies(workspaceId: string, projectId: string) {
@@ -27,6 +28,17 @@ export async function addDependency(p: {
   }
 
   return db.transaction(async (tx) => {
+    const existing = await repo.listByProject(p.projectId, tx);
+    const cycleCheck = wouldCreateCycle(existing, {
+      blockerTaskId: data.blockerTaskId,
+      blockedTaskId: data.blockedTaskId,
+    });
+    if (cycleCheck.cycle) {
+      throw new ValidationError(
+        `Cannot add dependency: would create a cycle (${cycleCheck.path.join(" → ")} → ${data.blockerTaskId})`
+      );
+    }
+
     const dependency = await repo.create(
       {
         projectId: p.projectId,

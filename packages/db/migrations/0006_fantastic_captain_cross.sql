@@ -1,0 +1,1 @@
+ALTER TABLE "task_dependencies" ADD CONSTRAINT "no_self_dependency" CHECK ("task_dependencies"."blocker_task_id" <> "task_dependencies"."blocked_task_id");

@@ -43,6 +43,13 @@
       "when": 1784727162692,
       "tag": "0005_wp_c6_rls_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784734395823,
+      "tag": "0006_fantastic_captain_cross",
+      "breakpoints": true
     }
   ]
 }
