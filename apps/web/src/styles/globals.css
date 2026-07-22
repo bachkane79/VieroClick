@@ -42,12 +42,12 @@
     --border-strong: 214 14% 81%; /* #C8CED6 interactive / selected */
     --input: 214 14% 81%;
 
-    /* ── Action & selection ───────────────────────────────────── */
-    --primary: 221 83% 53%; /* #2563EB */
+    /* ── Action & selection (brand = logo coral) ─────────────────── */
+    --primary: 14 82% 60%; /* #ED6C45 logo coral */
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 226 71% 48%; /* #1D4ED8 */
-    --ring: 221 83% 53%;
-    --focus-ring: 217 88% 78%; /* #93B4F8 keyboard focus */
+    --primary-hover: 14 74% 51%; /* #DA5730 */
+    --ring: 14 82% 60%;
+    --focus-ring: 16 92% 78%; /* #FBB79C keyboard focus */
 
     /* ── Neutrals (chips, hover, muted text) ──────────────────── */
     --secondary: 216 20% 95%;
@@ -67,10 +67,10 @@
     --ai: 249 52% 56%; /* #6757C8 */
     --ai-foreground: 0 0% 100%;
 
-    /* ── Brand alias → primary (no orange, no gradient) ───────── */
-    --brand: 221 83% 53%;
+    /* ── Brand alias → primary (logo coral) ───────────────────── */
+    --brand: 14 82% 60%;
     --brand-foreground: 0 0% 100%;
-    --brand-soft: 221 100% 96%;
+    --brand-soft: 18 100% 95%;
 
     /* Accent family — status / illustration / project colour dots only.
        Never a full-card wash (redesign §8.1). Each has a soft partner. */
@@ -110,11 +110,11 @@
     --border-strong: 216 12% 30%;
     --input: 216 12% 26%;
 
-    --primary: 217 90% 61%;
+    --primary: 15 88% 67%; /* #F58C63 logo coral (dark) */
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 221 83% 53%;
-    --ring: 217 90% 61%;
-    --focus-ring: 217 80% 60%;
+    --primary-hover: 14 82% 60%;
+    --ring: 15 88% 67%;
+    --focus-ring: 15 78% 60%;
 
     --secondary: 220 12% 16%;
     --secondary-foreground: 210 16% 92%;
@@ -131,9 +131,9 @@
     --ai: 249 72% 72%;
     --ai-foreground: 0 0% 100%;
 
-    --brand: 217 90% 61%;
+    --brand: 15 88% 67%;
     --brand-foreground: 0 0% 100%;
-    --brand-soft: 220 40% 20%;
+    --brand-soft: 16 40% 22%;
 
     --coral: 6 80% 66%;        --coral-soft: 6 30% 18%;
     --peach: 30 84% 62%;       --peach-soft: 28 32% 17%;

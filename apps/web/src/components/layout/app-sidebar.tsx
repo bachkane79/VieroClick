@@ -54,6 +54,7 @@ import {
   Target,
   Users,
   UserCircle,
+  UserCog,
   type LucideIcon,
 } from "lucide-react";
 
@@ -297,6 +298,20 @@ export function AppSidebar({ user, workspaces }: Props) {
           />
         </Link>
 
+        {/* Expand handle — only while collapsed; when expanded, the collapse
+            control lives on the panel header instead. */}
+        {collapsed && (
+          <button
+            type="button"
+            onClick={() => setCollapsedPersist(false)}
+            title={t(locale, "sb.expand")}
+            aria-label={t(locale, "sb.expand")}
+            className="mb-1.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <PanelLeftOpen className="h-[18px] w-[18px]" />
+          </button>
+        )}
+
         <nav className="relative flex flex-1 flex-col items-center gap-1">
 
           {RAIL.map((item) => {
@@ -415,18 +430,6 @@ export function AppSidebar({ user, workspaces }: Props) {
         </nav>
 
         <div className="mt-auto flex flex-col items-center gap-1.5 pt-2">
-          <Link
-            href={ws ? `${wsBase}/settings` : "/dashboard"}
-            title={t(locale, "sb.settings")}
-            className={cn(
-              "grid h-9 w-9 place-items-center rounded-lg transition-colors",
-              pathname.endsWith("/settings")
-                ? "bg-white/15 text-white"
-                : "text-white/60 hover:bg-white/10 hover:text-white"
-            )}
-          >
-            <Settings className="h-[18px] w-[18px]" />
-          </Link>
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
               <button
@@ -468,6 +471,26 @@ export function AppSidebar({ user, workspaces }: Props) {
                     {t(locale, "sb.profile")}
                   </Link>
                 </DropdownMenu.Item>
+                {ws && (
+                  <DropdownMenu.Item asChild>
+                    <Link
+                      href={`${wsBase}/settings`}
+                      className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
+                    >
+                      <Settings className="h-4 w-4 text-muted-foreground" />
+                      {locale === "vi" ? "Cài đặt workspace" : "Workspace settings"}
+                    </Link>
+                  </DropdownMenu.Item>
+                )}
+                <DropdownMenu.Item asChild>
+                  <Link
+                    href="/settings"
+                    className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
+                  >
+                    <UserCog className="h-4 w-4 text-muted-foreground" />
+                    {locale === "vi" ? "Cài đặt cá nhân" : "Personal settings"}
+                  </Link>
+                </DropdownMenu.Item>
                 <DropdownMenu.Item
                   onSelect={(e) => {
                     e.preventDefault();
@@ -502,8 +525,9 @@ export function AppSidebar({ user, workspaces }: Props) {
             <p className="truncate text-[13px] font-semibold text-foreground">
               {panelTitle(tab, locale)}
             </p>
-            {/* Create + collapse — hidden until the header is hovered. */}
-            <div className="flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover/panel:opacity-100">
+            <div className="flex items-center gap-0.5">
+              {/* Create — hidden until the header is hovered. */}
+              <div className="opacity-0 transition-opacity duration-150 group-hover/panel:opacity-100">
               <DropdownMenu.Root>
                 <DropdownMenu.Trigger asChild>
                   <button
@@ -540,10 +564,13 @@ export function AppSidebar({ user, workspaces }: Props) {
                   </DropdownMenu.Content>
                 </DropdownMenu.Portal>
               </DropdownMenu.Root>
+              </div>
+              {/* Collapse — sits on the panel header when expanded (annotation). */}
               <button
                 type="button"
                 onClick={() => setCollapsedPersist(true)}
                 title={t(locale, "sb.collapse")}
+                aria-label={t(locale, "sb.collapse")}
                 className="grid h-7 w-7 place-items-center rounded-md text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
               >
                 <PanelLeftClose className="h-4 w-4" />
@@ -578,16 +605,7 @@ export function AppSidebar({ user, workspaces }: Props) {
             )}
           </nav>
         </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setCollapsedPersist(false)}
-          title={t(locale, "sb.expand")}
-          className="group/expand flex w-2.5 shrink-0 items-center justify-center border-r border-border bg-surface transition-[width] hover:w-6"
-        >
-          <PanelLeftOpen className="h-4 w-4 text-text-secondary opacity-0 transition-opacity group-hover/expand:opacity-100" />
-        </button>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -671,13 +689,22 @@ function HomePanel({
 
       <SectionTitle
         action={
-          <Link
-            href={`${wsBase}/projects`}
-            title={t(locale, "sb.allProjects")}
-            className="rounded p-0.5 text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
-          >
-            <Briefcase className="h-3.5 w-3.5" />
-          </Link>
+          <div className="flex items-center gap-0.5">
+            <Link
+              href={`${wsBase}/settings`}
+              title={locale === "vi" ? "Cài đặt workspace" : "Workspace settings"}
+              className="rounded p-0.5 text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </Link>
+            <Link
+              href={`${wsBase}/projects`}
+              title={t(locale, "sb.allProjects")}
+              className="rounded p-0.5 text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
+            >
+              <Briefcase className="h-3.5 w-3.5" />
+            </Link>
+          </div>
         }
       >
         {t(locale, "sb.spaces")}
@@ -711,7 +738,7 @@ function HomePanel({
                   )}
                 </button>
                 <Link
-                  href={`${base}/overview`}
+                  href={`${base}/dashboard`}
                   className={cn(
                     "flex min-w-0 flex-1 items-center gap-2 py-1.5 pr-1 text-[13px]",
                     isCurrent ? "font-semibold text-foreground" : "text-foreground/90"
@@ -719,6 +746,13 @@ function HomePanel({
                 >
                   <span className={cn("h-2 w-2 shrink-0 rounded-[3px]", PROJECT_STATUS_DOT[project.status] ?? "bg-text-disabled")} />
                   <span className="truncate">{project.name}</span>
+                </Link>
+                <Link
+                  href={`${base}/overview`}
+                  title={locale === "vi" ? "Cài đặt dự án" : "Project settings"}
+                  className="grid h-6 w-6 shrink-0 place-items-center rounded text-text-secondary opacity-0 transition-opacity hover:bg-surface-hover hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+                >
+                  <Settings className="h-3.5 w-3.5" />
                 </Link>
               </div>
               {isExpanded && (

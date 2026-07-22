@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { cn } from "@vieroc/ui";
+import { useDock } from "@/components/layout/use-dock";
 import { useLocale } from "@/lib/i18n/client";
 import { t, type MessageKey } from "@/lib/i18n/dict";
 import {
@@ -25,6 +26,7 @@ import {
   Gauge,
   Users,
   Sparkles,
+  Wand2,
   Plus,
   Pin,
   Check,
@@ -74,6 +76,7 @@ const EXTRA: ViewDef[] = [
   { key: "reports", name: "Reports", path: "reports", icon: TrendingUp },
   { key: "analytics", name: "Analytics", path: "analytics", icon: BarChart3 },
   { key: "team", name: "Team", path: "team", icon: Users },
+  { key: "assign", name: "Giao việc AI", path: "assign", icon: Wand2 },
   // AI is a global entry (top bar); it stays reachable here as a normal view,
   // but no longer competes as a highlighted tab (redesign §7.1).
   { key: "ai", name: "AI Manager", path: "ai", icon: Sparkles },
@@ -126,19 +129,33 @@ export function ProjectNav({ slug, projectId }: Props) {
     return [...ESSENTIAL, ...pinnedViews];
   }, [pinned, activeExtraKey]);
 
+  // macOS-Dock magnification, same feel as the top-bar action cluster: tabs
+  // near the cursor scale up (neighbours ease down). The last dock slot is the
+  // "Add view" trigger. Origin is centred + shift kept tiny so growth stays
+  // inside the row's vertical padding (no clip through the overflow-x scroller).
+  const dock = useDock(barViews.length + 1, "x", { radius: 110, max: 0.12, shift: 1 });
+  const dockStyle = (i: number) => ({ ...dock.style(i), transformOrigin: "center center" as const });
+
   return (
     <div className="sticky top-0 z-20 border-b border-border bg-surface px-4">
-      <div className="no-scrollbar flex items-center gap-0.5 overflow-x-auto scroll-smooth">
-        {barViews.map((tab) => {
+      <div
+        ref={dock.containerRef as React.RefObject<HTMLDivElement>}
+        onMouseMove={dock.onMove}
+        onMouseLeave={dock.onLeave}
+        className="no-scrollbar flex items-center gap-0.5 overflow-x-auto scroll-smooth py-1"
+      >
+        {barViews.map((tab, i) => {
           const Icon = tab.icon;
           const active = isActive(tab);
           return (
             <Link
               key={tab.key}
+              ref={dock.setItemRef(i)}
+              style={dockStyle(i)}
               href={`${base}/${tab.path}`}
               prefetch={true}
               className={cn(
-                "group relative flex h-10 items-center gap-1.5 whitespace-nowrap px-3 text-[13px] font-medium transition-colors",
+                "group relative flex h-10 items-center gap-1.5 whitespace-nowrap px-3 text-[13px] font-medium transition-[transform,color] duration-100 ease-out will-change-transform",
                 active
                   ? "font-semibold text-foreground"
                   : "text-text-secondary hover:text-foreground"
@@ -161,8 +178,10 @@ export function ProjectNav({ slug, projectId }: Props) {
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
             <button
+              ref={dock.setItemRef(barViews.length)}
+              style={dockStyle(barViews.length)}
               className={cn(
-                "flex h-10 items-center gap-1.5 whitespace-nowrap rounded-md px-3 text-[13px] font-medium text-text-secondary transition-colors",
+                "flex h-10 items-center gap-1.5 whitespace-nowrap rounded-md px-3 text-[13px] font-medium text-text-secondary transition-[transform,background-color,color] duration-100 ease-out will-change-transform",
                 "hover:bg-surface-hover hover:text-foreground"
               )}
             >
