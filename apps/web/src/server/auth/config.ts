@@ -8,6 +8,21 @@ import Credentials from "next-auth/providers/credentials";
  * No database access here so it can be imported by `middleware.ts` (edge runtime).
  * The full config in `./index.ts` extends this with DB-touching callbacks.
  */
+
+// WP-C1: fail fast instead of silently falling back to a hardcoded secret. A
+// missing AUTH_SECRET previously fell back to a public string committed to the
+// repo — anyone who read the source could forge a valid session JWT for any
+// user. This module is imported by middleware.ts (edge runtime), so the throw
+// below happens at cold start, before any request is served.
+const AUTH_SECRET = process.env.AUTH_SECRET;
+if (!AUTH_SECRET) {
+  throw new Error(
+    "AUTH_SECRET is required. Set it in your env (see .env.local) before starting the app."
+  );
+}
+if (process.env.NODE_ENV === "production" && !process.env.NEXTAUTH_URL) {
+  throw new Error("NEXTAUTH_URL is required in production (used for OAuth callback origin).");
+}
 /**
  * The passwordless dev-bypass must never exist in production: gating the
  * provider itself (not just the login form) means a hand-crafted POST to the
@@ -58,7 +73,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
 }
 
 export const authConfig: NextAuthConfig = {
-  secret: process.env.AUTH_SECRET || "default-fallback-secret-for-development-only-12345",
+  secret: AUTH_SECRET,
   trustHost: true,
   providers,
   session: { strategy: "jwt" },

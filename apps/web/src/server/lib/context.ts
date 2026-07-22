@@ -5,6 +5,13 @@ import type { WorkspaceRole, ProjectRole } from "@vieroc/types";
 import { auth } from "@/server/auth";
 import { UnauthorizedError, ForbiddenError } from "./errors";
 
+// WP-C1: no fallback secret here either — importing "@/server/auth/config"
+// already throws at module load if AUTH_SECRET is missing, so by the time this
+// file runs the env is guaranteed to be set. Read it directly (not via
+// authConfig.secret) to keep this file's own guard self-contained.
+import "@/server/auth/config";
+const AUTH_SECRET = process.env.AUTH_SECRET!;
+
 import { headers } from "next/headers";
 import { decode } from "next-auth/jwt";
 
@@ -40,7 +47,7 @@ export async function getUserId(): Promise<string> {
         try {
           decoded = await decode({
             token,
-            secret: process.env.AUTH_SECRET || "default-fallback-secret-for-development-only-12345",
+            secret: AUTH_SECRET,
             salt,
           });
           if (decoded?.userId || decoded?.sub) {
@@ -65,8 +72,12 @@ export async function getUserId(): Promise<string> {
     ) {
       throw err;
     }
-    // headers() might throw outside HTTP context
-    console.error("Error retrieving userId from Authorization header:", err);
+    // headers() might throw outside HTTP context. Log only the message (WP-C1:
+    // never log the raw error object here — it can wrap header/decode internals).
+    console.error(
+      "Error retrieving userId from Authorization header:",
+      err instanceof Error ? err.message : "unknown error"
+    );
   }
 
   const session = await auth();
