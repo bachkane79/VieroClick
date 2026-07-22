@@ -156,6 +156,38 @@ export type TeamMemberMetrics = {
   scores: MemberScores;
 };
 
+/**
+ * Per-project member PROFILES (skills / seniority / availability / avatar),
+ * keyed by workspaceMemberId. `computeTeamMetrics` deliberately omits these
+ * qualitative fields; the "assign by profile" UI merges the two by id so it can
+ * show *why* the assignment agent scored a member the way it did.
+ */
+export async function listProjectMemberProfiles(projectId: string) {
+  const rows = await db
+    .select({
+      workspaceMemberId: projectMembers.workspaceMemberId,
+      avatarUrl: users.avatarUrl,
+      skills: memberProfiles.skills,
+      seniorityLevel: memberProfiles.seniorityLevel,
+      availabilityHoursPerWeek: memberProfiles.availabilityHoursPerWeek,
+      timezone: memberProfiles.timezone,
+    })
+    .from(projectMembers)
+    .innerJoin(workspaceMembers, eq(workspaceMembers.id, projectMembers.workspaceMemberId))
+    .innerJoin(users, eq(users.id, workspaceMembers.userId))
+    .leftJoin(memberProfiles, eq(memberProfiles.workspaceMemberId, projectMembers.workspaceMemberId))
+    .where(eq(projectMembers.projectId, projectId));
+
+  return rows.map((r) => ({
+    workspaceMemberId: r.workspaceMemberId,
+    avatarUrl: r.avatarUrl,
+    skills: (r.skills ?? []) as string[],
+    seniorityLevel: r.seniorityLevel ?? 1,
+    availabilityHoursPerWeek: r.availabilityHoursPerWeek ? Number(r.availabilityHoursPerWeek) : null,
+    timezone: r.timezone ?? null,
+  }));
+}
+
 export async function computeTeamMetrics(projectId: string): Promise<TeamMemberMetrics[]> {
   const roster = await db
     .select({

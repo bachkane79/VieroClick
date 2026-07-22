@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Repository overview
 
@@ -52,7 +52,7 @@ pnpm format
 
 There are no automated tests — no jest, vitest, or pytest configs exist in the repo.
 
-`.claude/launch.json` defines a `web` dev config that runs the Next.js app on **port 3100** (`next dev --turbo --port 3100`) — this is the port Claude Code's preview uses, distinct from the `:3000` referenced in the Docker/Nginx setup and `.env`.
+`.Codex/launch.json` defines a `web` dev config that runs the Next.js app on **port 3100** (`next dev --turbo --port 3100`) — this is the port Codex's preview uses, distinct from the `:3000` referenced in the Docker/Nginx setup and `.env`.
 
 ### Database (`packages/db`)
 
