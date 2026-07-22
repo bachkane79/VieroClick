@@ -1,0 +1,4 @@
+CREATE INDEX IF NOT EXISTS "workspace_posts_feed_idx" ON "workspace_posts" USING btree ("workspace_id","pinned","created_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "activity_events_project_created_idx" ON "activity_events" USING btree ("project_id","created_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "activity_events_workspace_created_idx" ON "activity_events" USING btree ("workspace_id","created_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "notifications_recipient_created_idx" ON "notifications" USING btree ("workspace_id","recipient_member_id","created_at");

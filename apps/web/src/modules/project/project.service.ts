@@ -12,7 +12,7 @@ import {
   activityEvents,
   users,
 } from "@vieroc/db";
-import { requireActor, type ActorContext } from "@/server/lib/context";
+import { requireActor, requireScopedActor, type ActorContext } from "@/server/lib/context";
 import { NotFoundError, ValidationError } from "@/server/lib/errors";
 import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
 import { enqueueNotifications } from "@/server/lib/notifications";
@@ -48,27 +48,36 @@ async function canAccessPrivateProject(
 
 // cache() de-duplicates identical calls within a single server render tree.
 // e.g. layout.tsx + page.tsx both calling getProject() → only 1 DB query.
+//
+// WP-C6 reference migration: reads go through requireScopedActor so the
+// underlying queries run under RLS (app_runtime role), not just the app-layer
+// ACL check below. `canAccessPrivateProject` → `resolveGrantLevel` still reads
+// through the default (owner) `db` for now — see docs_local/wp-c6-rls-report.md,
+// "còn lại" section — that one call is an accepted gap in this pass, not
+// silently assumed covered.
 export const listProjects = cache(async function listProjects(workspaceId: string) {
-  const ctx = await requireActor(workspaceId);
-  // Shared cache holds the full list; per-user private-project filtering happens
-  // outside the cache (WP-C3) so a private project never leaks into a non-member's
-  // sidebar/list.
-  const all = await getOrSetCache(`projects:${workspaceId}`, () => repo.listByWorkspace(workspaceId));
-  const hasPrivate = all.some((p) => p.isPrivate);
-  if (!hasPrivate || isWorkspaceAdmin(ctx)) return all;
+  return requireScopedActor(workspaceId, undefined, async (ctx, exec) => {
+    // Shared cache holds the full list; per-user private-project filtering happens
+    // outside the cache (WP-C3) so a private project never leaks into a non-member's
+    // sidebar/list. The cached set is identical for every workspace member (RLS
+    // scopes it to the workspace, not the individual) so sharing it is safe.
+    const all = await getOrSetCache(`projects:${workspaceId}`, () => repo.listByWorkspace(workspaceId, exec));
+    const hasPrivate = all.some((p) => p.isPrivate);
+    if (!hasPrivate || isWorkspaceAdmin(ctx)) return all;
 
-  const myProjectIds = new Set(
-    await repo.listProjectIdsForMember(workspaceId, ctx.workspaceMemberId)
-  );
-  const visible = [];
-  for (const p of all) {
-    if (!p.isPrivate || myProjectIds.has(p.id)) {
-      visible.push(p);
-      continue;
+    const myProjectIds = new Set(
+      await repo.listProjectIdsForMember(workspaceId, ctx.workspaceMemberId, exec)
+    );
+    const visible = [];
+    for (const p of all) {
+      if (!p.isPrivate || myProjectIds.has(p.id)) {
+        visible.push(p);
+        continue;
+      }
+      if (await canAccessPrivateProject(ctx, p, false)) visible.push(p);
     }
-    if (await canAccessPrivateProject(ctx, p, false)) visible.push(p);
-  }
-  return visible;
+    return visible;
+  });
 });
 
 export const getProject = cache(async function getProject(
@@ -90,105 +99,112 @@ export const getProject = cache(async function getProject(
   return project;
 });
 
+// WP-C6 reference migration: requireScopedActor opens the actor-scoped
+// (app_runtime + SET LOCAL) transaction; the §4.3 mutation transaction below
+// runs as a SAVEPOINT on that same connection via `exec.transaction(...)`
+// (NOT `db.transaction`, which would silently run on the owner connection and
+// bypass RLS for the write).
 export async function createProject(workspaceId: string, input: unknown) {
   const data = createProjectSchema.parse(input);
-  const ctx = await requireActor(workspaceId);
-  assertCanCreateProject(ctx);
 
-  const leadMemberId = data.leadMemberId ?? ctx.workspaceMemberId;
-  const memberRoles = new Map<string, "project_lead" | "member">();
-  memberRoles.set(ctx.workspaceMemberId, "project_lead");
-  memberRoles.set(leadMemberId, "project_lead");
-  for (const memberId of data.memberIds) {
-    if (!memberRoles.has(memberId)) memberRoles.set(memberId, "member");
-  }
+  return requireScopedActor(workspaceId, undefined, async (ctx, exec) => {
+    assertCanCreateProject(ctx);
 
-  const workspaceMemberIds = new Set(
-    (await repo.listWorkspaceMemberIds(workspaceId)).map((member) => member.id)
-  );
-  for (const memberId of memberRoles.keys()) {
-    if (!workspaceMemberIds.has(memberId)) {
-      throw new ValidationError("Project members must belong to this workspace");
+    const leadMemberId = data.leadMemberId ?? ctx.workspaceMemberId;
+    const memberRoles = new Map<string, "project_lead" | "member">();
+    memberRoles.set(ctx.workspaceMemberId, "project_lead");
+    memberRoles.set(leadMemberId, "project_lead");
+    for (const memberId of data.memberIds) {
+      if (!memberRoles.has(memberId)) memberRoles.set(memberId, "member");
     }
-  }
 
-  const project = await db.transaction(async (tx) => {
-    const project = await repo.create(
-      {
-        workspaceId,
-        name: data.name,
-        description: data.description ?? null,
-        scope: data.scope ?? null,
-        status: data.status,
-        leadMemberId: data.leadMemberId ?? ctx.workspaceMemberId,
-        startDate: data.startDate ?? null,
-        targetEndDate: data.targetEndDate ?? null,
-        goals: data.goals,
-        constraints: data.constraints,
-        expectedDeliverables: data.expectedDeliverables,
-        initialContext: data.initialContext ?? null,
-        aiEnabled: data.aiEnabled,
-        createdBy: ctx.userId,
-      },
-      tx
+    const workspaceMemberIds = new Set(
+      (await repo.listWorkspaceMemberIds(workspaceId, exec)).map((member) => member.id)
     );
+    for (const memberId of memberRoles.keys()) {
+      if (!workspaceMemberIds.has(memberId)) {
+        throw new ValidationError("Project members must belong to this workspace");
+      }
+    }
 
-    for (const [workspaceMemberId, role] of memberRoles) {
-      await repo.addMember(
+    const project = await exec.transaction(async (tx) => {
+      const project = await repo.create(
         {
-          projectId: project.id,
-          workspaceMemberId,
-          role,
-          allocationPercent: 100,
+          workspaceId,
+          name: data.name,
+          description: data.description ?? null,
+          scope: data.scope ?? null,
+          status: data.status,
+          leadMemberId: data.leadMemberId ?? ctx.workspaceMemberId,
+          startDate: data.startDate ?? null,
+          targetEndDate: data.targetEndDate ?? null,
+          goals: data.goals,
+          constraints: data.constraints,
+          expectedDeliverables: data.expectedDeliverables,
+          initialContext: data.initialContext ?? null,
+          aiEnabled: data.aiEnabled,
+          createdBy: ctx.userId,
         },
         tx
       );
-    }
 
-    await repo.seedDefaultStatuses(project.id, tx);
-    await events.projectCreated(tx, ctx, project);
+      for (const [workspaceMemberId, role] of memberRoles) {
+        await repo.addMember(
+          {
+            projectId: project.id,
+            workspaceMemberId,
+            role,
+            allocationPercent: 100,
+          },
+          tx
+        );
+      }
 
-    const notificationRecipients = [...memberRoles.keys()].filter(
-      (memberId) => memberId !== ctx.workspaceMemberId
-    );
-    if (notificationRecipients.length > 0) {
-      await enqueueNotifications(
-        tx,
-        notificationRecipients.map((memberId) => ({
-          workspaceId: ctx.workspaceId,
-          recipientMemberId: memberId,
-          projectId: project.id,
-          type: "project.member_added",
-          title: `You were added to ${project.name}`,
-          entityType: "project",
-          entityId: project.id,
-        }))
+      await repo.seedDefaultStatuses(project.id, tx);
+      await events.projectCreated(tx, ctx, project);
+
+      const notificationRecipients = [...memberRoles.keys()].filter(
+        (memberId) => memberId !== ctx.workspaceMemberId
       );
+      if (notificationRecipients.length > 0) {
+        await enqueueNotifications(
+          tx,
+          notificationRecipients.map((memberId) => ({
+            workspaceId: ctx.workspaceId,
+            recipientMemberId: memberId,
+            projectId: project.id,
+            type: "project.member_added",
+            title: `You were added to ${project.name}`,
+            entityType: "project",
+            entityId: project.id,
+          }))
+        );
+      }
+
+      await invalidateCache(`projects:${workspaceId}`);
+      return project;
+    });
+
+    // AI Leader OFF → manual project, no agents dispatched. The user can flip it
+    // on later from the overview banner (which dispatches planning then).
+    if (data.aiEnabled) {
+      void dispatchAgent({
+        targetRole: "planning",
+        senderRole: "assignment",
+        projectId: project.id,
+        message: "A new VieroClick project was created. Generate and apply the implementation plan.",
+        actorUserId: ctx.userId,
+        payload: {
+          projectName: project.name,
+          createdBy: ctx.userId,
+        },
+      }).catch((error) => {
+        console.error("Failed to dispatch planning agent after project creation:", error);
+      });
     }
 
-    await invalidateCache(`projects:${workspaceId}`);
     return project;
   });
-
-  // AI Leader OFF → manual project, no agents dispatched. The user can flip it
-  // on later from the overview banner (which dispatches planning then).
-  if (data.aiEnabled) {
-    void dispatchAgent({
-      targetRole: "planning",
-      senderRole: "assignment",
-      projectId: project.id,
-      message: "A new VieroClick project was created. Generate and apply the implementation plan.",
-      actorUserId: ctx.userId,
-      payload: {
-        projectName: project.name,
-        createdBy: ctx.userId,
-      },
-    }).catch((error) => {
-      console.error("Failed to dispatch planning agent after project creation:", error);
-    });
-  }
-
-  return project;
 }
 
 /**

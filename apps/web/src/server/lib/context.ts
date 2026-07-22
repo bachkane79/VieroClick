@@ -1,6 +1,6 @@
 import "server-only";
 import { and, eq } from "drizzle-orm";
-import { db, workspaceMembers, projectMembers, projects } from "@vieroc/db";
+import { db, withActor, workspaceMembers, projectMembers, projects, type Executor, type Transaction } from "@vieroc/db";
 import type { WorkspaceRole, ProjectRole } from "@vieroc/types";
 import { auth } from "@/server/auth";
 import { UnauthorizedError, ForbiddenError } from "./errors";
@@ -89,6 +89,59 @@ export async function getUserId(): Promise<string> {
  * Resolve the current user's membership in `workspaceId` (and `projectId` if
  * given). Throws if not authenticated or not a workspace member.
  */
+async function resolveActorContext(
+  exec: Executor,
+  userId: string,
+  workspaceId: string,
+  projectId?: string
+): Promise<ActorContext> {
+  const [member] = await exec
+    .select({ id: workspaceMembers.id, role: workspaceMembers.role })
+    .from(workspaceMembers)
+    .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)))
+    .limit(1);
+
+  if (!member) throw new ForbiddenError("Not a member of this workspace");
+
+  let projectRole: ProjectRole | null = null;
+  if (projectId) {
+    const [project] = await exec
+      .select({ id: projects.id })
+      .from(projects)
+      .where(and(eq(projects.id, projectId), eq(projects.workspaceId, workspaceId)))
+      .limit(1);
+
+    if (!project) throw new ForbiddenError("Project does not belong to this workspace");
+
+    const [pm] = await exec
+      .select({ role: projectMembers.role })
+      .from(projectMembers)
+      .where(
+        and(
+          eq(projectMembers.projectId, projectId),
+          eq(projectMembers.workspaceMemberId, member.id)
+        )
+      )
+      .limit(1);
+    projectRole = pm?.role ?? null;
+
+    const workspaceCanSeeAllProjects =
+      member.role === "owner" || member.role === "admin" || member.role === "leader";
+    if (!projectRole && !workspaceCanSeeAllProjects) {
+      throw new ForbiddenError("Not a member of this project");
+    }
+  }
+
+  return {
+    userId,
+    workspaceId,
+    workspaceMemberId: member.id,
+    workspaceRole: member.role,
+    projectId: projectId ?? null,
+    projectRole,
+  };
+}
+
 export async function requireActor(workspaceId: string, projectId?: string): Promise<ActorContext> {
   const userId = await getUserId();
   const cacheKey = `actor:${userId}:${workspaceId}:${projectId ?? "none"}`;
@@ -99,53 +152,31 @@ export async function requireActor(workspaceId: string, projectId?: string): Pro
 
   return getOrSetCache(
     cacheKey,
-    async () => {
-    const [member] = await db
-      .select({ id: workspaceMembers.id, role: workspaceMembers.role })
-      .from(workspaceMembers)
-      .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)))
-      .limit(1);
-
-    if (!member) throw new ForbiddenError("Not a member of this workspace");
-
-    let projectRole: ProjectRole | null = null;
-    if (projectId) {
-      const [project] = await db
-        .select({ id: projects.id })
-        .from(projects)
-        .where(and(eq(projects.id, projectId), eq(projects.workspaceId, workspaceId)))
-        .limit(1);
-
-      if (!project) throw new ForbiddenError("Project does not belong to this workspace");
-
-      const [pm] = await db
-        .select({ role: projectMembers.role })
-        .from(projectMembers)
-        .where(
-          and(
-            eq(projectMembers.projectId, projectId),
-            eq(projectMembers.workspaceMemberId, member.id)
-          )
-        )
-        .limit(1);
-      projectRole = pm?.role ?? null;
-
-      const workspaceCanSeeAllProjects =
-        member.role === "owner" || member.role === "admin" || member.role === "leader";
-      if (!projectRole && !workspaceCanSeeAllProjects) {
-        throw new ForbiddenError("Not a member of this project");
-      }
-    }
-
-    return {
-      userId,
-      workspaceId,
-      workspaceMemberId: member.id,
-      workspaceRole: member.role,
-      projectId: projectId ?? null,
-      projectRole,
-    };
-    },
+    () => resolveActorContext(db, userId, workspaceId, projectId),
     { ttlSeconds: ACTOR_CACHE_TTL_SECONDS }
   );
+}
+
+/**
+ * WP-C6: RLS-scoped variant of `requireActor`. Runs `fn` inside one
+ * `withActor` transaction (app_runtime role, `SET LOCAL app.user_id`) so every
+ * query `fn` makes through the `exec` it receives is subject to RLS, not just
+ * the app-layer ACL check. Not cached (unlike `requireActor`) — the actor
+ * context here is only valid for the lifetime of this one transaction.
+ *
+ * Migrate a module to this by: replacing `const ctx = await requireActor(...)`
+ * with `return requireScopedActor(workspaceId, projectId, async (ctx, exec) => {...})`,
+ * and passing `exec` as the last arg to every repo call inside `fn` (instead of
+ * relying on each repo function's `exec: Executor = db` default).
+ */
+export async function requireScopedActor<T>(
+  workspaceId: string,
+  projectId: string | undefined,
+  fn: (ctx: ActorContext, exec: Transaction) => Promise<T>
+): Promise<T> {
+  const userId = await getUserId();
+  return withActor(userId, async (exec) => {
+    const ctx = await resolveActorContext(exec, userId, workspaceId, projectId);
+    return fn(ctx, exec);
+  });
 }

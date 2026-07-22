@@ -295,6 +295,17 @@ export const agentSuggestionTypeSchema = z.enum([
   "project_hole",
 ]);
 
+// ─── Cursor pagination (WP-D1) ────────────────────────────────────────────────
+// Keyset pagination input, shared by every paginated list endpoint. `cursor` is
+// an opaque string produced by the previous page's `nextCursor` (see
+// apps/web/src/server/lib/cursor.ts) — NOT the offset-based `paginationSchema`
+// below, which is unused dead code and the wrong pattern for large lists.
+
+export const cursorQuerySchema = z.object({
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
 // ─── Pagination ───────────────────────────────────────────────────────────────
 
 export const paginationSchema = z.object({
@@ -318,6 +329,7 @@ export type CreateDecisionLogInput = z.infer<typeof createDecisionLogSchema>;
 export type CreateRiskInput = z.infer<typeof createRiskSchema>;
 export type UpdateMemberProfileInput = z.infer<typeof updateMemberProfileSchema>;
 export type PaginationInput = z.infer<typeof paginationSchema>;
+export type CursorQueryInput = z.infer<typeof cursorQuerySchema>;
 export type AgentJobType = z.infer<typeof agentJobTypeSchema>;
 export type AgentRole = z.infer<typeof agentRoleSchema>;
 export type AgentSuggestionType = z.infer<typeof agentSuggestionTypeSchema>;

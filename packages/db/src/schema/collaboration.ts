@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, integer, boolean, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, integer, boolean, index, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { timestamptz } from "./_helpers";
 import { users } from "./users";
 import { workspaces, workspaceMembers } from "./workspaces";
@@ -31,15 +31,22 @@ export const workspaceDocs = pgTable("workspace_docs", {
  * Team Hub announcements / posts — the casual team "sinh hoạt" board at the
  * workspace level.
  */
-export const workspacePosts = pgTable("workspace_posts", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  workspaceId: uuid("workspace_id")
-    .notNull()
-    .references(() => workspaces.id, { onDelete: "cascade" }),
-  authorMemberId: uuid("author_member_id")
-    .notNull()
-    .references(() => workspaceMembers.id, { onDelete: "cascade" }),
-  body: text("body").notNull(),
-  pinned: boolean("pinned").notNull().default(false),
-  createdAt: timestamptz("created_at").notNull().defaultNow(),
-});
+export const workspacePosts = pgTable(
+  "workspace_posts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    authorMemberId: uuid("author_member_id")
+      .notNull()
+      .references(() => workspaceMembers.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    pinned: boolean("pinned").notNull().default(false),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    // WP-D1: keyset pagination matches the existing sort (pinned DESC, created_at DESC).
+    index("workspace_posts_feed_idx").on(t.workspaceId, t.pinned, t.createdAt),
+  ]
+);
