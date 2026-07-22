@@ -1,6 +1,8 @@
+// LEGACY — its schema changes are already captured by packages/db/src/schema/
+// and the 3 journaled migrations (0000-0002). Kept for history only; do not run.
 // One-off idempotent migration: multi-assignee join table + projects.ai_enabled.
-// Run with the app's own env so it targets the same Neon DB the app reads:
-//   node --env-file=apps/web/.env.local packages/db/scripts/apply-multi-ai.mjs
+// Historical run command (targeted the same Neon DB the app reads):
+//   node --env-file=.env.local packages/db/migrations/_legacy/apply-multi-ai.mjs
 import { Pool, neonConfig } from "@neondatabase/serverless";
 import ws from "ws";
 

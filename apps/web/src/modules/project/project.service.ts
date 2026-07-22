@@ -117,7 +117,7 @@ export async function createProject(workspaceId: string, input: unknown) {
       );
     }
 
-    invalidateCache(`projects:${workspaceId}`);
+    await invalidateCache(`projects:${workspaceId}`);
     return project;
   });
 
@@ -162,8 +162,8 @@ export async function setAiLeader(p: {
     const row = await repo.update(p.projectId, { aiEnabled: p.enabled }, tx);
     if (!row) throw new NotFoundError("Project");
     await events.projectUpdated(tx, ctx, existing, { aiEnabled: p.enabled });
-    invalidateCache(`project:${p.projectId}`);
-    invalidateCache(`projects:${p.workspaceId}`);
+    await invalidateCache(`project:${p.projectId}`);
+    await invalidateCache(`projects:${p.workspaceId}`);
     return row;
   });
 
@@ -213,8 +213,8 @@ export async function updateProject(workspaceId: string, projectId: string, inpu
     const updated = await repo.update(projectId, patch, tx);
     if (!updated) throw new NotFoundError("Project");
     await events.projectUpdated(tx, ctx, existing, { ...patch });
-    invalidateCache(`projects:${workspaceId}`);
-    invalidateCache(`project:${projectId}`);
+    await invalidateCache(`projects:${workspaceId}`);
+    await invalidateCache(`project:${projectId}`);
     return updated;
   });
 }

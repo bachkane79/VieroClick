@@ -22,5 +22,5 @@ export async function notifyWorkspaceBot(
 
 // Escape the subset of Markdown that breaks Telegram's legacy parser.
 function escapeMd(s: string): string {
-  return s.replace(/([_*`\[])/g, "\\$1");
+  return s.replace(/([_*`[])/g, "\\$1");
 }

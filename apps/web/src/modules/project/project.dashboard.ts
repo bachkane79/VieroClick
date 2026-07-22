@@ -17,6 +17,26 @@ export interface DashboardKpis {
   openTotal: number;
 }
 
+/**
+ * Deterministic executive summary (no LLM hop — renders instantly and never
+ * hallucinates). Mirrors the tone of ClickUp's AI Executive Summary card.
+ */
+function buildSummary(health: HealthDetails, kpis: DashboardKpis): string {
+  const parts: string[] = [];
+  const mood = health.score >= 80 ? "ổn định" : health.score >= 50 ? "cần chú ý" : "đang gặp rủi ro";
+  parts.push(
+    `Dự án ${mood} với điểm sức khỏe ${health.score}/100 — đã hoàn thành ${health.doneTasks}/${health.totalTasks} việc (${health.completionPct}%).`
+  );
+  if (kpis.overdue > 0) parts.push(`${kpis.overdue} việc quá hạn cần xử lý trước tiên.`);
+  if (health.openBlockerCount > 0) parts.push(`${health.openBlockerCount} blocker đang mở.`);
+  if (kpis.unassigned > 0) parts.push(`${kpis.unassigned} việc đang mở chưa được giao cho ai.`);
+  if (health.highRiskCount > 0) parts.push(`${health.highRiskCount} rủi ro mức cao cần theo dõi.`);
+  if (parts.length === 1 && kpis.openTotal === 0 && health.totalTasks > 0) {
+    parts.push("Không còn việc mở — sẵn sàng đóng dự án hoặc lên kế hoạch giai đoạn tiếp theo.");
+  }
+  return parts.join(" ");
+}
+
 export interface StatusSlice {
   name: string;
   type: string;
@@ -176,24 +196,4 @@ export async function computeProjectDashboard(projectId: string): Promise<Projec
     latestActivity: activityRows,
     summary: buildSummary(health, kpis),
   };
-}
-
-/**
- * Deterministic executive summary (no LLM hop — renders instantly and never
- * hallucinates). Mirrors the tone of ClickUp's AI Executive Summary card.
- */
-function buildSummary(health: HealthDetails, kpis: DashboardKpis): string {
-  const parts: string[] = [];
-  const mood = health.score >= 80 ? "ổn định" : health.score >= 50 ? "cần chú ý" : "đang gặp rủi ro";
-  parts.push(
-    `Dự án ${mood} với điểm sức khỏe ${health.score}/100 — đã hoàn thành ${health.doneTasks}/${health.totalTasks} việc (${health.completionPct}%).`
-  );
-  if (kpis.overdue > 0) parts.push(`${kpis.overdue} việc quá hạn cần xử lý trước tiên.`);
-  if (health.openBlockerCount > 0) parts.push(`${health.openBlockerCount} blocker đang mở.`);
-  if (kpis.unassigned > 0) parts.push(`${kpis.unassigned} việc đang mở chưa được giao cho ai.`);
-  if (health.highRiskCount > 0) parts.push(`${health.highRiskCount} rủi ro mức cao cần theo dõi.`);
-  if (parts.length === 1 && kpis.openTotal === 0 && health.totalTasks > 0) {
-    parts.push("Không còn việc mở — sẵn sàng đóng dự án hoặc lên kế hoạch giai đoạn tiếp theo.");
-  }
-  return parts.join(" ");
 }

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Textarea } from "@vieroc/ui";
 import { toast } from "sonner";
-import { AlertOctagon, Plus, CheckCircle, User, AlertTriangle, ArrowRight } from "lucide-react";
+import { AlertOctagon, Plus, CheckCircle, User, AlertTriangle } from "lucide-react";
 import { reportBlockerAction, updateBlockerAction } from "@/modules/blocker/blocker.actions";
 
 interface BlockerRow {

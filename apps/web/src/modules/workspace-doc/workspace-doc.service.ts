@@ -41,7 +41,7 @@ export async function createWorkspaceDoc(p: { workspaceId: string; input: unknow
       },
       tx
     );
-    invalidateCache(CACHE(p.workspaceId));
+    await invalidateCache(CACHE(p.workspaceId));
     return doc;
   });
 }
@@ -65,7 +65,7 @@ export async function updateWorkspaceDoc(p: {
   return db.transaction(async (tx) => {
     const updated = await repo.update(p.docId, patch, tx);
     if (!updated) throw new NotFoundError("Document");
-    invalidateCache(CACHE(p.workspaceId));
+    await invalidateCache(CACHE(p.workspaceId));
     return updated;
   });
 }
@@ -77,7 +77,7 @@ export async function deleteWorkspaceDoc(p: { workspaceId: string; docId: string
 
   return db.transaction(async (tx) => {
     await repo.remove(p.docId, tx);
-    invalidateCache(CACHE(p.workspaceId));
+    await invalidateCache(CACHE(p.workspaceId));
     return { id: p.docId };
   });
 }

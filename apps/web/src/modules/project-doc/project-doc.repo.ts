@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db, projectDocs, type Executor } from "@vieroc/db";
 
 export type ProjectDocInsert = typeof projectDocs.$inferInsert;

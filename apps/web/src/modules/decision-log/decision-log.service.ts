@@ -57,7 +57,7 @@ export async function logDecision(p: { workspaceId: string; projectId: string; i
       await enqueueNotifications(tx, notifyItems);
     }
 
-    invalidateCache(`decisions:${p.projectId}`);
+    await invalidateCache(`decisions:${p.projectId}`);
 
     return decision;
   });
@@ -76,7 +76,7 @@ export async function deleteDecision(p: {
 
   return db.transaction(async (tx) => {
     await repo.remove(p.decisionId, tx);
-    invalidateCache(`decisions:${p.projectId}`);
+    await invalidateCache(`decisions:${p.projectId}`);
     return { id: p.decisionId };
   });
 }

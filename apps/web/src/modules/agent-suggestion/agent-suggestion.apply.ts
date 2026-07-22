@@ -633,7 +633,7 @@ export async function invalidateProjectViews(projectId: string, workspaceId: str
     `project:${projectId}`,
     `project_members:${projectId}`,
   ]) {
-    invalidateCache(key);
+    await invalidateCache(key);
   }
 
   const [workspace] = await db

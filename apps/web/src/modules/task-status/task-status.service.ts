@@ -36,8 +36,8 @@ export async function createStatus(p: {
     );
 
     await events.statusCreated(tx, ctx, status);
-    invalidateCache(`statuses:${p.projectId}`);
-    invalidateCache(`board:${p.projectId}`);
+    await invalidateCache(`statuses:${p.projectId}`);
+    await invalidateCache(`board:${p.projectId}`);
 
     return status;
   });
@@ -67,8 +67,8 @@ export async function updateStatus(p: {
     if (!updated) throw new NotFoundError("Task status");
 
     await events.statusUpdated(tx, ctx, existing, updated);
-    invalidateCache(`statuses:${p.projectId}`);
-    invalidateCache(`board:${p.projectId}`);
+    await invalidateCache(`statuses:${p.projectId}`);
+    await invalidateCache(`board:${p.projectId}`);
 
     return updated;
   });
@@ -88,8 +88,8 @@ export async function deleteStatus(p: {
   return db.transaction(async (tx) => {
     await events.statusDeleted(tx, ctx, existing);
     await repo.remove(p.statusId, tx);
-    invalidateCache(`statuses:${p.projectId}`);
-    invalidateCache(`board:${p.projectId}`);
+    await invalidateCache(`statuses:${p.projectId}`);
+    await invalidateCache(`board:${p.projectId}`);
     return { id: p.statusId };
   });
 }

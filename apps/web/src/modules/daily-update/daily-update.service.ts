@@ -40,7 +40,7 @@ export async function submitDailyUpdate(p: {
     );
 
     await events.dailyUpdateSubmitted(tx, ctx, update);
-    invalidateCache(`daily_updates:${p.projectId}`);
+    await invalidateCache(`daily_updates:${p.projectId}`);
 
     return update;
   });

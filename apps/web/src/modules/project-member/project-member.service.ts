@@ -44,7 +44,7 @@ export async function addMember(p: { workspaceId: string; projectId: string; inp
         entityId: p.projectId,
       },
     ]);
-    invalidateCache(`project_members:${p.projectId}`);
+    await invalidateCache(`project_members:${p.projectId}`);
     return member;
   });
 }
@@ -66,7 +66,7 @@ export async function updateMember(p: {
     const updated = await repo.update(p.memberId, data, tx);
     if (!updated) throw new NotFoundError("Project member");
     await events.memberUpdated(tx, ctx, updated, { ...data });
-    invalidateCache(`project_members:${p.projectId}`);
+    await invalidateCache(`project_members:${p.projectId}`);
     return updated;
   });
 }
@@ -81,7 +81,7 @@ export async function removeMember(p: { workspaceId: string; projectId: string; 
   return db.transaction(async (tx) => {
     await events.memberRemoved(tx, ctx, existing);
     await repo.remove(p.memberId, tx);
-    invalidateCache(`project_members:${p.projectId}`);
+    await invalidateCache(`project_members:${p.projectId}`);
     return { id: p.memberId };
   });
 }

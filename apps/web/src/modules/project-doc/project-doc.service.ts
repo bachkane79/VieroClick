@@ -33,7 +33,7 @@ export async function createDoc(p: { workspaceId: string; projectId: string; inp
     );
 
     await events.docCreated(tx, ctx, doc);
-    invalidateCache(`docs:${p.projectId}`);
+    await invalidateCache(`docs:${p.projectId}`);
 
     return doc;
   });
@@ -49,7 +49,7 @@ export async function deleteDoc(p: { workspaceId: string; projectId: string; doc
   return db.transaction(async (tx) => {
     await events.docDeleted(tx, ctx, existing);
     await repo.remove(p.docId, tx);
-    invalidateCache(`docs:${p.projectId}`);
+    await invalidateCache(`docs:${p.projectId}`);
     return { id: p.docId };
   });
 }

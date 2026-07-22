@@ -4,7 +4,6 @@ import { eq } from "drizzle-orm";
 import {
   applyObserverRequestSchema,
   observerSuggestionSchema,
-  type ObserverSuggestionInput,
 } from "@vieroc/validators";
 import { isAgentRequest } from "@/server/lib/agent-auth";
 import {

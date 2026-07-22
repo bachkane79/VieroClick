@@ -9,7 +9,7 @@ import {
 } from "@/modules/workspace/workspace.actions";
 import { Button } from "@vieroc/ui";
 import { toast } from "sonner";
-import { User, Shield, Briefcase, Clock, FileText, Globe, Layers, Award } from "lucide-react";
+import { User, Briefcase, Clock, FileText, Globe, Layers, Award } from "lucide-react";
 
 interface UserInfo {
   id: string;
@@ -69,7 +69,7 @@ export function ProfileForm({ user, workspaces }: Props) {
         } else {
           toast.error("Failed to load workspace member profile");
         }
-      } catch (err) {
+      } catch {
         toast.error("An error occurred loading workspace profile");
       } finally {
         setLoadingProfile(false);
@@ -96,7 +96,7 @@ export function ProfileForm({ user, workspaces }: Props) {
       } else {
         toast.error(res.error ?? "Failed to update profile");
       }
-    } catch (err) {
+    } catch {
       toast.error("An error occurred");
     } finally {
       setSavingUser(false);
@@ -133,7 +133,7 @@ export function ProfileForm({ user, workspaces }: Props) {
       } else {
         toast.error(res.error ?? "Failed to update profile");
       }
-    } catch (err) {
+    } catch {
       toast.error("An error occurred");
     } finally {
       setSavingProfile(false);

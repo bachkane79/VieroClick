@@ -12,7 +12,7 @@ import {
   resourceTypeSchema,
 } from "./permission.schema";
 import { assertCanManageTeams } from "./permission.policy";
-import { assertLevel, resolveEffectiveLevel } from "./permission.access";
+import { assertLevel } from "./permission.access";
 import * as events from "./permission.events";
 import * as repo from "./permission.repo";
 

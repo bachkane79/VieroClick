@@ -18,7 +18,7 @@ import {
   memberProfiles,
   taskAssignees,
 } from "@vieroc/db";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getUserId } from "@/server/lib/context";
 import { isAgentRequest } from "@/server/lib/agent-auth";
 

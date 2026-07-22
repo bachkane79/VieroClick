@@ -20,7 +20,7 @@ export function LoginForm({ showDevBypass = false }: Props) {
     setLoading(provider);
     try {
       await signIn(provider, { callbackUrl: "/dashboard" });
-    } catch (err) {
+    } catch {
       setLoading(null);
     }
   };
@@ -35,7 +35,7 @@ export function LoginForm({ showDevBypass = false }: Props) {
         name: name || email.split("@")[0] || "Developer",
         callbackUrl: "/dashboard",
       });
-    } catch (err) {
+    } catch {
       setLoading(null);
     }
   };

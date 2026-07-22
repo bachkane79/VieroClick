@@ -15,10 +15,9 @@ export default async function ProjectDocsDecisionsPage({ params }: Props) {
   const { slug, projectId } = await params;
 
   let workspace;
-  let project;
   try {
     workspace = await getWorkspace(slug);
-    project = await getProject(workspace.id, projectId);
+    await getProject(workspace.id, projectId);
   } catch (err) {
     if (err instanceof NotFoundError) notFound();
     throw err;

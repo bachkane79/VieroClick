@@ -9,8 +9,8 @@
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push",
+    "db:migrate": "node scripts/guard-migrate.mjs migrate",
+    "db:push": "node scripts/guard-migrate.mjs push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/seed.ts"
   },

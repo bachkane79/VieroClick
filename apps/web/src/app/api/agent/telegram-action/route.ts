@@ -119,7 +119,7 @@ export async function POST(request: Request) {
         return blocker;
       });
 
-      invalidateCache(`blockers:${projectId}`);
+      await invalidateCache(`blockers:${projectId}`);
       return NextResponse.json({ ok: true, actionType, id: created.id, title: created.title });
     }
 
@@ -154,7 +154,7 @@ export async function POST(request: Request) {
         return update;
       });
 
-      invalidateCache(`daily_updates:${projectId}`);
+      await invalidateCache(`daily_updates:${projectId}`);
       return NextResponse.json({ ok: true, actionType, id: created.id, workDate: created.workDate });
     }
 

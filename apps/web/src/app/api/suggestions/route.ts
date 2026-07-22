@@ -4,7 +4,6 @@ import { eq } from "drizzle-orm";
 import { getUserId } from "@/server/lib/context";
 import { isAgentRequest } from "@/server/lib/agent-auth";
 import { agentSuggestionTypeSchema } from "@vieroc/validators";
-import { revalidatePath } from "next/cache";
 
 export async function POST(request: Request) {
   try {

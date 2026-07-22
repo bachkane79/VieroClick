@@ -55,7 +55,7 @@ export async function reportBlocker(p: {
       ]);
     }
 
-    invalidateCache(`blockers:${p.projectId}`);
+    await invalidateCache(`blockers:${p.projectId}`);
 
     return blocker;
   });
@@ -97,7 +97,7 @@ export async function updateBlocker(p: {
       await events.blockerUpdated(tx, ctx, existing, updated);
     }
 
-    invalidateCache(`blockers:${p.projectId}`);
+    await invalidateCache(`blockers:${p.projectId}`);
 
     return updated;
   });

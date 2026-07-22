@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, Textarea } from "@vieroc/ui";
 import { toast } from "sonner";
-import { ClipboardList, Sparkles, Smile, MessageSquare, AlertCircle } from "lucide-react";
+import { ClipboardList, Smile, MessageSquare, AlertCircle } from "lucide-react";
 import { submitDailyUpdateAction } from "@/modules/daily-update/daily-update.actions";
 
 interface UpdateRow {
@@ -316,7 +316,7 @@ export function DailyViewClient({
         <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
           <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 border-b pb-3 border-neutral-100 dark:border-neutral-800">
             <AlertCircle className="w-4 h-4 text-amber-500" />
-            Missing Today's Update
+            Missing Today&apos;s Update
           </h3>
 
           {missingMembers.length === 0 ? (

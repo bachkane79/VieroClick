@@ -42,8 +42,8 @@ export async function createWorkspace(input: unknown) {
       { workspaceId: ws.id, actorUserId: userId, actorMemberId: member.id },
       ws.name
     );
-    invalidateCachePattern(`my_workspaces:${userId}`);
-    invalidateCachePattern(`workspace_by_slug:`);
+    await invalidateCachePattern(`my_workspaces:${userId}`);
+    await invalidateCachePattern(`workspace_by_slug:`);
     return ws;
   });
 }
@@ -92,8 +92,8 @@ export async function ensurePersonalWorkspace(displayName: string) {
       { workspaceId: ws.id, actorUserId: userId, actorMemberId: member.id },
       ws.name
     );
-    invalidateCachePattern(`my_workspaces:${userId}`);
-    invalidateCachePattern(`workspace_by_slug:`);
+    await invalidateCachePattern(`my_workspaces:${userId}`);
+    await invalidateCachePattern(`workspace_by_slug:`);
     return ws;
   });
 }
@@ -107,8 +107,8 @@ export async function updateWorkspace(workspaceId: string, input: unknown) {
     const updated = await repo.update(workspaceId, data, tx);
     if (!updated) throw new NotFoundError("Workspace");
     await events.workspaceUpdated(tx, ctx, { ...data });
-    invalidateCachePattern(`my_workspaces:`);
-    invalidateCachePattern(`workspace_by_slug:`);
+    await invalidateCachePattern(`my_workspaces:`);
+    await invalidateCachePattern(`workspace_by_slug:`);
     return updated;
   });
 }
@@ -146,9 +146,9 @@ export async function inviteWorkspaceMember(workspaceId: string, input: unknown)
       email: data.email,
     });
 
-    invalidateCache(`workspace_members:${workspaceId}`);
-    invalidateCachePattern(`actor:`);
-    invalidateCachePattern(`workspace_by_slug:`);
+    await invalidateCache(`workspace_members:${workspaceId}`);
+    await invalidateCachePattern(`actor:`);
+    await invalidateCachePattern(`workspace_by_slug:`);
 
     const { track } = await import("@/server/lib/analytics");
     track("invitation_sent", { workspaceId, role: data.role });
@@ -170,9 +170,9 @@ export async function updateWorkspaceMemberRole(
     if (!updated) throw new NotFoundError("Workspace Member");
     await events.workspaceMemberRoleUpdated(tx, ctx, { memberId, role });
     
-    invalidateCache(`workspace_members:${workspaceId}`);
-    invalidateCachePattern(`actor:`);
-    invalidateCachePattern(`workspace_by_slug:`);
+    await invalidateCache(`workspace_members:${workspaceId}`);
+    await invalidateCachePattern(`actor:`);
+    await invalidateCachePattern(`workspace_by_slug:`);
 
     return updated;
   });
@@ -187,9 +187,9 @@ export async function removeWorkspaceMember(workspaceId: string, memberId: strin
     if (!deleted) throw new NotFoundError("Workspace Member");
     await events.workspaceMemberRemoved(tx, ctx, { memberId, userId: deleted.userId });
 
-    invalidateCache(`workspace_members:${workspaceId}`);
-    invalidateCachePattern(`actor:`);
-    invalidateCachePattern(`workspace_by_slug:`);
+    await invalidateCache(`workspace_members:${workspaceId}`);
+    await invalidateCachePattern(`actor:`);
+    await invalidateCachePattern(`workspace_by_slug:`);
 
     return deleted;
   });
@@ -208,7 +208,7 @@ export async function getMyUserDetails() {
 export async function updateMyUserDetails(fullName: string, avatarUrl: string | null) {
   const userId = await getUserId();
   const updated = await repo.updateUserDetails(userId, { fullName, avatarUrl });
-  invalidateCache(`user_details:${userId}`);
+  await invalidateCache(`user_details:${userId}`);
   return updated;
 }
 
@@ -251,7 +251,7 @@ export async function updateWorkspaceMemberProfileDetails(workspaceId: string, i
       ...data,
     });
 
-    invalidateCache(`workspace_profile:${workspaceId}:${ctx.workspaceMemberId}`);
+    await invalidateCache(`workspace_profile:${workspaceId}:${ctx.workspaceMemberId}`);
 
     return profile;
   });

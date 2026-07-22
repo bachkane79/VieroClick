@@ -14,7 +14,9 @@ RUN pnpm install --frozen-lockfile
 
 FROM base AS builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# Bring the full installed tree (root + per-package node_modules with pnpm symlinks),
+# then overlay the source. node_modules is .dockerignore'd so the source copy won't clobber it.
+COPY --from=deps /app ./
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED 1
 RUN pnpm --filter @vieroc/web build

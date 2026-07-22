@@ -64,7 +64,7 @@ export async function createReport(p: {
       await enqueueNotifications(tx, notifyItems);
     }
 
-    invalidateCache(`reports:${p.projectId}`);
+    await invalidateCache(`reports:${p.projectId}`);
 
     return report;
   });
@@ -110,7 +110,7 @@ export async function approveReport(p: {
       await enqueueNotifications(tx, notifyItems);
     }
 
-    invalidateCache(`reports:${p.projectId}`);
+    await invalidateCache(`reports:${p.projectId}`);
 
     return updated;
   });

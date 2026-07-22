@@ -1,6 +1,6 @@
 import * as dotenv from "dotenv";
 import * as path from "path";
-dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
+dotenv.config({ path: path.resolve(__dirname, "../../../.env.local") });
 
 import { db, users, workspaces, workspaceMembers, projects, taskStatuses } from "./index";
 
