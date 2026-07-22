@@ -187,7 +187,7 @@ export function ChatClient({
   }, [messages]);
 
   return (
-    <div className="flex h-screen min-h-0">
+    <div className="flex h-full min-h-0">
       {/* ── Directory: channels + DMs (Discord-style) ─────────────────────── */}
       <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-card">
         <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">

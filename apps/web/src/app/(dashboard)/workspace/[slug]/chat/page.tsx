@@ -27,7 +27,7 @@ export default async function ChatIndexPage({ params }: Props) {
   if (first) redirect(`/workspace/${slug}/chat/${first.id}`);
 
   return (
-    <div className="flex h-screen flex-col items-center justify-center text-center text-muted-foreground">
+    <div className="flex h-full min-h-0 flex-col items-center justify-center text-center text-muted-foreground">
       <MessagesSquare className="mb-3 h-10 w-10 opacity-40" />
       <p className="text-sm font-semibold">Chưa có kênh chat nào</p>
       <p className="mt-1 text-xs">Kênh #general sẽ được tạo khi một thành viên có quyền mở Chat.</p>

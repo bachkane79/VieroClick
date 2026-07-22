@@ -92,7 +92,7 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
   }).format(new Date());
 
   return (
-    <div className="mx-auto max-w-[1080px] px-6 py-6 lg:px-8">
+    <div className="mx-auto max-w-[1080px] px-6 py-5 lg:px-8">
       {/* Greeting — compact attention header, not a hero (§11.1) */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -119,7 +119,7 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
       </div>
 
       {/* Today & upcoming */}
-      <section className="mt-8">
+      <section className="mt-6">
         <div className="mb-3 flex items-center gap-2.5">
           <CalendarClock className="h-4 w-4 text-text-secondary" />
           <h2 className="text-[15px] font-semibold">{t(locale, "home.today")}</h2>
@@ -189,7 +189,7 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
       </section>
 
       {/* Lower grid: announcements + activity/rollup */}
-      <div className="mt-8 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <AnnouncementsPanel
           workspaceId={workspace.id}
           workspaceSlug={slug}
@@ -215,7 +215,7 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
               {t(locale, "home.activity.empty")}
             </p>
           ) : (
-            <ul className="space-y-2.5">
+            <ul className="max-h-[280px] space-y-2.5 overflow-y-auto pr-1">
               {activity.map((a) => (
                 <li key={a.id} className="flex items-start gap-2 text-xs">
                   <span
@@ -253,7 +253,7 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
       </div>
 
       {/* Projects */}
-      <div className="mb-3 mt-8 flex items-center justify-between">
+      <div className="mb-3 mt-6 flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-[15px] font-semibold">
           <Layers className="h-4 w-4 text-text-secondary" />
           {t(locale, "home.projects")}

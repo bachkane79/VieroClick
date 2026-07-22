@@ -33,7 +33,7 @@ export default async function ProjectLayout({ children, params }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full min-h-screen bg-canvas text-foreground">
+    <div className="flex h-full min-h-0 flex-col bg-canvas text-foreground">
       {/* Context header: Workspace / Projects / Name + status (redesign §11.3) */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-4 py-2.5">
         <nav className="flex min-w-0 items-center gap-1.5 text-[13px]">
@@ -78,7 +78,7 @@ export default async function ProjectLayout({ children, params }: Props) {
 async function ProjectAccessDenied({ slug }: { slug: string }) {
   const locale = await getLocale();
   return (
-    <div className="flex h-full min-h-screen items-center justify-center bg-canvas px-6">
+    <div className="flex h-full min-h-0 items-center justify-center bg-canvas px-6">
       <div className="w-full max-w-md rounded-xl border border-border bg-surface p-8 text-center shadow-soft">
         <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-surface-subtle text-text-secondary">
           <Lock className="h-5 w-5" />
