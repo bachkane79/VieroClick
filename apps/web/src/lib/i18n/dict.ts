@@ -35,6 +35,15 @@ const vi = {
   "home.overdueN": "{n} quá hạn",
   "home.dueAt": "Hạn {d}",
 
+  // Permission / error states (§12)
+  "perm.denied.title": "Bạn chưa có quyền truy cập dự án này",
+  "perm.denied.body": "Dự án này ở chế độ riêng tư hoặc bạn chưa được thêm làm thành viên. Hãy đề nghị chủ dự án thêm bạn vào để xem nội dung.",
+  "perm.denied.back": "Quay lại danh sách dự án",
+  "err.title": "Đã có lỗi xảy ra",
+  "err.body": "Không tải được nội dung này. Bạn có thể thử lại.",
+  "err.retry": "Thử lại",
+  "err.home": "Về trang chủ",
+
   // Due meta
   "due.overdue": "Quá hạn",
   "due.today": "Hôm nay",
@@ -207,6 +216,14 @@ const en: Record<keyof typeof vi, string> = {
   "home.blockedN": "{n} blocked",
   "home.overdueN": "{n} overdue",
   "home.dueAt": "Due {d}",
+
+  "perm.denied.title": "You don't have access to this project",
+  "perm.denied.body": "This project is private or you haven't been added as a member yet. Ask the project owner to add you to see its content.",
+  "perm.denied.back": "Back to projects",
+  "err.title": "Something went wrong",
+  "err.body": "We couldn't load this content. You can try again.",
+  "err.retry": "Try again",
+  "err.home": "Back home",
 
   "due.overdue": "Overdue",
   "due.today": "Today",
