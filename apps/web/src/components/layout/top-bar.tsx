@@ -2,22 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useParams, usePathname } from "next/navigation";
+import { useParams } from "next/navigation";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { cn } from "@vieroc/ui";
 import { CreateWorkspaceDialog } from "@/modules/workspace/components/create-workspace-dialog";
 import { CreateOrganizationDialog } from "@/modules/organization/components/create-organization-dialog";
 import { useLocale } from "@/lib/i18n/client";
 import { t } from "@/lib/i18n/dict";
-import {
-  Building2,
-  ChevronsUpDown,
-  FileText,
-  FolderPlus,
-  Plus,
-  Search,
-  Sparkles,
-} from "lucide-react";
+import { Building2, ChevronsUpDown, Plus, Search, Sparkles } from "lucide-react";
 
 interface Props {
   workspaces: Array<{ id: string; name: string; slug: string; organizationId: string | null }>;
@@ -31,7 +23,6 @@ interface Props {
  */
 export function TopBar({ workspaces, organizations }: Props) {
   const params = useParams() as { slug?: string; projectId?: string };
-  const pathname = usePathname();
   const locale = useLocale();
   const [wsDialog, setWsDialog] = useState(false);
   const [orgDialog, setOrgDialog] = useState(false);
@@ -139,46 +130,7 @@ export function TopBar({ workspaces, organizations }: Props) {
       </button>
 
       <div className="ml-auto flex items-center gap-1.5">
-        {/* Global create */}
-        <DropdownMenu.Root>
-          <DropdownMenu.Trigger asChild>
-            <button
-              disabled={!activeWorkspace}
-              className="flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-primary-hover disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">{t(locale, "tb.create")}</span>
-            </button>
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Portal>
-            <DropdownMenu.Content
-              align="end"
-              sideOffset={6}
-              className="z-50 w-52 rounded-lg border border-border bg-popover p-1.5 shadow-elevated focus:outline-none"
-            >
-              <DropdownMenu.Item asChild>
-                <Link
-                  href={`${wsBase}/projects/new`}
-                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
-                >
-                  <FolderPlus className="h-4 w-4 text-muted-foreground" />
-                  {t(locale, "tb.newProject")}
-                </Link>
-              </DropdownMenu.Item>
-              <DropdownMenu.Item asChild>
-                <Link
-                  href={`${wsBase}/docs`}
-                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
-                >
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  {t(locale, "tb.newDoc")}
-                </Link>
-              </DropdownMenu.Item>
-            </DropdownMenu.Content>
-          </DropdownMenu.Portal>
-        </DropdownMenu.Root>
-
-        {/* Ask AI — single global entry */}
+        {/* Ask AI — single global entry (global create lives in the panel +) */}
         <Link
           href={activeWorkspace ? askAiHref : "/dashboard"}
           title={t(locale, "tb.askAi")}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useParams, useRouter } from "next/navigation";
@@ -9,32 +9,51 @@ import type { User } from "next-auth";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { cn } from "@vieroc/ui";
 import { listProjectsAction } from "@/modules/project/project.actions";
+import { listProjectPhasesAction } from "@/modules/wbs/wbs.actions";
 import { unreadCountAction } from "@/modules/notification/notification.actions";
+import { listTeamsWithMembersAction } from "@/modules/permission/permission.actions";
 import { listWorkspaceDocsAction } from "@/modules/workspace-doc/workspace-doc.actions";
 import { listChatDirectoryAction } from "@/modules/channel/channel.actions";
 import { useLocale } from "@/lib/i18n/client";
 import { t } from "@/lib/i18n/dict";
 import { setLocaleAction } from "@/lib/i18n/actions";
 import {
+  AlertOctagon,
+  BarChart3,
   BookText,
+  Briefcase,
+  CalendarCheck,
+  CalendarDays,
+  CalendarRange,
   ChevronDown,
   ChevronRight,
+  ClipboardList,
+  FileText,
+  FolderPlus,
+  Gauge,
   Globe,
   Hash,
   HelpCircle,
   Home,
   Inbox,
   KanbanSquare,
-  LayoutDashboard,
-  ListTodo,
   Layers,
+  LayoutDashboard,
+  LayoutGrid,
+  ListTodo,
   LogOut,
   MessagesSquare,
+  MoreHorizontal,
+  Network,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
   Settings,
+  Settings2,
   Sparkles,
+  Table2,
+  Target,
+  Users,
   UserCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -46,6 +65,8 @@ interface Props {
 }
 
 type SidebarProject = { id: string; name: string; status: string };
+type PhaseLink = { id: string; title: string };
+type TeamItem = { id: string; name: string; memberIds: string[] };
 type DocItem = { id: string; parentId: string | null; title: string };
 type ChatDir = {
   ok: boolean;
@@ -53,8 +74,8 @@ type ChatDir = {
   dms: Array<{ id: string; otherName: string }>;
 };
 
-/** The seven global areas (redesign §6.1). Ordered, fixed. */
-type Area = "home" | "mywork" | "inbox" | "projects" | "docs" | "chat" | "dashboards";
+/** Rail tab = the contextual panel currently shown (ClickUp model). */
+type RailTab = "home" | "planner" | "ai" | "teams" | "docs";
 
 const SIDEBAR_COLLAPSED_KEY = "vc-sidebar-collapsed";
 
@@ -66,29 +87,84 @@ const PROJECT_STATUS_DOT: Record<string, string> = {
   archived: "bg-text-disabled",
 };
 
-/** Derive the active global area from the current path. */
-function deriveArea(pathname: string): Area {
-  if (/\/my-tasks(\/|$)/.test(pathname)) return "mywork";
-  if (/\/inbox(\/|$)/.test(pathname)) return "inbox";
-  if (/\/chat(\/|$)/.test(pathname)) return "chat";
+/** Keep the panel in sync when navigation happens outside the rail. */
+function deriveTab(pathname: string): RailTab | null {
   if (/\/docs(\/|$)/.test(pathname)) return "docs";
-  if (/\/dashboards(\/|$)/.test(pathname) || /\/projects\/[^/]+\/dashboard(\/|$)/.test(pathname)) {
-    return "dashboards";
+  if (/\/my-tasks(\/|$)/.test(pathname)) return "planner";
+  if (/\/projects\/[^/]+\/ai(\/|$)/.test(pathname)) return "ai";
+  return null;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   macOS-Dock magnification for the rail. As the pointer travels the rail,
+   each item scales by its distance to the cursor (nearest = largest, the
+   neighbours ease down), growing toward the panel. Disabled under
+   prefers-reduced-motion (§9.4). Only `transform` animates — no layout shift.
+   ───────────────────────────────────────────────────────────────────────── */
+function useDock(count: number) {
+  const navRef = useRef<HTMLElement>(null);
+  const itemRefs = useRef<Array<HTMLElement | null>>([]);
+  const centers = useRef<number[]>([]);
+  const [pointerY, setPointerY] = useState<number | null>(null);
+  const [reduce, setReduce] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const on = () => setReduce(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+
+  function measure() {
+    const nav = navRef.current;
+    if (!nav) return;
+    const top = nav.getBoundingClientRect().top;
+    centers.current = itemRefs.current.map((el) =>
+      el ? el.getBoundingClientRect().top - top + el.offsetHeight / 2 : 0
+    );
   }
-  if (/\/projects(\/|$)/.test(pathname) || /\/project\//.test(pathname)) return "projects";
-  return "home";
+
+  function onMove(e: React.MouseEvent) {
+    if (reduce) return;
+    if (centers.current.length !== count) measure();
+    const nav = navRef.current;
+    if (!nav) return;
+    setPointerY(e.clientY - nav.getBoundingClientRect().top);
+  }
+
+  function style(i: number): React.CSSProperties {
+    if (reduce || pointerY === null) return {};
+    const R = 88; // influence radius (px)
+    const MAX = 0.55; // extra scale at the cursor
+    const d = Math.abs(pointerY - (centers.current[i] ?? i * 56));
+    const f = Math.max(0, 1 - d / R);
+    const eased = f * f;
+    const scale = 1 + MAX * eased;
+    return {
+      transform: `translateX(${9 * eased}px) scale(${scale})`,
+      transformOrigin: "left center",
+      zIndex: eased > 0.05 ? 10 : undefined,
+    };
+  }
+
+  return {
+    navRef,
+    setItemRef: (i: number) => (el: HTMLElement | null) => {
+      itemRefs.current[i] = el;
+    },
+    onMove,
+    onLeave: () => setPointerY(null),
+    style,
+    reduce,
+  };
 }
 
 /**
- * Unified application shell — left side (redesign §10.1).
- *
- *   GlobalRail      → switch between the seven global areas only.
- *   ContextSidebar  → the hierarchy the active area drills into
- *                     (project tree / doc tree / channels / dashboards).
- *
- * No gradient, no per-item actions on the rail, no duplicate navigation.
- * The workspace switcher, search, Create and Ask AI live in the TopBar; the
- * rail owns the account/user menu and locale (one location each, §7.1).
+ * Application shell (left) — ClickUp-style dark icon rail + a collapsible
+ * "scale-out" context panel. The rail carries the macOS-Dock magnification;
+ * the panel header's create (+) and collapse controls reveal on hover. The
+ * TopBar above owns the workspace switcher, search and Ask AI.
  */
 export function AppSidebar({ user, workspaces }: Props) {
   const pathname = usePathname();
@@ -100,14 +176,20 @@ export function AppSidebar({ user, workspaces }: Props) {
 
   const [projects, setProjects] = useState<SidebarProject[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [phasesByProject, setPhasesByProject] = useState<Record<string, PhaseLink[]>>({});
   const [unread, setUnread] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
+  const [tab, setTab] = useState<RailTab>(() => deriveTab(pathname) ?? "home");
+  const [teams, setTeams] = useState<TeamItem[] | null>(null);
   const [docs, setDocs] = useState<DocItem[] | null>(null);
   const [chatDir, setChatDir] = useState<ChatDir | null>(null);
 
-  const activeWorkspace = workspaces.find((ws) => ws.slug === currentSlug) ?? workspaces[0];
-  const area = deriveArea(pathname);
-  const wsBase = activeWorkspace ? `/workspace/${activeWorkspace.slug}` : "";
+  const dock = useDock(6);
+
+  const activeWorkspace = workspaces.find((w) => w.slug === currentSlug) ?? workspaces[0];
+  const ws = activeWorkspace?.slug;
+  const wsBase = ws ? `/workspace/${ws}` : "";
+  const wsId = activeWorkspace?.id ?? null;
 
   useEffect(() => {
     try {
@@ -126,41 +208,55 @@ export function AppSidebar({ user, workspaces }: Props) {
     }
   }
 
-  // Projects + unread badge follow the active workspace.
+  function openTab(next: RailTab) {
+    setTab(next);
+    if (collapsed) setCollapsedPersist(false);
+  }
+
+  useEffect(() => {
+    const derived = deriveTab(pathname);
+    if (derived) setTab(derived);
+  }, [pathname]);
+
   useEffect(() => {
     let cancelled = false;
-    if (!activeWorkspace) {
+    if (!wsId) {
       setProjects([]);
       return;
     }
-    listProjectsAction({ workspaceId: activeWorkspace.id }).then((res) => {
+    listProjectsAction({ workspaceId: wsId }).then((res) => {
       if (!cancelled && res.ok) setProjects(res.data);
     });
-    unreadCountAction({ workspaceId: activeWorkspace.id }).then((res) => {
+    unreadCountAction({ workspaceId: wsId }).then((res) => {
       if (!cancelled && res.ok) setUnread(res.data);
     });
     return () => {
       cancelled = true;
     };
-  }, [activeWorkspace?.id, pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [wsId, pathname]);
 
-  // Drop lazy caches when the workspace changes.
   useEffect(() => {
+    setTeams(null);
     setDocs(null);
     setChatDir(null);
-  }, [activeWorkspace?.id]);
+  }, [wsId]);
 
-  // Lazy-load the panel's data on first visit of its area.
+  // Lazy-load per-tab data on first open.
   useEffect(() => {
-    if (!activeWorkspace || collapsed) return;
+    if (!wsId || collapsed) return;
     let cancelled = false;
-    if (area === "docs" && docs === null) {
-      listWorkspaceDocsAction({ workspaceId: activeWorkspace.id }).then((res) => {
+    if (tab === "teams" && teams === null) {
+      listTeamsWithMembersAction({ workspaceId: wsId }).then((res) => {
+        if (!cancelled) setTeams(res.ok ? res.data : []);
+      });
+    }
+    if (tab === "docs" && docs === null) {
+      listWorkspaceDocsAction({ workspaceId: wsId }).then((res) => {
         if (!cancelled) setDocs(res.ok ? res.data : []);
       });
     }
-    if (area === "chat" && chatDir === null) {
-      listChatDirectoryAction({ workspaceId: activeWorkspace.id }).then((res) => {
+    if (tab === "home" && chatDir === null) {
+      listChatDirectoryAction({ workspaceId: wsId }).then((res) => {
         if (cancelled) return;
         setChatDir(
           res.ok
@@ -176,9 +272,8 @@ export function AppSidebar({ user, workspaces }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [area, activeWorkspace?.id, collapsed, docs, chatDir]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tab, wsId, collapsed, teams, docs, chatDir]);
 
-  // Keep the current project expanded in the tree.
   useEffect(() => {
     if (currentProjectId) {
       setExpanded((prev) =>
@@ -196,31 +291,65 @@ export function AppSidebar({ user, workspaces }: Props) {
     });
   }
 
+  useEffect(() => {
+    if (!wsId) return;
+    let cancelled = false;
+    for (const projectId of expanded) {
+      if (phasesByProject[projectId]) continue;
+      listProjectPhasesAction({ workspaceId: wsId, projectId }).then((res) => {
+        if (!cancelled && res.ok) {
+          setPhasesByProject((prev) => ({ ...prev, [projectId]: res.data }));
+        }
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [expanded, wsId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function switchLocale() {
     const next = locale === "vi" ? "en" : "vi";
     await setLocaleAction(next);
     router.refresh();
   }
 
-  const RAIL: Array<{ area: Area; href: string; icon: LucideIcon; label: string }> = [
-    { area: "home", href: wsBase || "/dashboard", icon: Home, label: t(locale, "sb.home") },
-    { area: "mywork", href: `${wsBase}/my-tasks`, icon: ListTodo, label: t(locale, "sb.myWork") },
-    { area: "inbox", href: `${wsBase}/inbox`, icon: Inbox, label: t(locale, "sb.inbox") },
-    { area: "projects", href: `${wsBase}/projects`, icon: Layers, label: t(locale, "sb.projects") },
-    { area: "docs", href: `${wsBase}/docs`, icon: BookText, label: t(locale, "sb.docs") },
-    { area: "chat", href: `${wsBase}/chat`, icon: MessagesSquare, label: t(locale, "sb.chat") },
-    {
-      area: "dashboards",
-      href: `${wsBase}/dashboards`,
-      icon: LayoutDashboard,
-      label: t(locale, "sb.dashboards"),
-    },
+  // Project context for the "More" launcher grid.
+  const moreProjectId = currentProjectId ?? projects[0]?.id ?? null;
+  const moreProject = projects.find((p) => p.id === moreProjectId) ?? null;
+  const moreBase = moreProjectId ? `${wsBase}/projects/${moreProjectId}` : null;
+  const moreTiles: Array<[string, LucideIcon, string, string]> = moreBase
+    ? [
+        [t(locale, "sb.dashboards"), LayoutDashboard, "bg-primary/10 text-primary", `${moreBase}/dashboard`],
+        ["Analytics", BarChart3, "bg-ai/10 text-ai", `${moreBase}/analytics`],
+        [t(locale, "sb.timeline"), CalendarRange, "bg-sky/10 text-sky", `${moreBase}/timeline`],
+        [t(locale, "sb.wbs"), Network, "bg-success/10 text-success", `${moreBase}/wbs`],
+        [t(locale, "sb.workload"), Gauge, "bg-warning/10 text-warning", `${moreBase}/workload`],
+        [t(locale, "sb.goals"), Target, "bg-primary/10 text-primary", `${moreBase}/risks-milestones`],
+        [t(locale, "sb.reports"), ClipboardList, "bg-ai/10 text-ai", `${moreBase}/reports`],
+        [t(locale, "sb.table"), Table2, "bg-sky/10 text-sky", `${moreBase}/table`],
+        [t(locale, "sb.blockers"), AlertOctagon, "bg-destructive/10 text-destructive", `${moreBase}/blockers`],
+        [t(locale, "sb.daily"), CalendarCheck, "bg-success/10 text-success", `${moreBase}/daily`],
+      ]
+    : [];
+
+  const RAIL: Array<{
+    key: RailTab | "more";
+    icon: LucideIcon;
+    label: string;
+    href?: string;
+  }> = [
+    { key: "home", icon: Home, label: t(locale, "sb.home"), href: wsBase || "/dashboard" },
+    { key: "planner", icon: CalendarDays, label: t(locale, "sb.planner"), href: `${wsBase}/my-tasks` },
+    { key: "ai", icon: Sparkles, label: t(locale, "sb.ai") },
+    { key: "teams", icon: Users, label: t(locale, "sb.teams") },
+    { key: "docs", icon: BookText, label: t(locale, "sb.docs"), href: `${wsBase}/docs` },
+    { key: "more", icon: LayoutGrid, label: t(locale, "sb.more") },
   ];
 
   return (
     <div className="flex h-full shrink-0">
-      {/* ── GlobalRail — area switch only ──────────────────────────────── */}
-      <aside className="flex w-[68px] shrink-0 flex-col items-center border-r border-border bg-surface-subtle py-3">
+      {/* ── Dark icon rail with Dock magnification ─────────────────────── */}
+      <aside className="flex w-[68px] shrink-0 flex-col items-center bg-[#282521] py-3 text-white">
         <Link
           href={wsBase || "/dashboard"}
           className="mb-2 grid h-9 w-9 place-items-center rounded-lg"
@@ -236,81 +365,173 @@ export function AppSidebar({ user, workspaces }: Props) {
           />
         </Link>
 
-        <nav className="flex flex-1 flex-col items-center gap-1">
-          {RAIL.map((item) => {
-            const active = area === item.area;
-            const disabled = !activeWorkspace && item.area !== "home";
+        <nav
+          ref={dock.navRef}
+          onMouseMove={dock.onMove}
+          onMouseLeave={dock.onLeave}
+          className="relative flex flex-1 flex-col items-center gap-1 overflow-visible"
+        >
+          {RAIL.map((item, i) => {
             const Icon = item.icon;
-            return (
-              <Link
-                key={item.area}
-                href={disabled ? "#" : item.href}
-                aria-disabled={disabled}
-                title={item.label}
-                className={cn(
-                  "dock-item group relative flex w-[52px] flex-col items-center gap-1 rounded-lg py-1.5",
-                  disabled && "pointer-events-none opacity-40",
-                  active
-                    ? "bg-primary/10 text-primary"
-                    : "text-text-secondary hover:bg-surface-hover hover:text-foreground"
-                )}
-              >
+            const active = item.key !== "more" && tab === item.key;
+            const disabled = !ws && item.key !== "home";
+            const cls = cn(
+              "group relative flex w-[54px] flex-col items-center gap-1 rounded-xl py-2 transition-[background-color,color] duration-150",
+              disabled && "pointer-events-none opacity-30",
+              active ? "bg-white/15 text-white" : "text-white/60 hover:bg-white/10 hover:text-white"
+            );
+            const inner = (
+              <>
                 {active && (
-                  <span className="absolute -left-3 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-primary" />
+                  <span className="absolute -left-3 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-white" />
                 )}
                 <span className="relative">
-                  <Icon className="h-[19px] w-[19px]" strokeWidth={active ? 2.2 : 1.9} />
-                  {item.area === "inbox" && unread > 0 && (
-                    <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+                  <Icon className="h-[19px] w-[19px]" strokeWidth={active ? 2.1 : 1.9} />
+                  {item.key === "home" && unread > 0 && (
+                    <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-white">
                       {unread > 9 ? "9+" : unread}
                     </span>
                   )}
                 </span>
-                <span className="max-w-full truncate text-[9.5px] font-semibold leading-none">
-                  {item.label}
-                </span>
-              </Link>
+                <span className="text-[9.5px] font-semibold leading-none">{item.label}</span>
+              </>
+            );
+
+            // "More" opens the launcher grid; the rest switch the panel tab.
+            if (item.key === "more") {
+              return (
+                <DropdownMenu.Root key="more">
+                  <DropdownMenu.Trigger asChild>
+                    <button
+                      ref={dock.setItemRef(i)}
+                      style={dock.style(i)}
+                      disabled={disabled}
+                      title={item.label}
+                      className={cls}
+                    >
+                      {inner}
+                    </button>
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.Content
+                      side="right"
+                      align="start"
+                      sideOffset={12}
+                      className="z-50 w-[288px] rounded-2xl border border-border bg-popover p-3 text-foreground shadow-elevated focus:outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
+                    >
+                      <p className="px-1 text-sm font-semibold">{t(locale, "sb.moreTitle")}</p>
+                      <p className="mt-0.5 px-1 text-[11px] text-muted-foreground">
+                        {moreProject
+                          ? t(locale, "sb.moreProject", { name: moreProject.name })
+                          : t(locale, "sb.morePickProject")}
+                      </p>
+                      {moreBase ? (
+                        <div className="mt-2.5 grid grid-cols-3 gap-1.5">
+                          {moreTiles.map(([label, TileIcon, color, href]) => (
+                            <DropdownMenu.Item asChild key={href}>
+                              <Link
+                                href={href}
+                                className="dock-item flex cursor-pointer flex-col items-center gap-1.5 rounded-xl px-1 py-2.5 hover:bg-surface-hover focus:bg-surface-hover focus:outline-none"
+                              >
+                                <span className={cn("grid h-10 w-10 place-items-center rounded-xl", color)}>
+                                  <TileIcon className="h-[18px] w-[18px]" />
+                                </span>
+                                <span className="text-center text-[11px] font-medium leading-tight">
+                                  {label}
+                                </span>
+                              </Link>
+                            </DropdownMenu.Item>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="mt-2 rounded-lg bg-surface-subtle px-3 py-4 text-center text-xs text-muted-foreground">
+                          {t(locale, "sb.morePickProject")}
+                        </div>
+                      )}
+                      <DropdownMenu.Separator className="my-2.5 h-px bg-border" />
+                      <DropdownMenu.Item asChild>
+                        <Link
+                          href={ws ? `${wsBase}/settings` : "/dashboard"}
+                          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-border px-2.5 py-2 text-xs font-semibold transition-colors hover:bg-surface-hover focus:bg-surface-hover focus:outline-none"
+                        >
+                          <Settings2 className="h-3.5 w-3.5" />
+                          {t(locale, "sb.customizeNav")}
+                        </Link>
+                      </DropdownMenu.Item>
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Portal>
+                </DropdownMenu.Root>
+              );
+            }
+
+            if (item.href) {
+              return (
+                <Link
+                  key={item.key}
+                  ref={dock.setItemRef(i)}
+                  style={dock.style(i)}
+                  href={disabled ? "#" : item.href}
+                  onClick={() => openTab(item.key as RailTab)}
+                  title={item.label}
+                  className={cls}
+                >
+                  {inner}
+                </Link>
+              );
+            }
+            return (
+              <button
+                key={item.key}
+                ref={dock.setItemRef(i)}
+                style={dock.style(i)}
+                type="button"
+                disabled={disabled}
+                onClick={() => openTab(item.key as RailTab)}
+                title={item.label}
+                className={cls}
+              >
+                {inner}
+              </button>
             );
           })}
         </nav>
 
-        <div className="mt-auto flex flex-col items-center gap-1 pt-2">
+        <div className="mt-auto flex flex-col items-center gap-1.5 pt-2">
           <button
             type="button"
             title={t(locale, "sb.help")}
             onClick={() => window.dispatchEvent(new Event("vc:open-command"))}
-            className="dock-item grid h-9 w-9 place-items-center rounded-lg text-text-secondary hover:bg-surface-hover hover:text-foreground"
+            className="dock-item grid h-9 w-9 place-items-center rounded-lg text-white/60 hover:bg-white/10 hover:text-white"
           >
             <HelpCircle className="h-[18px] w-[18px]" />
           </button>
           <Link
-            href={activeWorkspace ? `${wsBase}/settings` : "/dashboard"}
+            href={ws ? `${wsBase}/settings` : "/dashboard"}
             title={t(locale, "sb.settings")}
             className={cn(
               "dock-item grid h-9 w-9 place-items-center rounded-lg",
               pathname.endsWith("/settings")
-                ? "bg-primary/10 text-primary"
-                : "text-text-secondary hover:bg-surface-hover hover:text-foreground"
+                ? "bg-white/15 text-white"
+                : "text-white/60 hover:bg-white/10 hover:text-white"
             )}
           >
             <Settings className="h-[18px] w-[18px]" />
           </Link>
-
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
               <button
                 title={user.name ?? "Account"}
-                className="mt-0.5 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+                className="mt-0.5 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
               >
                 {user.image ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={user.image}
                     alt=""
-                    className="h-8 w-8 rounded-full object-cover ring-1 ring-border-strong"
+                    className="h-8 w-8 rounded-full object-cover ring-1 ring-white/30"
                   />
                 ) : (
-                  <span className="grid h-8 w-8 place-items-center rounded-full bg-primary/10 text-[12px] font-bold uppercase text-primary">
+                  <span className="grid h-8 w-8 place-items-center rounded-full bg-white/15 text-[12px] font-bold uppercase text-white">
                     {(user.name ?? user.email ?? "?").charAt(0)}
                   </span>
                 )}
@@ -321,7 +542,7 @@ export function AppSidebar({ user, workspaces }: Props) {
                 side="right"
                 align="end"
                 sideOffset={10}
-                className="z-50 w-60 rounded-lg border border-border bg-popover p-1.5 shadow-elevated focus:outline-none"
+                className="z-50 w-60 rounded-lg border border-border bg-popover p-1.5 text-foreground shadow-elevated focus:outline-none"
               >
                 <div className="px-2.5 py-2">
                   <p className="truncate text-sm font-semibold">{user.name}</p>
@@ -331,7 +552,7 @@ export function AppSidebar({ user, workspaces }: Props) {
                 <DropdownMenu.Item asChild>
                   <Link
                     href="/profile"
-                    className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
+                    className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
                   >
                     <UserCircle className="h-4 w-4 text-muted-foreground" />
                     {t(locale, "sb.profile")}
@@ -342,7 +563,7 @@ export function AppSidebar({ user, workspaces }: Props) {
                     e.preventDefault();
                     void switchLocale();
                   }}
-                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
+                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
                 >
                   <Globe className="h-4 w-4 text-muted-foreground" />
                   <span className="flex-1">{t(locale, "sb.language")}</span>
@@ -364,61 +585,97 @@ export function AppSidebar({ user, workspaces }: Props) {
         </div>
       </aside>
 
-      {/* ── ContextSidebar — the hierarchy the active area drills into ──── */}
-      {!collapsed && (
-        <div className="flex w-64 shrink-0 flex-col border-r border-border bg-surface">
-          <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-3">
+      {/* ── Scale-out context panel ────────────────────────────────────── */}
+      {!collapsed ? (
+        <div className="group/panel flex w-72 shrink-0 flex-col border-r border-border bg-surface">
+          <div className="flex h-12 shrink-0 items-center justify-between gap-1 border-b border-border px-3">
             <p className="truncate text-[13px] font-semibold text-foreground">
-              {panelTitle(area, locale)}
+              {panelTitle(tab, locale)}
             </p>
-            <button
-              type="button"
-              onClick={() => setCollapsedPersist(true)}
-              title={t(locale, "sb.collapse")}
-              className="grid h-7 w-7 place-items-center rounded-md text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
-            >
-              <PanelLeftClose className="h-4 w-4" />
-            </button>
+            {/* Create + collapse — hidden until the header is hovered. */}
+            <div className="flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover/panel:opacity-100">
+              <DropdownMenu.Root>
+                <DropdownMenu.Trigger asChild>
+                  <button
+                    title={t(locale, "tb.create")}
+                    className="grid h-7 w-7 place-items-center rounded-md text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.Content
+                    align="end"
+                    sideOffset={6}
+                    className="z-50 w-52 rounded-lg border border-border bg-popover p-1.5 shadow-elevated focus:outline-none"
+                  >
+                    <DropdownMenu.Item asChild>
+                      <Link
+                        href={`${wsBase}/projects/new`}
+                        className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
+                      >
+                        <FolderPlus className="h-4 w-4 text-muted-foreground" />
+                        {t(locale, "tb.newProject")}
+                      </Link>
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item asChild>
+                      <Link
+                        href={`${wsBase}/docs`}
+                        className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
+                      >
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        {t(locale, "tb.newDoc")}
+                      </Link>
+                    </DropdownMenu.Item>
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
+              <button
+                type="button"
+                onClick={() => setCollapsedPersist(true)}
+                title={t(locale, "sb.collapse")}
+                className="grid h-7 w-7 place-items-center rounded-md text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
+              >
+                <PanelLeftClose className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           <nav className="min-h-0 flex-1 overflow-y-auto p-2">
-            {!activeWorkspace ? (
+            {!ws ? (
               <p className="px-2 pt-2 text-xs text-muted-foreground">{t(locale, "sb.selectWs")}</p>
-            ) : area === "docs" ? (
-              <DocsPanel docs={docs} wsBase={wsBase} locale={locale} />
-            ) : area === "chat" ? (
-              <ChatPanel chatDir={chatDir} wsBase={wsBase} pathname={pathname} locale={locale} />
-            ) : area === "dashboards" ? (
-              <DashboardsPanel
-                projects={projects}
+            ) : tab === "home" ? (
+              <HomePanel
                 wsBase={wsBase}
-                currentProjectId={currentProjectId}
                 pathname={pathname}
-                locale={locale}
-              />
-            ) : (
-              <SpacesPanel
+                unread={unread}
                 projects={projects}
                 expanded={expanded}
                 toggleExpanded={toggleExpanded}
-                wsBase={wsBase}
+                phasesByProject={phasesByProject}
                 currentProjectId={currentProjectId}
-                pathname={pathname}
+                chatDir={chatDir}
                 locale={locale}
               />
+            ) : tab === "planner" ? (
+              <PlannerPanel projects={projects} wsBase={wsBase} pathname={pathname} currentProjectId={currentProjectId} locale={locale} />
+            ) : tab === "ai" ? (
+              <AiPanel projects={projects} wsBase={wsBase} pathname={pathname} currentProjectId={currentProjectId} locale={locale} />
+            ) : tab === "teams" ? (
+              <TeamsPanel teams={teams} projects={projects} wsBase={wsBase} pathname={pathname} currentProjectId={currentProjectId} locale={locale} />
+            ) : (
+              <DocsPanel docs={docs} projects={projects} wsBase={wsBase} pathname={pathname} currentProjectId={currentProjectId} locale={locale} />
             )}
           </nav>
         </div>
-      )}
-
-      {collapsed && (
+      ) : (
         <button
           type="button"
           onClick={() => setCollapsedPersist(false)}
           title={t(locale, "sb.expand")}
-          className="flex w-6 shrink-0 items-center justify-center border-r border-border bg-surface text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
+          className="group/expand flex w-2.5 shrink-0 items-center justify-center border-r border-border bg-surface transition-[width] hover:w-6"
         >
-          <PanelLeftOpen className="h-4 w-4" />
+          <PanelLeftOpen className="h-4 w-4 text-text-secondary opacity-0 transition-opacity group-hover/expand:opacity-100" />
         </button>
       )}
     </div>
@@ -426,178 +683,388 @@ export function AppSidebar({ user, workspaces }: Props) {
 }
 
 /* ── Panel title ─────────────────────────────────────────────────────────── */
-
-function panelTitle(area: Area, locale: ReturnType<typeof useLocale>): string {
-  switch (area) {
+function panelTitle(tab: RailTab, locale: ReturnType<typeof useLocale>): string {
+  switch (tab) {
+    case "planner":
+      return t(locale, "sb.planner");
+    case "ai":
+      return t(locale, "sb.ai");
+    case "teams":
+      return t(locale, "sb.teams");
     case "docs":
       return t(locale, "sb.docs");
-    case "chat":
-      return t(locale, "sb.chat");
-    case "dashboards":
-      return t(locale, "sb.dashboards");
     default:
-      return t(locale, "sb.spaces");
+      return t(locale, "sb.home");
   }
 }
 
-/* ── Spaces panel (project tree) — the workspace hierarchy ─────────────────── */
-
-function SpacesPanel({
+/* ── Home panel ─────────────────────────────────────────────────────────── */
+function HomePanel({
+  wsBase,
+  pathname,
+  unread,
   projects,
   expanded,
   toggleExpanded,
-  wsBase,
+  phasesByProject,
   currentProjectId,
-  pathname,
+  chatDir,
   locale,
 }: {
+  wsBase: string;
+  pathname: string;
+  unread: number;
   projects: SidebarProject[];
   expanded: Set<string>;
   toggleExpanded: (id: string) => void;
-  wsBase: string;
+  phasesByProject: Record<string, PhaseLink[]>;
   currentProjectId?: string;
-  pathname: string;
+  chatDir: ChatDir | null;
   locale: ReturnType<typeof useLocale>;
 }) {
+  const [moreOpen, setMoreOpen] = useState(false);
   return (
     <>
+      <div className="space-y-px">
+        <PanelLink
+          href={`${wsBase}/inbox`}
+          icon={Inbox}
+          label={t(locale, "sb.inbox")}
+          active={pathname.endsWith("/inbox")}
+          badge={unread > 0 ? unread : undefined}
+        />
+        <PanelLink
+          href={`${wsBase}/my-tasks`}
+          icon={ListTodo}
+          label={t(locale, "sb.myTasks")}
+          active={pathname.endsWith("/my-tasks")}
+        />
+        {/* "More" — secondary destinations, collapsed by default (image 3). */}
+        <button
+          type="button"
+          onClick={() => setMoreOpen((v) => !v)}
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
+        >
+          <MoreHorizontal className="h-4 w-4 shrink-0" />
+          <span className="flex-1 text-left">{t(locale, "sb.moreLinks")}</span>
+          <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", moreOpen && "rotate-180")} />
+        </button>
+        {moreOpen && (
+          <div className="ml-3 space-y-px border-l border-border pl-1">
+            <PanelLink href={`${wsBase}/projects`} icon={Layers} label={t(locale, "sb.allProjects")} active={pathname.endsWith("/projects")} />
+            <PanelLink href={`${wsBase}/chat`} icon={MessagesSquare} label={t(locale, "sb.allChannels")} active={pathname.endsWith("/chat")} />
+            <PanelLink href={`${wsBase}/dashboards`} icon={LayoutDashboard} label={t(locale, "sb.allDashboards")} active={pathname.endsWith("/dashboards")} />
+            <PanelLink href={`${wsBase}/settings`} icon={Settings} label={t(locale, "sb.settings")} active={pathname.endsWith("/settings")} />
+          </div>
+        )}
+      </div>
+
+      <SectionTitle
+        action={
+          <Link
+            href={`${wsBase}/projects`}
+            title={t(locale, "sb.allProjects")}
+            className="rounded p-0.5 text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
+          >
+            <Briefcase className="h-3.5 w-3.5" />
+          </Link>
+        }
+      >
+        {t(locale, "sb.spaces")}
+      </SectionTitle>
+
       {projects.length === 0 ? (
-        <div className="px-2 py-3">
-          <p className="text-xs text-muted-foreground">{t(locale, "sb.noProjects")}</p>
-        </div>
+        <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.noProjects")}</p>
       ) : (
-        <div className="space-y-px">
-          {projects.map((project) => {
-            const base = `${wsBase}/projects/${project.id}`;
-            const isCurrent = currentProjectId === project.id;
-            const isExpanded = expanded.has(project.id);
-            return (
-              <div key={project.id}>
-                <div
+        projects.map((project) => {
+          const base = `${wsBase}/projects/${project.id}`;
+          const isCurrent = currentProjectId === project.id;
+          const isExpanded = expanded.has(project.id);
+          return (
+            <div key={project.id}>
+              <div
+                className={cn(
+                  "group flex items-center rounded-md pr-1 transition-colors",
+                  isCurrent ? "bg-primary/8" : "hover:bg-surface-hover"
+                )}
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleExpanded(project.id)}
+                  className="grid h-7 w-6 place-items-center rounded text-text-secondary hover:text-foreground"
+                  aria-label={isExpanded ? "Collapse" : "Expand"}
+                >
+                  {isExpanded ? (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  )}
+                </button>
+                <Link
+                  href={`${base}/overview`}
                   className={cn(
-                    "group flex items-center rounded-md pr-1 transition-colors",
-                    isCurrent ? "bg-primary/8" : "hover:bg-surface-hover"
+                    "flex min-w-0 flex-1 items-center gap-2 py-1.5 pr-1 text-[13px]",
+                    isCurrent ? "font-semibold text-foreground" : "text-foreground/90"
                   )}
                 >
-                  <button
-                    type="button"
-                    onClick={() => toggleExpanded(project.id)}
-                    className="grid h-7 w-6 place-items-center rounded text-text-secondary hover:text-foreground"
-                    aria-label={isExpanded ? "Collapse" : "Expand"}
-                  >
-                    {isExpanded ? (
-                      <ChevronDown className="h-3.5 w-3.5" />
-                    ) : (
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    )}
-                  </button>
-                  <Link
-                    href={`${base}/overview`}
-                    className={cn(
-                      "flex min-w-0 flex-1 items-center gap-2 py-1.5 pr-1 text-[13px]",
-                      isCurrent ? "font-semibold text-foreground" : "text-foreground/90"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "h-2 w-2 shrink-0 rounded-[3px]",
-                        PROJECT_STATUS_DOT[project.status] ?? "bg-text-disabled"
-                      )}
-                    />
-                    <span className="truncate">{project.name}</span>
-                  </Link>
-                </div>
-
-                {isExpanded && (
-                  <div className="mb-1 ml-3 border-l border-border pl-1">
-                    <TreeLeaf
-                      href={`${base}/tasks`}
-                      icon={ListTodo}
-                      label={t(locale, "sb.list")}
-                      active={isCurrent && /\/(tasks|list)(\/|$)/.test(pathname)}
-                    />
-                    <TreeLeaf
-                      href={`${base}/board`}
-                      icon={KanbanSquare}
-                      label={t(locale, "sb.board")}
-                      active={isCurrent && /\/board(\/|$)/.test(pathname)}
-                    />
-                    <TreeLeaf
-                      href={`${base}/ai`}
-                      icon={Sparkles}
-                      label={t(locale, "sb.aiManager")}
-                      active={isCurrent && /\/ai(\/|$)/.test(pathname)}
-                      ai
-                    />
-                  </div>
-                )}
+                  <span className={cn("h-2 w-2 shrink-0 rounded-[3px]", PROJECT_STATUS_DOT[project.status] ?? "bg-text-disabled")} />
+                  <span className="truncate">{project.name}</span>
+                </Link>
               </div>
-            );
-          })}
-        </div>
+              {isExpanded && (
+                <div className="mb-1 ml-3 border-l border-border pl-1">
+                  <TreeLeaf href={`${base}/tasks`} icon={ListTodo} label={t(locale, "sb.list")} active={isCurrent && /\/(tasks|list)(\/|$)/.test(pathname)} />
+                  <TreeLeaf href={`${base}/board`} icon={KanbanSquare} label={t(locale, "sb.board")} active={isCurrent && /\/board(\/|$)/.test(pathname)} />
+                  <TreeLeaf href={`${base}/ai`} icon={Sparkles} label={t(locale, "sb.aiManager")} active={isCurrent && /\/ai(\/|$)/.test(pathname)} ai />
+                  {(phasesByProject[project.id]?.length ?? 0) > 0 && (
+                    <div className="mt-0.5">
+                      <p className="flex items-center gap-1.5 py-1 pl-2 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+                        <Layers className="h-3 w-3" />
+                        {t(locale, "sb.phases")}
+                      </p>
+                      {phasesByProject[project.id]!.map((phase) => (
+                        <Link
+                          key={phase.id}
+                          href={`${base}/tasks?phase=${phase.id}`}
+                          title={phase.title}
+                          className="flex items-center gap-2 rounded-md py-1.5 pl-4 pr-2 text-[13px] text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
+                        >
+                          <span className="truncate">{phase.title}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })
       )}
 
       <Link
         href={`${wsBase}/projects/new`}
-        className="mt-1 flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] font-medium text-primary transition-colors hover:bg-primary/8"
+        className="mt-0.5 flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] font-medium text-primary transition-colors hover:bg-primary/8"
       >
         <Plus className="h-4 w-4" />
         {t(locale, "sb.newProject")}
       </Link>
+
+      {(chatDir === null || chatDir.ok) && (
+        <>
+          <SectionTitle
+            action={
+              <Link
+                href={`${wsBase}/chat`}
+                title={t(locale, "sb.openChat")}
+                className="rounded p-0.5 text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
+              >
+                <MessagesSquare className="h-3.5 w-3.5" />
+              </Link>
+            }
+          >
+            {t(locale, "sb.channels")}
+          </SectionTitle>
+          {chatDir === null ? (
+            <p className="px-2 py-1.5 text-xs text-muted-foreground">{t(locale, "sb.loading")}</p>
+          ) : (
+            <div className="space-y-px">
+              {chatDir.channels.map((c) => (
+                <PanelLink key={c.id} href={`${wsBase}/chat/${c.id}`} icon={Hash} label={c.name} active={pathname.endsWith(`/chat/${c.id}`)} />
+              ))}
+              {chatDir.dms.length > 0 && (
+                <p className="px-2 pb-0.5 pt-2 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+                  {t(locale, "sb.dmsSection")}
+                </p>
+              )}
+              {chatDir.dms.map((d) => (
+                <PanelLink key={d.id} href={`${wsBase}/chat/${d.id}`} icon={UserCircle} label={d.otherName} active={pathname.endsWith(`/chat/${d.id}`)} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </>
   );
 }
 
-function TreeLeaf({
-  href,
-  icon: Icon,
-  label,
-  active,
-  ai = false,
+/* ── Planner panel ──────────────────────────────────────────────────────── */
+function PlannerPanel({
+  projects,
+  wsBase,
+  pathname,
+  currentProjectId,
+  locale,
 }: {
-  href: string;
-  icon: LucideIcon;
-  label: string;
-  active: boolean;
-  ai?: boolean;
+  projects: SidebarProject[];
+  wsBase: string;
+  pathname: string;
+  currentProjectId?: string;
+  locale: ReturnType<typeof useLocale>;
 }) {
   return (
-    <Link
-      href={href}
-      className={cn(
-        "flex items-center gap-2 rounded-md py-1.5 pl-2 pr-2 text-[13px] transition-colors",
-        active
-          ? "bg-primary/10 font-medium text-foreground"
-          : "text-text-secondary hover:bg-surface-hover hover:text-foreground"
+    <>
+      <PanelLink href={`${wsBase}/my-tasks`} icon={ListTodo} label={t(locale, "sb.myTasks")} active={pathname.endsWith("/my-tasks")} />
+      {projects.length > 0 ? (
+        <>
+          <SectionTitle>{t(locale, "sb.plannerCalendars")}</SectionTitle>
+          <div className="space-y-px">
+            {projects.map((p) => (
+              <PanelLink key={p.id} href={`${wsBase}/projects/${p.id}/calendar`} icon={CalendarDays} label={p.name} active={currentProjectId === p.id && pathname.endsWith("/calendar")} />
+            ))}
+          </div>
+          <SectionTitle>{t(locale, "sb.plannerTimelines")}</SectionTitle>
+          <div className="space-y-px">
+            {projects.map((p) => (
+              <PanelLink key={p.id} href={`${wsBase}/projects/${p.id}/timeline`} icon={CalendarRange} label={p.name} active={currentProjectId === p.id && pathname.endsWith("/timeline")} />
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.noProjects")}</p>
       )}
-    >
-      <Icon className={cn("h-3.5 w-3.5 shrink-0", ai && "text-ai")} />
-      <span className="truncate">{label}</span>
-    </Link>
+    </>
   );
 }
 
-/* ── Docs panel ────────────────────────────────────────────────────────────── */
+/* ── AI panel ───────────────────────────────────────────────────────────── */
+function AiPanel({
+  projects,
+  wsBase,
+  pathname,
+  currentProjectId,
+  locale,
+}: {
+  projects: SidebarProject[];
+  wsBase: string;
+  pathname: string;
+  currentProjectId?: string;
+  locale: ReturnType<typeof useLocale>;
+}) {
+  return (
+    <>
+      <p className="px-2 pt-1 text-[11px] leading-snug text-text-secondary">{t(locale, "sb.aiHint")}</p>
+      <SectionTitle>{t(locale, "sb.aiByProject")}</SectionTitle>
+      {projects.length > 0 ? (
+        <div className="space-y-px">
+          {projects.map((p) => (
+            <PanelLink key={p.id} href={`${wsBase}/projects/${p.id}/ai`} icon={Sparkles} label={p.name} active={currentProjectId === p.id && pathname.endsWith("/ai")} ai />
+          ))}
+        </div>
+      ) : (
+        <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.noProjects")}</p>
+      )}
+    </>
+  );
+}
 
+/* ── Teams panel ────────────────────────────────────────────────────────── */
+function TeamsPanel({
+  teams,
+  projects,
+  wsBase,
+  pathname,
+  currentProjectId,
+  locale,
+}: {
+  teams: TeamItem[] | null;
+  projects: SidebarProject[];
+  wsBase: string;
+  pathname: string;
+  currentProjectId?: string;
+  locale: ReturnType<typeof useLocale>;
+}) {
+  return (
+    <>
+      <SectionTitle
+        action={
+          <Link href={`${wsBase}/settings`} title={t(locale, "sb.manageTeams")} className="rounded p-0.5 text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground">
+            <Settings2 className="h-3.5 w-3.5" />
+          </Link>
+        }
+      >
+        {t(locale, "sb.teamsInWs")}
+      </SectionTitle>
+      {teams === null ? (
+        <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.loading")}</p>
+      ) : teams.length === 0 ? (
+        <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.noTeams")}</p>
+      ) : (
+        <div className="space-y-px">
+          {teams.map((team) => (
+            <Link
+              key={team.id}
+              href={`${wsBase}/settings`}
+              title={t(locale, "sb.membersN", { n: team.memberIds.length })}
+              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
+            >
+              <Users className="h-4 w-4 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">{team.name}</span>
+              <span className="rounded-full bg-surface-subtle px-1.5 text-[10px] font-semibold">{team.memberIds.length}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+      {projects.length > 0 && (
+        <>
+          <SectionTitle>{t(locale, "sb.projectTeams")}</SectionTitle>
+          <div className="space-y-px">
+            {projects.map((p) => (
+              <PanelLink key={p.id} href={`${wsBase}/projects/${p.id}/team`} icon={Users} label={p.name} active={currentProjectId === p.id && pathname.endsWith("/team")} />
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+/* ── Docs panel ─────────────────────────────────────────────────────────── */
 function DocsPanel({
   docs,
+  projects,
   wsBase,
+  pathname,
+  currentProjectId,
   locale,
 }: {
   docs: DocItem[] | null;
+  projects: SidebarProject[];
   wsBase: string;
+  pathname: string;
+  currentProjectId?: string;
   locale: ReturnType<typeof useLocale>;
 }) {
-  if (docs === null) {
-    return <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.loading")}</p>;
-  }
-  if (docs.length === 0) {
-    return <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.noDocs")}</p>;
-  }
   return (
-    <div className="space-y-px">
-      <DocTree docs={docs} parentId={null} depth={0} baseHref={`${wsBase}/docs`} />
-    </div>
+    <>
+      <SectionTitle
+        action={
+          <Link href={`${wsBase}/docs`} title={t(locale, "sb.openDocs")} className="rounded p-0.5 text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground">
+            <BookText className="h-3.5 w-3.5" />
+          </Link>
+        }
+      >
+        {t(locale, "sb.wsDocs")}
+      </SectionTitle>
+      {docs === null ? (
+        <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.loading")}</p>
+      ) : docs.length === 0 ? (
+        <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.noDocs")}</p>
+      ) : (
+        <div className="space-y-px">
+          <DocTree docs={docs} parentId={null} depth={0} baseHref={`${wsBase}/docs`} />
+        </div>
+      )}
+      {projects.length > 0 && (
+        <>
+          <SectionTitle>{t(locale, "sb.projectDocs")}</SectionTitle>
+          <div className="space-y-px">
+            {projects.map((p) => (
+              <PanelLink key={p.id} href={`${wsBase}/projects/${p.id}/docs-decisions`} icon={FileText} label={p.name} active={currentProjectId === p.id && pathname.endsWith("/docs-decisions")} />
+            ))}
+          </div>
+        </>
+      )}
+    </>
   );
 }
 
@@ -624,7 +1091,7 @@ function DocTree({
             className="flex items-center gap-1.5 rounded-md py-1.5 pr-2 text-[13px] text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
             style={{ paddingLeft: 8 + depth * 14 }}
           >
-            <BookText className="h-3.5 w-3.5 shrink-0" />
+            <FileText className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">{d.title}</span>
           </Link>
           <DocTree docs={docs} parentId={d.id} depth={depth + 1} baseHref={baseHref} />
@@ -634,109 +1101,28 @@ function DocTree({
   );
 }
 
-/* ── Chat panel ────────────────────────────────────────────────────────────── */
-
-function ChatPanel({
-  chatDir,
-  wsBase,
-  pathname,
-  locale,
-}: {
-  chatDir: ChatDir | null;
-  wsBase: string;
-  pathname: string;
-  locale: ReturnType<typeof useLocale>;
-}) {
-  if (chatDir === null) {
-    return <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.loading")}</p>;
-  }
-  return (
-    <>
-      <PanelSection>{t(locale, "sb.channels")}</PanelSection>
-      <div className="space-y-px">
-        {chatDir.channels.map((c) => (
-          <PanelLink
-            key={c.id}
-            href={`${wsBase}/chat/${c.id}`}
-            icon={Hash}
-            label={c.name}
-            active={pathname.endsWith(`/chat/${c.id}`)}
-          />
-        ))}
-        {chatDir.channels.length === 0 && (
-          <p className="px-2 py-1.5 text-xs text-muted-foreground">{t(locale, "sb.noChannels")}</p>
-        )}
-      </div>
-      {chatDir.dms.length > 0 && (
-        <>
-          <PanelSection>{t(locale, "sb.dmsSection")}</PanelSection>
-          <div className="space-y-px">
-            {chatDir.dms.map((d) => (
-              <PanelLink
-                key={d.id}
-                href={`${wsBase}/chat/${d.id}`}
-                icon={UserCircle}
-                label={d.otherName}
-                active={pathname.endsWith(`/chat/${d.id}`)}
-              />
-            ))}
-          </div>
-        </>
-      )}
-    </>
-  );
-}
-
-/* ── Dashboards panel ──────────────────────────────────────────────────────── */
-
-function DashboardsPanel({
-  projects,
-  wsBase,
-  currentProjectId,
-  pathname,
-  locale,
-}: {
-  projects: SidebarProject[];
-  wsBase: string;
-  currentProjectId?: string;
-  pathname: string;
-  locale: ReturnType<typeof useLocale>;
-}) {
-  return (
-    <>
-      <PanelLink
-        href={`${wsBase}/dashboards`}
-        icon={LayoutDashboard}
-        label={t(locale, "sb.allDashboards")}
-        active={pathname.endsWith("/dashboards")}
-      />
-      <PanelSection>{t(locale, "sb.dashByProject")}</PanelSection>
-      {projects.length > 0 ? (
-        <div className="space-y-px">
-          {projects.map((p) => (
-            <PanelLink
-              key={p.id}
-              href={`${wsBase}/projects/${p.id}/dashboard`}
-              icon={LayoutDashboard}
-              label={p.name}
-              active={currentProjectId === p.id && pathname.endsWith("/dashboard")}
-            />
-          ))}
-        </div>
-      ) : (
-        <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.noProjects")}</p>
-      )}
-    </>
-  );
-}
-
 /* ── Panel primitives ──────────────────────────────────────────────────────── */
-
-function PanelSection({ children }: { children: React.ReactNode }) {
+function SectionTitle({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <p className="px-2 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
-      {children}
-    </p>
+    <div className="flex items-center justify-between px-2 pb-1 pt-3">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">{children}</p>
+      {action}
+    </div>
+  );
+}
+
+function TreeLeaf({ href, icon: Icon, label, active, ai = false }: { href: string; icon: LucideIcon; label: string; active: boolean; ai?: boolean }) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "flex items-center gap-2 rounded-md py-1.5 pl-2 pr-2 text-[13px] transition-colors",
+        active ? "bg-primary/10 font-medium text-foreground" : "text-text-secondary hover:bg-surface-hover hover:text-foreground"
+      )}
+    >
+      <Icon className={cn("h-3.5 w-3.5 shrink-0", ai && "text-ai")} />
+      <span className="truncate">{label}</span>
+    </Link>
   );
 }
 
@@ -745,24 +1131,31 @@ function PanelLink({
   icon: Icon,
   label,
   active,
+  badge,
+  ai = false,
 }: {
   href: string;
   icon: LucideIcon;
   label: string;
   active: boolean;
+  badge?: number;
+  ai?: boolean;
 }) {
   return (
     <Link
       href={href}
       className={cn(
         "flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] transition-colors",
-        active
-          ? "bg-primary/10 font-medium text-foreground"
-          : "text-text-secondary hover:bg-surface-hover hover:text-foreground"
+        active ? "bg-primary/10 font-medium text-foreground" : "text-text-secondary hover:bg-surface-hover hover:text-foreground"
       )}
     >
-      <Icon className="h-4 w-4 shrink-0" />
+      <Icon className={cn("h-4 w-4 shrink-0", ai && "text-ai")} />
       <span className="min-w-0 flex-1 truncate">{label}</span>
+      {badge !== undefined && badge > 0 && (
+        <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">
+          {badge > 9 ? "9+" : badge}
+        </span>
+      )}
     </Link>
   );
 }
