@@ -32,3 +32,13 @@ export class ValidationError extends AppError {
     super(message, "validation", 422);
   }
 }
+
+/** WP-C5: rate-limit exceeded. `retryAfter` = seconds until the window resets. */
+export class RateLimitError extends AppError {
+  constructor(
+    message = "Too many requests",
+    public readonly retryAfter = 60
+  ) {
+    super(message, "rate_limited", 429);
+  }
+}

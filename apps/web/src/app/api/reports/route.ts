@@ -3,11 +3,18 @@ import { db, leaderReports } from "@vieroc/db";
 import { getUserId } from "@/server/lib/context";
 import { isAgentRequest } from "@/server/lib/agent-auth";
 import { invalidateCache } from "@/server/lib/cache";
+import { enforceRestRateLimit } from "@/server/lib/rate-limit";
+import { enforceSameOrigin } from "@/server/lib/csrf";
 
 export async function POST(request: Request) {
   try {
-    // Accept agent service key OR user session
+    // Accept agent service key OR user session. Agent traffic (secret-authed,
+    // server-to-server) skips CSRF/rate-limit; user (cookie) traffic is guarded.
     if (!isAgentRequest(request)) {
+      const csrf = enforceSameOrigin(request);
+      if (csrf) return csrf;
+      const limited = await enforceRestRateLimit(request, "reports", { limit: 30, windowSec: 60 });
+      if (limited) return limited;
       await getUserId();
     }
     const body = await request.json();

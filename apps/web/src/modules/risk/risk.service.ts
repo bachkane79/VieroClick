@@ -53,7 +53,8 @@ export async function updateRisk(p: {
   assertCanManageRisks(ctx);
 
   const existing = await repo.findById(p.riskId);
-  if (!existing) throw new NotFoundError("Risk");
+  // Scope check (WP-C2): entity must belong to the actor's authorized project.
+  if (!existing || existing.projectId !== p.projectId) throw new NotFoundError("Risk");
 
   const values: Partial<repo.RiskInsert> = {};
   if (data.title !== undefined) values.title = data.title;
@@ -80,7 +81,8 @@ export async function deleteRisk(p: { workspaceId: string; projectId: string; ri
   assertCanManageRisks(ctx);
 
   const existing = await repo.findById(p.riskId);
-  if (!existing) throw new NotFoundError("Risk");
+  // Scope check (WP-C2): entity must belong to the actor's authorized project.
+  if (!existing || existing.projectId !== p.projectId) throw new NotFoundError("Risk");
 
   return db.transaction(async (tx) => {
     await repo.remove(p.riskId, tx);

@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
 import { NotFoundError, ForbiddenError } from "@/server/lib/errors";
+import { assertRateLimit } from "@/server/lib/rate-limit";
 import * as repo from "./channel.repo";
 import * as events from "./channel.events";
 import { createChannelSchema, sendMessageSchema, openDmSchema } from "./channel.schema";
@@ -69,6 +70,8 @@ export async function createChannel(p: { workspaceId: string; input: unknown }) 
   const data = createChannelSchema.parse(p.input);
   const ctx = await requireActor(p.workspaceId);
   assertCanCreateChannel(ctx);
+  // WP-C5: cap channel creation per user (10 / min).
+  await assertRateLimit(ctx.userId, "channel-create", { limit: 10, windowSec: 60 });
 
   const existing = await repo.findChannelByName(p.workspaceId, data.name);
   if (existing) return existing;
@@ -141,6 +144,8 @@ export async function sendMessage(p: { workspaceId: string; channelId: string; i
   const data = sendMessageSchema.parse(p.input);
   const ctx = await requireActor(p.workspaceId);
   assertCanPostMessage(ctx);
+  // WP-C5: chat is the primary flood target — cap per user (30 msg / 10s).
+  await assertRateLimit(ctx.userId, "chat-send", { limit: 30, windowSec: 10 });
   await requireChannelAccess(ctx, p.channelId, p.workspaceId);
 
   return db.transaction(async (tx) => {

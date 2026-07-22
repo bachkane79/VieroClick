@@ -72,7 +72,8 @@ export async function deleteDecision(p: {
   assertCanLogDecision(ctx);
 
   const existing = await repo.findById(p.decisionId);
-  if (!existing) throw new NotFoundError("Decision");
+  // Scope check (WP-C2): entity must belong to the actor's authorized project.
+  if (!existing || existing.projectId !== p.projectId) throw new NotFoundError("Decision");
 
   return db.transaction(async (tx) => {
     await repo.remove(p.decisionId, tx);

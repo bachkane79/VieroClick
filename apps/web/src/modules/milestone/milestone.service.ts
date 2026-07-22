@@ -54,7 +54,8 @@ export async function updateMilestone(p: {
   assertCanManageMilestones(ctx);
 
   const existing = await repo.findById(p.milestoneId);
-  if (!existing) throw new NotFoundError("Milestone");
+  // Scope check (WP-C2): entity must belong to the actor's authorized project.
+  if (!existing || existing.projectId !== p.projectId) throw new NotFoundError("Milestone");
 
   const values: Partial<repo.MilestoneInsert> = {};
   if (data.title !== undefined) values.title = data.title;
@@ -82,7 +83,8 @@ export async function deleteMilestone(p: {
   assertCanManageMilestones(ctx);
 
   const existing = await repo.findById(p.milestoneId);
-  if (!existing) throw new NotFoundError("Milestone");
+  // Scope check (WP-C2): entity must belong to the actor's authorized project.
+  if (!existing || existing.projectId !== p.projectId) throw new NotFoundError("Milestone");
 
   return db.transaction(async (tx) => {
     await repo.remove(p.milestoneId, tx);

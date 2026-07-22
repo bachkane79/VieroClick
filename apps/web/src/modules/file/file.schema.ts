@@ -1,9 +1,10 @@
 import { z } from "zod";
+import { nfcText } from "@vieroc/validators";
 
 export const registerFileSchema = z.object({
-  fileName: z.string().min(1),
-  mimeType: z.string().optional(),
-  storageKey: z.string().min(1),
+  fileName: nfcText(z.string().trim().min(1).max(500)),
+  mimeType: z.string().trim().max(255).optional(),
+  storageKey: z.string().trim().min(1).max(1024),
   sizeBytes: z.number().int().nonnegative().optional(),
 });
 

@@ -4,9 +4,16 @@ import { eq } from "drizzle-orm";
 import { findById } from "@/modules/task/task.repo";
 import { addComment } from "@/modules/comment/comment.service";
 import { AppError } from "@/server/lib/errors";
+import { enforceRestRateLimit } from "@/server/lib/rate-limit";
+import { enforceSameOrigin } from "@/server/lib/csrf";
 
 export async function POST(request: Request) {
   try {
+    const csrf = enforceSameOrigin(request);
+    if (csrf) return csrf;
+    const limited = await enforceRestRateLimit(request, "comments", { limit: 60, windowSec: 60 });
+    if (limited) return limited;
+
     const body = await request.json();
     const { taskId, content } = body;
 

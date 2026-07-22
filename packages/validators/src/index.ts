@@ -8,9 +8,19 @@ import { agentAutonomySchema } from "./agent-payloads";
 
 /** Normalize user-authored text before validation and persistence.
  * NFC keeps Vietnamese diacritics byte-stable across forms, search and views.
+ * Exported (WP-C4) so module-local schemas share the exact same normalization
+ * instead of re-declaring their own.
  */
-const nfc = (value: unknown) => (typeof value === "string" ? value.normalize("NFC") : value);
-const nfcText = (schema: z.ZodString) => z.preprocess(nfc, schema);
+export const nfc = (value: unknown) => (typeof value === "string" ? value.normalize("NFC") : value);
+export const nfcText = (schema: z.ZodString) => z.preprocess(nfc, schema);
+
+// WP-C4 length caps — every free-text field gets a max so a single request can't
+// carry an unbounded payload. Tiers: SHORT ≈ titles, LONG ≈ descriptions/notes,
+// HUGE ≈ document bodies, TAG ≈ individual array items (labels/skills/goals).
+export const TEXT_LIMITS = { SHORT: 300, LONG: 10_000, HUGE: 50_000, TAG: 500, TZ: 100 } as const;
+const shortText = () => nfcText(z.string().trim().min(1).max(TEXT_LIMITS.SHORT));
+const longText = () => nfcText(z.string().trim().max(TEXT_LIMITS.LONG));
+const tagText = () => nfcText(z.string().trim().min(1).max(TEXT_LIMITS.TAG));
 
 export * from "./task-core";
 export * from "./agent-payloads";
@@ -62,17 +72,17 @@ export const projectStatusSchema = z.enum(["draft", "active", "paused", "complet
 
 export const createProjectSchema = z.object({
   name: nfcText(z.string().trim().min(1).max(200)),
-  description: nfcText(z.string()).optional(),
-  scope: nfcText(z.string()).optional(),
+  description: longText().optional(),
+  scope: longText().optional(),
   status: projectStatusSchema.default("draft"),
   leadMemberId: z.string().uuid().optional(),
   startDate: z.string().date().optional(),
   targetEndDate: z.string().date().optional(),
-  goals: z.array(nfcText(z.string())).default([]),
-  constraints: z.array(nfcText(z.string())).default([]),
-  expectedDeliverables: z.array(nfcText(z.string())).default([]),
+  goals: z.array(tagText()).max(100).default([]),
+  constraints: z.array(tagText()).max(100).default([]),
+  expectedDeliverables: z.array(tagText()).max(100).default([]),
   memberIds: z.array(z.string().uuid()).default([]),
-  initialContext: nfcText(z.string()).optional(),
+  initialContext: nfcText(z.string().trim().max(20_000)).optional(),
   // AI Leader master switch chosen at creation. When false, the project is
   // created for manual work and no planning agent is dispatched.
   aiEnabled: z.boolean().default(true),
@@ -90,7 +100,7 @@ export const updateProjectSchema = createProjectSchema.partial().extend({
 
 export const createTaskSchema = z.object({
   title: nfcText(z.string().trim().min(1).max(500)),
-  description: nfcText(z.string()).optional(),
+  description: longText().optional(),
   statusId: z.string().uuid(),
   priority: taskPrioritySchema.default("medium"),
   assigneeMemberId: z.string().uuid().nullable().optional(),
@@ -101,10 +111,10 @@ export const createTaskSchema = z.object({
   dueDate: z.string().date().optional(),
   estimateHours: z.number().min(0).optional(),
   acceptanceCriteria: taskAcceptanceCriteriaSchema,
-  labels: z.array(nfcText(z.string())).default([]),
+  labels: z.array(nfcText(z.string().trim().min(1).max(100))).max(50).default([]),
   position: z.number().int().min(0).default(0),
   isMilestone: z.boolean().default(false),
-  blockerReason: nfcText(z.string()).optional(),
+  blockerReason: nfcText(z.string().trim().max(2000)).optional(),
   allowBlockedOverride: z.boolean().default(false),
 });
 
@@ -122,7 +132,7 @@ export const reviewTaskSchema = z.object({
 export const moveTaskSchema = z.object({
   statusId: z.string().uuid(),
   position: z.number().int().min(0),
-  blockerReason: z.string().optional(),
+  blockerReason: nfcText(z.string().trim().max(2000)).optional(),
   allowBlockedOverride: z.boolean().default(false),
 });
 
@@ -162,7 +172,7 @@ export const commentMetadataSchema = z
   .passthrough();
 
 export const createCommentSchema = z.object({
-  body: nfcText(z.string().trim().min(1)),
+  body: nfcText(z.string().trim().min(1).max(TEXT_LIMITS.LONG)),
   // Threaded reply target (null/omitted = top-level comment).
   parentCommentId: z.string().uuid().nullable().optional(),
   metadata: commentMetadataSchema.default({ links: [] }),
@@ -172,12 +182,12 @@ export const createCommentSchema = z.object({
 
 export const createDailyUpdateSchema = z.object({
   workDate: z.string().date(),
-  completedText: z.string().optional(),
-  inProgressText: z.string().optional(),
-  blockersText: z.string().optional(),
+  completedText: longText().optional(),
+  inProgressText: longText().optional(),
+  blockersText: longText().optional(),
   confidenceLevel: z.number().int().min(1).max(5).optional(),
-  supportNeeded: z.string().optional(),
-  concerns: z.string().optional(),
+  supportNeeded: longText().optional(),
+  concerns: longText().optional(),
 });
 
 // ─── Blocker ──────────────────────────────────────────────────────────────────
@@ -185,8 +195,8 @@ export const createDailyUpdateSchema = z.object({
 export const blockerStatusSchema = z.enum(["open", "in_review", "resolved", "ignored"]);
 
 export const createBlockerSchema = z.object({
-  title: z.string().min(1).max(300),
-  description: z.string().optional(),
+  title: shortText(),
+  description: longText().optional(),
   taskId: z.string().uuid().optional(),
   severity: taskPrioritySchema.default("medium"),
   ownerMemberId: z.string().uuid().optional(),
@@ -210,9 +220,9 @@ export const projectDocTypeSchema = z.enum([
 ]);
 
 export const createProjectDocSchema = z.object({
-  title: nfcText(z.string().trim().min(1).max(300)),
+  title: shortText(),
   type: projectDocTypeSchema.default("other"),
-  content: nfcText(z.string().min(1)),
+  content: nfcText(z.string().trim().min(1).max(TEXT_LIMITS.HUGE)),
 });
 
 export const updateProjectDocSchema = createProjectDocSchema.partial();
@@ -220,9 +230,9 @@ export const updateProjectDocSchema = createProjectDocSchema.partial();
 // ─── Decision Log ─────────────────────────────────────────────────────────────
 
 export const createDecisionLogSchema = z.object({
-  title: z.string().min(1).max(300),
-  decision: z.string().min(1),
-  reason: z.string().optional(),
+  title: shortText(),
+  decision: nfcText(z.string().trim().min(1).max(TEXT_LIMITS.LONG)),
+  reason: longText().optional(),
   decidedByMemberId: z.string().uuid().optional(),
   affectedTaskIds: z.array(z.string().uuid()).default([]),
 });
@@ -230,23 +240,23 @@ export const createDecisionLogSchema = z.object({
 // ─── Risk ─────────────────────────────────────────────────────────────────────
 
 export const createRiskSchema = z.object({
-  title: z.string().min(1).max(300),
-  description: z.string().optional(),
+  title: shortText(),
+  description: longText().optional(),
   probability: z.number().int().min(1).max(5),
   impact: z.number().int().min(1).max(5),
   ownerMemberId: z.string().uuid().optional(),
-  mitigation: z.string().optional(),
-  escalationPath: z.string().optional(),
+  mitigation: longText().optional(),
+  escalationPath: nfcText(z.string().trim().max(5000)).optional(),
 });
 
 // ─── Member Profile ───────────────────────────────────────────────────────────
 
 export const updateMemberProfileSchema = z.object({
-  skills: z.array(z.string()).optional(),
+  skills: z.array(nfcText(z.string().trim().min(1).max(100))).max(100).optional(),
   seniorityLevel: z.number().int().min(1).max(10).optional(),
   availabilityHoursPerWeek: z.number().min(0).max(168).optional(),
-  timezone: z.string().optional(),
-  profileNotes: z.string().optional(),
+  timezone: z.string().trim().max(TEXT_LIMITS.TZ).optional(),
+  profileNotes: longText().optional(),
 });
 
 // ─── Agent jobs, roles & suggestions ───────────────────────────────────────────

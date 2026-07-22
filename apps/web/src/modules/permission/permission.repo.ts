@@ -24,6 +24,7 @@ export type ResourceMeta = {
   createdBy: string | null; // creator user id
   projectId: string | null; // governing project (for grant inheritance)
   workspaceId: string;
+  isPrivate: boolean; // governing project's privacy flag (§4.2, WP-C3)
 };
 
 // ── Teams ────────────────────────────────────────────────────────────────────
@@ -162,11 +163,17 @@ export async function getResourceMeta(
 ): Promise<ResourceMeta | null> {
   if (type === "project") {
     const [row] = await exec
-      .select({ createdBy: projects.createdBy, workspaceId: projects.workspaceId })
+      .select({
+        createdBy: projects.createdBy,
+        workspaceId: projects.workspaceId,
+        isPrivate: projects.isPrivate,
+      })
       .from(projects)
       .where(eq(projects.id, id))
       .limit(1);
-    return row ? { createdBy: row.createdBy, projectId: id, workspaceId: row.workspaceId } : null;
+    return row
+      ? { createdBy: row.createdBy, projectId: id, workspaceId: row.workspaceId, isPrivate: row.isPrivate }
+      : null;
   }
   if (type === "task") {
     const [row] = await exec
@@ -174,13 +181,19 @@ export async function getResourceMeta(
         createdBy: tasks.createdBy,
         projectId: tasks.projectId,
         workspaceId: projects.workspaceId,
+        isPrivate: projects.isPrivate,
       })
       .from(tasks)
       .innerJoin(projects, eq(projects.id, tasks.projectId))
       .where(eq(tasks.id, id))
       .limit(1);
     return row
-      ? { createdBy: row.createdBy, projectId: row.projectId, workspaceId: row.workspaceId }
+      ? {
+          createdBy: row.createdBy,
+          projectId: row.projectId,
+          workspaceId: row.workspaceId,
+          isPrivate: row.isPrivate,
+        }
       : null;
   }
   // 'doc' meta resolution is added when doc sharing is wired (Phase 3).

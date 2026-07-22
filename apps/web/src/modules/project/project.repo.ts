@@ -1,5 +1,5 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   db,
   projects,
@@ -36,6 +36,26 @@ export async function listWorkspaceMemberIds(workspaceId: string, exec: Executor
     .select({ id: workspaceMembers.id })
     .from(workspaceMembers)
     .where(eq(workspaceMembers.workspaceId, workspaceId));
+}
+
+/** Project ids in `workspaceId` where `workspaceMemberId` is an actual project member.
+ *  Used by listProjects to keep private projects visible to their members (WP-C3). */
+export async function listProjectIdsForMember(
+  workspaceId: string,
+  workspaceMemberId: string,
+  exec: Executor = db
+): Promise<string[]> {
+  const rows = await exec
+    .select({ id: projectMembers.projectId })
+    .from(projectMembers)
+    .innerJoin(projects, eq(projects.id, projectMembers.projectId))
+    .where(
+      and(
+        eq(projects.workspaceId, workspaceId),
+        eq(projectMembers.workspaceMemberId, workspaceMemberId)
+      )
+    );
+  return rows.map((r) => r.id);
 }
 
 export async function create(values: ProjectInsert, exec: Executor = db): Promise<ProjectRow> {

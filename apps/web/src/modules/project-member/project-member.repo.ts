@@ -1,9 +1,26 @@
 import "server-only";
 import { and, eq } from "drizzle-orm";
-import { db, projectMembers, type Executor } from "@vieroc/db";
+import { db, projectMembers, workspaceMembers, type Executor } from "@vieroc/db";
 
 export type ProjectMemberInsert = typeof projectMembers.$inferInsert;
 export type ProjectMemberRow = typeof projectMembers.$inferSelect;
+
+/**
+ * Resolve the auth userId behind a workspace-member id. Used to scope actor-cache
+ * invalidation to the affected user (see WP-B2). Returns null if the member row
+ * is gone (already-removed member) — caller falls back to a broad `actor:` wipe.
+ */
+export async function findUserIdByWorkspaceMember(
+  workspaceMemberId: string,
+  exec: Executor = db
+): Promise<string | null> {
+  const [row] = await exec
+    .select({ userId: workspaceMembers.userId })
+    .from(workspaceMembers)
+    .where(eq(workspaceMembers.id, workspaceMemberId))
+    .limit(1);
+  return row?.userId ?? null;
+}
 
 export async function findById(id: string, exec: Executor = db): Promise<ProjectMemberRow | null> {
   const [row] = await exec.select().from(projectMembers).where(eq(projectMembers.id, id)).limit(1);

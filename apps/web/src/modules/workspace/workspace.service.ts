@@ -5,7 +5,8 @@ import type { WorkspaceRole } from "@vieroc/types";
 import { getUserId, requireActor } from "@/server/lib/context";
 import { NotFoundError } from "@/server/lib/errors";
 import { getOrSetCache, invalidateCache, invalidateCachePattern } from "@/server/lib/cache";
-import { createWorkspaceSchema, updateWorkspaceSchema } from "./workspace.schema";
+import { assertRateLimit } from "@/server/lib/rate-limit";
+import { createWorkspaceSchema, updateWorkspaceSchema, workspaceRoleSchema, memberIdSchema } from "./workspace.schema";
 import { assertCanManageWorkspace } from "./workspace.policy";
 import * as repo from "./workspace.repo";
 import * as events from "./workspace.events";
@@ -124,6 +125,8 @@ export async function inviteWorkspaceMember(workspaceId: string, input: unknown)
   const data = inviteMemberSchema.parse(input);
   const ctx = await requireActor(workspaceId);
   assertCanManageWorkspace(ctx);
+  // WP-C5: cap invites per user (20 / min) to curb invite spam.
+  await assertRateLimit(ctx.userId, "invite", { limit: 20, windowSec: 60 });
 
   return db.transaction(async (tx) => {
     let user = await repo.findUserByEmail(data.email, tx);
@@ -162,11 +165,13 @@ export async function updateWorkspaceMemberRole(
   memberId: string,
   role: WorkspaceRole
 ) {
+  const validRole = workspaceRoleSchema.parse(role);
+  const validMemberId = memberIdSchema.parse(memberId);
   const ctx = await requireActor(workspaceId);
   assertCanManageWorkspace(ctx);
 
   return db.transaction(async (tx) => {
-    const updated = await repo.updateMemberRole(memberId, role, tx);
+    const updated = await repo.updateMemberRole(workspaceId, validMemberId, validRole, tx);
     if (!updated) throw new NotFoundError("Workspace Member");
     await events.workspaceMemberRoleUpdated(tx, ctx, { memberId, role });
     
@@ -179,11 +184,12 @@ export async function updateWorkspaceMemberRole(
 }
 
 export async function removeWorkspaceMember(workspaceId: string, memberId: string) {
+  const validMemberId = memberIdSchema.parse(memberId);
   const ctx = await requireActor(workspaceId);
   assertCanManageWorkspace(ctx);
 
   return db.transaction(async (tx) => {
-    const deleted = await repo.removeMember(memberId, tx);
+    const deleted = await repo.removeMember(workspaceId, validMemberId, tx);
     if (!deleted) throw new NotFoundError("Workspace Member");
     await events.workspaceMemberRemoved(tx, ctx, { memberId, userId: deleted.userId });
 

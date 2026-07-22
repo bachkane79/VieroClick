@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { createCommentSchema } from "@vieroc/validators";
+import { createCommentSchema, nfcText, TEXT_LIMITS } from "@vieroc/validators";
 
 export { createCommentSchema };
 
 export const updateCommentSchema = z.object({
-  body: z.string().min(1),
+  body: nfcText(z.string().trim().min(1).max(TEXT_LIMITS.LONG)),
 });
 
 export type CreateCommentInput = z.infer<typeof createCommentSchema>;

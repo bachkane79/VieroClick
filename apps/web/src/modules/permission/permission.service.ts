@@ -3,6 +3,7 @@ import { db } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
 import { NotFoundError, ValidationError } from "@/server/lib/errors";
 import { LEVEL_RANK } from "@/server/lib/permissions";
+import { enqueueNotifications } from "@/server/lib/notifications";
 import * as workspaceRepo from "../workspace/workspace.repo";
 import {
   shareGrantSchema,
@@ -42,7 +43,13 @@ export async function shareResource(p: { workspaceId: string; input: unknown }) 
   // The sharer needs at least edit on the item, and can only grant a level ≤ their own.
   const ownLevel = await assertLevel(
     ctx,
-    { type: grant.resourceType, id: grant.resourceId, createdBy: meta.createdBy, projectId: meta.projectId },
+    {
+      type: grant.resourceType,
+      id: grant.resourceId,
+      createdBy: meta.createdBy,
+      projectId: meta.projectId,
+      isPrivate: meta.isPrivate,
+    },
     "edit"
   );
   if (LEVEL_RANK[grant.level] > LEVEL_RANK[ownLevel]) {
@@ -76,6 +83,21 @@ export async function shareResource(p: { workspaceId: string; input: unknown }) 
       tx
     );
     await events.grantShared(tx, ctx, grant);
+    // WP-C3: tell a member subject they were granted access (skip self-grants
+    // and team grants — team notifications would need fan-out per member).
+    if (grant.subjectType === "member" && grant.subjectId !== ctx.workspaceMemberId) {
+      await enqueueNotifications(tx, [
+        {
+          workspaceId: p.workspaceId,
+          recipientMemberId: grant.subjectId,
+          projectId: meta.projectId,
+          type: "resource.shared",
+          title: `You were given ${grant.level} access to a ${grant.resourceType}`,
+          entityType: grant.resourceType,
+          entityId: grant.resourceId,
+        },
+      ]);
+    }
     return row;
   });
 }
@@ -86,7 +108,13 @@ export async function revokeResourceGrant(p: { workspaceId: string; input: unkno
   const ctx = await requireActor(p.workspaceId, meta.projectId ?? undefined);
   await assertLevel(
     ctx,
-    { type: grant.resourceType, id: grant.resourceId, createdBy: meta.createdBy, projectId: meta.projectId },
+    {
+      type: grant.resourceType,
+      id: grant.resourceId,
+      createdBy: meta.createdBy,
+      projectId: meta.projectId,
+      isPrivate: meta.isPrivate,
+    },
     "edit"
   );
 

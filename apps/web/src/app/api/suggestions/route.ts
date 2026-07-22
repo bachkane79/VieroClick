@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import { getUserId } from "@/server/lib/context";
 import { isAgentRequest } from "@/server/lib/agent-auth";
 import { agentSuggestionTypeSchema } from "@vieroc/validators";
+import { enforceRestRateLimit } from "@/server/lib/rate-limit";
+import { enforceSameOrigin } from "@/server/lib/csrf";
 
 export async function POST(request: Request) {
   try {
@@ -15,6 +17,10 @@ export async function POST(request: Request) {
     if (isAgentRequest(request)) {
       userId = null;
     } else {
+      const csrf = enforceSameOrigin(request);
+      if (csrf) return csrf;
+      const limited = await enforceRestRateLimit(request, "suggestions", { limit: 30, windowSec: 60 });
+      if (limited) return limited;
       userId = await getUserId();
     }
     const body = await request.json();

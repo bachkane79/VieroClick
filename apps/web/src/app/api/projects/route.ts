@@ -4,9 +4,16 @@ import { eq } from "drizzle-orm";
 import { getUserId } from "@/server/lib/context";
 import { createProject } from "@/modules/project/project.service";
 import { AppError } from "@/server/lib/errors";
+import { enforceRestRateLimit } from "@/server/lib/rate-limit";
+import { enforceSameOrigin } from "@/server/lib/csrf";
 
 export async function POST(request: Request) {
   try {
+    const csrf = enforceSameOrigin(request);
+    if (csrf) return csrf;
+    const limited = await enforceRestRateLimit(request, "projects", { limit: 30, windowSec: 60 });
+    if (limited) return limited;
+
     const body = await request.json();
     const { name, description, workspaceId } = body;
 

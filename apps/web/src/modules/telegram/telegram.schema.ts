@@ -1,16 +1,17 @@
 import { z } from "zod";
+import { nfcText } from "@vieroc/validators";
 
 export const linkChannelSchema = z.object({
-  telegramChatId: z.string().min(1),
+  telegramChatId: z.string().trim().min(1).max(100),
   projectId: z.string().uuid().optional(),
-  title: z.string().optional(),
-  type: z.string().optional(),
+  title: nfcText(z.string().trim().max(200)).optional(),
+  type: z.string().trim().max(50).optional(),
 });
 
 export const updateChannelSchema = z.object({
   isActive: z.boolean().optional(),
   projectId: z.string().uuid().nullable().optional(),
-  title: z.string().optional(),
+  title: nfcText(z.string().trim().max(200)).optional(),
 });
 
 export type LinkChannelInput = z.infer<typeof linkChannelSchema>;

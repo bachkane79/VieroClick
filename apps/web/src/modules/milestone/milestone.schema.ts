@@ -1,10 +1,11 @@
 import { z } from "zod";
+import { nfcText, TEXT_LIMITS } from "@vieroc/validators";
 
 export const createMilestoneSchema = z.object({
-  title: z.string().min(1),
-  description: z.string().optional(),
+  title: nfcText(z.string().trim().min(1).max(TEXT_LIMITS.SHORT)),
+  description: nfcText(z.string().trim().max(TEXT_LIMITS.LONG)).optional(),
   targetDate: z.string().date().optional(),
-  status: z.string().default("planned"),
+  status: z.string().trim().min(1).max(50).default("planned"),
 });
 
 export const updateMilestoneSchema = createMilestoneSchema.partial();

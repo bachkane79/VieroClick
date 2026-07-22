@@ -79,7 +79,8 @@ export async function approveReport(p: {
   assertCanManageReports(ctx);
 
   const existing = await repo.findById(p.reportId);
-  if (!existing) throw new NotFoundError("Report");
+  // Scope check (WP-C2): entity must belong to the actor's authorized project.
+  if (!existing || existing.projectId !== p.projectId) throw new NotFoundError("Report");
 
   return db.transaction(async (tx) => {
     const updated = await repo.update(

@@ -54,7 +54,8 @@ export async function updateStatus(p: {
   assertCanManageStatuses(ctx);
 
   const existing = await repo.findById(p.statusId);
-  if (!existing) throw new NotFoundError("Task status");
+  // Scope check (WP-C2): entity must belong to the actor's authorized project.
+  if (!existing || existing.projectId !== p.projectId) throw new NotFoundError("Task status");
 
   const values: Partial<repo.TaskStatusInsert> = {};
   if (data.name !== undefined) values.name = data.name;
@@ -83,7 +84,8 @@ export async function deleteStatus(p: {
   assertCanManageStatuses(ctx);
 
   const existing = await repo.findById(p.statusId);
-  if (!existing) throw new NotFoundError("Task status");
+  // Scope check (WP-C2): entity must belong to the actor's authorized project.
+  if (!existing || existing.projectId !== p.projectId) throw new NotFoundError("Task status");
 
   return db.transaction(async (tx) => {
     await events.statusDeleted(tx, ctx, existing);

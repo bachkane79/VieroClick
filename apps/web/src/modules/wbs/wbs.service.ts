@@ -56,7 +56,8 @@ export async function updateWbsNode(p: {
   assertCanManageWbs(ctx);
 
   const existing = await repo.findById(p.nodeId);
-  if (!existing) throw new NotFoundError("WBS node");
+  // Scope check (WP-C2): entity must belong to the actor's authorized project.
+  if (!existing || existing.projectId !== p.projectId) throw new NotFoundError("WBS node");
 
   const values: Partial<repo.WbsNodeInsert> = {};
   if (data.parentId !== undefined) values.parentId = data.parentId ?? null;
@@ -86,7 +87,8 @@ export async function deleteWbsNode(p: {
   assertCanManageWbs(ctx);
 
   const existing = await repo.findById(p.nodeId);
-  if (!existing) throw new NotFoundError("WBS node");
+  // Scope check (WP-C2): entity must belong to the actor's authorized project.
+  if (!existing || existing.projectId !== p.projectId) throw new NotFoundError("WBS node");
 
   return db.transaction(async (tx) => {
     await events.wbsNodeDeleted(tx, ctx, existing);

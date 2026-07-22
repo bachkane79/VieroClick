@@ -12,33 +12,82 @@ import {
   activityEvents,
   users,
 } from "@vieroc/db";
-import { requireActor } from "@/server/lib/context";
+import { requireActor, type ActorContext } from "@/server/lib/context";
 import { NotFoundError, ValidationError } from "@/server/lib/errors";
 import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
 import { enqueueNotifications } from "@/server/lib/notifications";
 import { dispatchAgent } from "@/server/lib/agent-dispatch";
+import { isWorkspaceAdmin, meetsLevel } from "@/server/lib/permissions";
+import { resolveGrantLevel } from "@/modules/permission/permission.access";
 import { createProjectSchema, updateProjectSchema } from "./project.schema";
 import { assertCanCreateProject, assertCanManageProject } from "./project.policy";
 import * as repo from "./project.repo";
 import * as events from "./project.events";
 
+/**
+ * WP-C3 — visibility of a PRIVATE project. Non-private projects are governed by
+ * the normal requireActor rules. A private project is visible only to: workspace
+ * owner/admin, the creator, an actual project member, or a subject with an
+ * explicit grant (resolveGrantLevel covers creator/admin/grant; `isMember`
+ * covers project membership). Guests never gain access without a grant.
+ */
+async function canAccessPrivateProject(
+  ctx: ActorContext,
+  project: { id: string; createdBy: string | null },
+  isMember: boolean
+): Promise<boolean> {
+  if (isWorkspaceAdmin(ctx) || isMember) return true;
+  const level = await resolveGrantLevel(ctx, {
+    type: "project",
+    id: project.id,
+    createdBy: project.createdBy,
+    projectId: project.id,
+  });
+  return meetsLevel(level, "view");
+}
+
 // cache() de-duplicates identical calls within a single server render tree.
 // e.g. layout.tsx + page.tsx both calling getProject() → only 1 DB query.
 export const listProjects = cache(async function listProjects(workspaceId: string) {
-  await requireActor(workspaceId);
-  return getOrSetCache(`projects:${workspaceId}`, () => repo.listByWorkspace(workspaceId));
+  const ctx = await requireActor(workspaceId);
+  // Shared cache holds the full list; per-user private-project filtering happens
+  // outside the cache (WP-C3) so a private project never leaks into a non-member's
+  // sidebar/list.
+  const all = await getOrSetCache(`projects:${workspaceId}`, () => repo.listByWorkspace(workspaceId));
+  const hasPrivate = all.some((p) => p.isPrivate);
+  if (!hasPrivate || isWorkspaceAdmin(ctx)) return all;
+
+  const myProjectIds = new Set(
+    await repo.listProjectIdsForMember(workspaceId, ctx.workspaceMemberId)
+  );
+  const visible = [];
+  for (const p of all) {
+    if (!p.isPrivate || myProjectIds.has(p.id)) {
+      visible.push(p);
+      continue;
+    }
+    if (await canAccessPrivateProject(ctx, p, false)) visible.push(p);
+  }
+  return visible;
 });
 
 export const getProject = cache(async function getProject(
   workspaceId: string,
   projectId: string
 ) {
-  await requireActor(workspaceId, projectId);
-  return getOrSetCache(`project:${projectId}`, async () => {
-    const project = await repo.findById(projectId);
-    if (!project || project.workspaceId !== workspaceId) throw new NotFoundError("Project");
-    return project;
+  const ctx = await requireActor(workspaceId, projectId);
+  const project = await getOrSetCache(`project:${projectId}`, async () => {
+    const p = await repo.findById(projectId);
+    if (!p || p.workspaceId !== workspaceId) throw new NotFoundError("Project");
+    return p;
   });
+  // WP-C3: a private project is reachable only by members/admin/creator/grantees.
+  // requireActor already blocks non-privileged non-members; this additionally
+  // closes the owner/admin/leader "see-all" bypass for leaders on private projects.
+  if (project.isPrivate && !(await canAccessPrivateProject(ctx, project, !!ctx.projectRole))) {
+    throw new NotFoundError("Project");
+  }
+  return project;
 });
 
 export async function createProject(workspaceId: string, input: unknown) {
@@ -197,6 +246,10 @@ export async function updateProject(workspaceId: string, projectId: string, inpu
   if (data.description !== undefined) patch.description = data.description ?? null;
   if (data.scope !== undefined) patch.scope = data.scope ?? null;
   if (data.status !== undefined) patch.status = data.status;
+  // WP-B2 note: changing leadMemberId does NOT invalidate `actor:` — safe today
+  // because permissions.ts derives isProjectManager from projectMembers.role, not
+  // projects.leadMemberId. If any auth path ever treats leadMemberId as authority,
+  // add an actor-cache invalidation here (see project-member.service.ts).
   if (data.leadMemberId !== undefined) patch.leadMemberId = data.leadMemberId ?? null;
   if (data.startDate !== undefined) patch.startDate = data.startDate ?? null;
   if (data.targetEndDate !== undefined) patch.targetEndDate = data.targetEndDate ?? null;

@@ -97,19 +97,26 @@ export async function listMembers(workspaceId: string, exec: Executor = db) {
     .where(eq(workspaceMembers.workspaceId, workspaceId));
 }
 
-export async function updateMemberRole(memberId: string, role: WorkspaceRole, exec: Executor = db) {
+// WP-C2: scoped by workspaceId so a caller can never mutate a member row from a
+// different workspace by passing a foreign memberId (cross-tenant IDOR).
+export async function updateMemberRole(
+  workspaceId: string,
+  memberId: string,
+  role: WorkspaceRole,
+  exec: Executor = db
+) {
   const [row] = await exec
     .update(workspaceMembers)
     .set({ role })
-    .where(eq(workspaceMembers.id, memberId))
+    .where(and(eq(workspaceMembers.id, memberId), eq(workspaceMembers.workspaceId, workspaceId)))
     .returning();
   return row ?? null;
 }
 
-export async function removeMember(memberId: string, exec: Executor = db) {
+export async function removeMember(workspaceId: string, memberId: string, exec: Executor = db) {
   const [row] = await exec
     .delete(workspaceMembers)
-    .where(eq(workspaceMembers.id, memberId))
+    .where(and(eq(workspaceMembers.id, memberId), eq(workspaceMembers.workspaceId, workspaceId)))
     .returning();
   return row ?? null;
 }

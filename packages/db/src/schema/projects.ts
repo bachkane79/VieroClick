@@ -39,10 +39,12 @@ export const projects = pgTable("projects", {
     .notNull()
     .default("full_auto"),
   agentConfidenceThreshold: real("agent_confidence_threshold").notNull().default(0.7),
-  // NOTE: `is_private` (Space-level privacy, §4.2) is intentionally NOT added
-  // here yet — `listByWorkspace`/`findById` use `.select()` (all columns), so
-  // adding the column before its migration is applied breaks project reads
-  // against the live DB. Add it together with the permission-grants migration.
+  // Space-level privacy (§4.2, WP-C3). When true, coarse workspace/project roles
+  // no longer grant default access — only an explicit permission_grant (or being
+  // workspace admin / the creator) can see/act on the project. `.select()`/
+  // `.returning()` include this automatically now that the column exists in both
+  // schema and DB (applied together, WP-C3).
+  isPrivate: boolean("is_private").notNull().default(false),
   // AI Leader master switch: when false the project is managed manually and no
   // agents are dispatched (planning/assignment/observer). Toggled from the
   // overview banner (on) or project settings (off).

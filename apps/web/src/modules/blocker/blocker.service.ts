@@ -72,7 +72,9 @@ export async function updateBlocker(p: {
   assertCanResolve(ctx);
 
   const existing = await repo.findById(p.blockerId);
-  if (!existing) throw new NotFoundError("Blocker");
+  // Scope check (WP-C2): the entity must belong to the project the actor was
+  // authorized against, else a PM of project A could mutate project B's row.
+  if (!existing || existing.projectId !== p.projectId) throw new NotFoundError("Blocker");
 
   const resolving = data.status === "resolved" && existing.status !== "resolved";
 
