@@ -26,6 +26,8 @@ export interface TaskView {
   labels: string[];
   position: number;
   isMilestone: boolean;
+  /** WP-D3: optimistic-concurrency token — send back on update to detect stale edits. */
+  version: number;
 }
 
 export interface TaskStatusView {
@@ -102,6 +104,7 @@ export function toTaskView(task: {
   labels: string[];
   position: number;
   isMilestone: boolean;
+  version: number;
 }): TaskView {
   // Prefer the explicit multi-assignee set; fall back to the primary column so
   // rows loaded without the join still render an assignee.
@@ -130,6 +133,7 @@ export function toTaskView(task: {
     labels: task.labels,
     position: task.position,
     isMilestone: task.isMilestone,
+    version: task.version,
   };
 }
 

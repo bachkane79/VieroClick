@@ -3,7 +3,7 @@ import { AppError } from "./errors";
 
 export type ActionResult<T> =
   | { ok: true; data: T }
-  | { ok: false; error: string; code: string };
+  | { ok: false; error: string; code: string; details?: unknown };
 
 /**
  * Wrap a server action body so the boundary always returns a serializable
@@ -17,7 +17,7 @@ export async function runAction<T>(fn: () => Promise<T>): Promise<ActionResult<T
       return { ok: false, error: err.issues[0]?.message ?? "Invalid input", code: "validation" };
     }
     if (err instanceof AppError) {
-      return { ok: false, error: err.message, code: err.code };
+      return { ok: false, error: err.message, code: err.code, details: err.details };
     }
     if (err instanceof Error) {
       return { ok: false, error: err.message, code: "error" };

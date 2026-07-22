@@ -50,6 +50,13 @@
       "when": 1784734395823,
       "tag": "0006_fantastic_captain_cross",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784740473754,
+      "tag": "0007_majestic_ronan",
+      "breakpoints": true
     }
   ]
 }

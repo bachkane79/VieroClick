@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
   db,
   projects,
@@ -66,12 +66,17 @@ export async function create(values: ProjectInsert, exec: Executor = db): Promis
 export async function update(
   id: string,
   patch: Partial<ProjectInsert>,
-  exec: Executor = db
+  exec: Executor = db,
+  expectedVersion?: number
 ): Promise<ProjectRow | null> {
+  const where =
+    expectedVersion !== undefined
+      ? and(eq(projects.id, id), eq(projects.version, expectedVersion))
+      : eq(projects.id, id);
   const [row] = await exec
     .update(projects)
-    .set({ ...patch, updatedAt: new Date() })
-    .where(eq(projects.id, id))
+    .set({ ...patch, updatedAt: new Date(), version: sql`${projects.version} + 1` })
+    .where(where)
     .returning();
   return row ?? null;
 }

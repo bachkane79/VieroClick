@@ -2,7 +2,8 @@ export class AppError extends Error {
   constructor(
     message: string,
     public readonly code: string,
-    public readonly status: number
+    public readonly status: number,
+    public readonly details?: unknown
   ) {
     super(message);
     this.name = new.target.name;
@@ -40,5 +41,14 @@ export class RateLimitError extends AppError {
     public readonly retryAfter = 60
   ) {
     super(message, "rate_limited", 429);
+  }
+}
+
+/** WP-D3: optimistic-concurrency conflict — the caller's `version` is stale.
+ *  `details` carries the current row + version so the UI can refresh instead
+ *  of silently retrying and overwriting a concurrent edit. */
+export class ConflictError extends AppError {
+  constructor(message: string, details: { currentVersion: number; current: unknown }) {
+    super(message, "conflict", 409, details);
   }
 }

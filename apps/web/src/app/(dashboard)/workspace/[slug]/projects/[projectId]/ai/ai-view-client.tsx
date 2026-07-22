@@ -29,6 +29,7 @@ interface Props {
   initialSuggestions: SuggestionRow[];
   agentAutonomy: "full_auto" | "review_required";
   agentConfidenceThreshold: number;
+  projectVersion: number;
 }
 
 export function AiViewClient({
@@ -38,11 +39,13 @@ export function AiViewClient({
   initialSuggestions,
   agentAutonomy,
   agentConfidenceThreshold,
+  projectVersion,
 }: Props) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [autonomy, setAutonomy] = useState<"full_auto" | "review_required">(agentAutonomy);
   const [threshold, setThreshold] = useState(agentConfidenceThreshold);
+  const [version, setVersion] = useState(projectVersion);
   const [activePanel, setActivePanel] = useState<"assistant" | "suggestions">("assistant");
   const [replanReason, setReplanReason] = useState("");
   const [showReplanInput, setShowReplanInput] = useState(false);
@@ -161,13 +164,19 @@ export function AiViewClient({
       workspaceId,
       projectId,
       slug: workspaceSlug,
-      data: { agentAutonomy: next },
+      data: { agentAutonomy: next, version },
     });
     if (!res.ok) {
       setAutonomy(previous);
-      toast.error(res.error);
+      if (res.code === "conflict") {
+        toast.error("This project was updated by someone else — refreshing with the latest data.");
+        router.refresh();
+      } else {
+        toast.error(res.error);
+      }
       return;
     }
+    setVersion(res.data.version);
     toast.success(
       next === "full_auto"
         ? "Agent autonomy set to full auto — plans and assignments apply immediately."
@@ -184,12 +193,18 @@ export function AiViewClient({
       workspaceId,
       projectId,
       slug: workspaceSlug,
-      data: { agentConfidenceThreshold: threshold },
+      data: { agentConfidenceThreshold: threshold, version },
     });
     if (!res.ok) {
-      toast.error(res.error);
+      if (res.code === "conflict") {
+        toast.error("This project was updated by someone else — refreshing with the latest data.");
+        router.refresh();
+      } else {
+        toast.error(res.error);
+      }
       return;
     }
+    setVersion(res.data.version);
     toast.success(`Assignments below ${threshold} confidence will now wait for review.`);
   }
 

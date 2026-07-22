@@ -200,7 +200,7 @@ export function TaskDetailDrawer({
           projectId,
           slug: workspaceSlug,
           taskId: task.id,
-          data: payload,
+          data: { ...payload, version: task.version },
         })
       : await createTaskAction({
           workspaceId,
@@ -211,6 +211,11 @@ export function TaskDetailDrawer({
 
     if (!result.ok) {
       setSubmitting(false);
+      if (result.code === "conflict") {
+        toast.error("This task was updated by someone else — refreshing with the latest data.");
+        router.refresh();
+        return;
+      }
       toast.error(result.error);
       return;
     }

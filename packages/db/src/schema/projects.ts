@@ -54,6 +54,10 @@ export const projects = pgTable("projects", {
     .references(() => users.id),
   createdAt: timestamptz("created_at").notNull().defaultNow(),
   updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+  // WP-D3: optimistic concurrency token. Bumped on every update; a client-supplied
+  // stale `version` on PATCH is rejected with a 409 conflict instead of silently
+  // overwriting a concurrent edit.
+  version: integer("version").notNull().default(1),
 });
 
 export const projectMembers = pgTable(

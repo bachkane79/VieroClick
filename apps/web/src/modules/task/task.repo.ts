@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import {
   db,
   projects,
@@ -102,12 +102,17 @@ export async function createDependency(
 export async function update(
   id: string,
   patch: Partial<TaskInsert>,
-  exec: Executor = db
+  exec: Executor = db,
+  expectedVersion?: number
 ): Promise<TaskRow | null> {
+  const where =
+    expectedVersion !== undefined
+      ? and(eq(tasks.id, id), eq(tasks.version, expectedVersion))
+      : eq(tasks.id, id);
   const [row] = await exec
     .update(tasks)
-    .set({ ...patch, updatedAt: new Date() })
-    .where(eq(tasks.id, id))
+    .set({ ...patch, updatedAt: new Date(), version: sql`${tasks.version} + 1` })
+    .where(where)
     .returning();
   return row ?? null;
 }
@@ -215,6 +220,7 @@ export async function listByAssigneeWithProject(
       completedAt: tasks.completedAt,
       createdAt: tasks.createdAt,
       updatedAt: tasks.updatedAt,
+      version: tasks.version,
       projectName: projects.name,
       projectStatus: projects.status,
       statusName: taskStatuses.name,

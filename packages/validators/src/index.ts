@@ -92,6 +92,9 @@ export const updateProjectSchema = createProjectSchema.partial().extend({
   agentAutonomy: agentAutonomySchema.optional(),
   agentConfidenceThreshold: z.number().min(0).max(1).optional(),
   aiEnabled: z.boolean().optional(),
+  // WP-D3: optimistic-concurrency token. When provided, the update is rejected
+  // with a 409 conflict if it no longer matches the row's current version.
+  version: z.number().int().min(1).optional(),
 });
 
 // ─── Task ─────────────────────────────────────────────────────────────────────
@@ -121,6 +124,11 @@ export const createTaskSchema = z.object({
 export const updateTaskSchema = createTaskSchema.partial().extend({
   // Actual hours logged (assignee or manager can set; feeds speed score + accuracy).
   actualHours: z.number().min(0).max(100000).nullable().optional(),
+  // WP-D3: optimistic-concurrency token. When provided, the update is rejected
+  // with a 409 conflict if it no longer matches the row's current version.
+  // Optional because updateTask() is also called internally (assignTask,
+  // changeTaskStatus, moveTask) without a version to check.
+  version: z.number().int().min(1).optional(),
 });
 
 export const reviewTaskSchema = z.object({

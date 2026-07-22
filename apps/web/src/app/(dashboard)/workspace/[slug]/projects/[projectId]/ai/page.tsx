@@ -47,6 +47,7 @@ export default async function ProjectAiPage({ params }: Props) {
         initialSuggestions={adaptedSuggestions}
         agentAutonomy={project.agentAutonomy}
         agentConfidenceThreshold={project.agentConfidenceThreshold}
+        projectVersion={project.version}
       />
     </div>
   );

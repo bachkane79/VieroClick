@@ -82,11 +82,15 @@ export function TaskQuickActions({
       projectId,
       slug: workspaceSlug,
       taskId: task.id,
-      data: { priority },
+      data: { priority, version: task.version },
     });
     if (!result.ok) {
       onOptimistic(task.id, null);
-      toast.error(result.error);
+      if (result.code === "conflict") {
+        toast.error("This task was updated by someone else — please reload.");
+      } else {
+        toast.error(result.error);
+      }
     }
   }
 

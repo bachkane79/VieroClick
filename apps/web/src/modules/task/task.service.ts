@@ -5,7 +5,7 @@ import { db, projects, type Executor } from "@vieroc/db";
 import { requireActor, type ActorContext } from "@/server/lib/context";
 import { isProjectManager, isReviewer, meetsLevel } from "@/server/lib/permissions";
 import { resolveGrantLevel } from "@/modules/permission/permission.access";
-import { NotFoundError, ValidationError } from "@/server/lib/errors";
+import { ConflictError, NotFoundError, ValidationError } from "@/server/lib/errors";
 import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
 import { enqueueNotifications } from "@/server/lib/notifications";
 import { createTaskDependencySchema } from "@/modules/task-dependency/task-dependency.schema";
@@ -365,8 +365,16 @@ export async function updateTask(p: {
       }
     }
 
-    const updated = await repo.update(p.taskId, values, tx);
-    if (!updated) throw new NotFoundError("Task");
+    const updated = await repo.update(p.taskId, values, tx, data.version);
+    if (!updated) {
+      if (data.version === undefined) throw new NotFoundError("Task");
+      const current = await repo.findById(p.taskId, tx);
+      if (!current) throw new NotFoundError("Task");
+      throw new ConflictError("This task was updated by someone else — refresh and try again.", {
+        currentVersion: current.version,
+        current,
+      });
+    }
 
     await events.taskUpdated(tx, ctx, existing, updated);
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@vieroc/ui";
 import { Calendar, Clock } from "lucide-react";
 import { toast } from "sonner";
@@ -44,6 +45,7 @@ export function GanttClient({
   projectStart,
   projectEnd,
 }: Props) {
+  const router = useRouter();
   const { effectiveTasks, applyOptimistic } = useOptimisticTasks(tasks);
   const trackRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<{ taskId: string; deltaDays: number } | null>(null);
@@ -96,11 +98,16 @@ export function GanttClient({
         projectId,
         slug: workspaceSlug,
         taskId: task.id,
-        data: patch,
+        data: { ...patch, version: task.version },
       });
       if (!result.ok) {
         applyOptimistic(task.id, null);
-        toast.error(result.error);
+        if (result.code === "conflict") {
+          toast.error("This task was updated by someone else — refreshing with the latest data.");
+          router.refresh();
+        } else {
+          toast.error(result.error);
+        }
       } else {
         toast.success("Dates updated");
       }

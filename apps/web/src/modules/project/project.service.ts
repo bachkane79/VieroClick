@@ -13,7 +13,7 @@ import {
   users,
 } from "@vieroc/db";
 import { requireActor, requireScopedActor, type ActorContext } from "@/server/lib/context";
-import { NotFoundError, ValidationError } from "@/server/lib/errors";
+import { ConflictError, NotFoundError, ValidationError } from "@/server/lib/errors";
 import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
 import { enqueueNotifications } from "@/server/lib/notifications";
 import { dispatchAgent } from "@/server/lib/agent-dispatch";
@@ -279,8 +279,16 @@ export async function updateProject(workspaceId: string, projectId: string, inpu
     patch.agentConfidenceThreshold = data.agentConfidenceThreshold;
 
   return db.transaction(async (tx) => {
-    const updated = await repo.update(projectId, patch, tx);
-    if (!updated) throw new NotFoundError("Project");
+    const updated = await repo.update(projectId, patch, tx, data.version);
+    if (!updated) {
+      if (data.version === undefined) throw new NotFoundError("Project");
+      const current = await repo.findById(projectId, tx);
+      if (!current) throw new NotFoundError("Project");
+      throw new ConflictError("This project was updated by someone else — refresh and try again.", {
+        currentVersion: current.version,
+        current,
+      });
+    }
     await events.projectUpdated(tx, ctx, existing, { ...patch });
     await invalidateCache(`projects:${workspaceId}`);
     await invalidateCache(`project:${projectId}`);

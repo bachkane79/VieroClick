@@ -91,6 +91,8 @@ export const tasks = pgTable(
     createdAt: timestamptz("created_at").notNull().defaultNow(),
     updatedAt: timestamptz("updated_at").notNull().defaultNow(),
     planRef: text("plan_ref"),
+    // WP-D3: optimistic concurrency token, see projects.version for the same pattern.
+    version: integer("version").notNull().default(1),
   },
   (t) => [
     uniqueIndex("tasks_project_plan_ref_idx")
