@@ -12,6 +12,7 @@ import {
   activityEvents,
 } from "@vieroc/db";
 import { aliasedTable, desc, eq } from "drizzle-orm";
+import { withApiLogging } from "@/server/lib/api-handler";
 
 /**
  * GET /api/test-db
@@ -21,8 +22,7 @@ import { aliasedTable, desc, eq } from "drizzle-orm";
  * `build_project_context()` expects: projects, members, tasks, blockers,
  * daily_updates, risks, recent_events. No mutation, demo/dev helper.
  */
-export async function GET() {
-  try {
+export const GET = withApiLogging("api.test-db.read", async () => {
     const assignee = aliasedTable(workspaceMembers, "assignee");
     const assigneeUser = aliasedTable(users, "assignee_user");
     const updateMember = aliasedTable(workspaceMembers, "update_member");
@@ -123,9 +123,4 @@ export async function GET() {
       risks: riskRows,
       recent_events: eventRows,
     });
-  } catch (err) {
-    console.error("Error in /api/test-db:", err);
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-}
+});

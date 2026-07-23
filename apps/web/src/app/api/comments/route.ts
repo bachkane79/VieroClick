@@ -3,12 +3,11 @@ import { db, projects } from "@vieroc/db";
 import { eq } from "drizzle-orm";
 import { findById } from "@/modules/task/task.repo";
 import { addComment } from "@/modules/comment/comment.service";
-import { AppError } from "@/server/lib/errors";
 import { enforceRestRateLimit } from "@/server/lib/rate-limit";
 import { enforceSameOrigin } from "@/server/lib/csrf";
+import { withApiLogging } from "@/server/lib/api-handler";
 
-export async function POST(request: Request) {
-  try {
+export const POST = withApiLogging("api.comments.create", async (request) => {
     const csrf = enforceSameOrigin(request);
     if (csrf) return csrf;
     const limited = await enforceRestRateLimit(request, "comments", { limit: 60, windowSec: 60 });
@@ -53,17 +52,4 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(result, { status: 201 });
-  } catch (err) {
-    console.error("Error creating comment in API:", err);
-    if (err instanceof AppError) {
-      return NextResponse.json(
-        { error: err.message, code: err.code },
-        { status: err.status }
-      );
-    }
-    if (err instanceof Error) {
-      return NextResponse.json({ error: err.message, code: "error" }, { status: 500 });
-    }
-    return NextResponse.json({ error: "Unknown error", code: "error" }, { status: 500 });
-  }
-}
+});

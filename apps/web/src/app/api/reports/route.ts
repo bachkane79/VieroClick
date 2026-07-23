@@ -5,9 +5,9 @@ import { isAgentRequest } from "@/server/lib/agent-auth";
 import { invalidateCache } from "@/server/lib/cache";
 import { enforceRestRateLimit } from "@/server/lib/rate-limit";
 import { enforceSameOrigin } from "@/server/lib/csrf";
+import { withApiLogging } from "@/server/lib/api-handler";
 
-export async function POST(request: Request) {
-  try {
+export const POST = withApiLogging("api.reports.create", async (request) => {
     // Accept agent service key OR user session. Agent traffic (secret-authed,
     // server-to-server) skips CSRF/rate-limit; user (cookie) traffic is guarded.
     if (!isAgentRequest(request)) {
@@ -67,8 +67,4 @@ export async function POST(request: Request) {
     await invalidateCache(`reports:${projectId}`);
 
     return NextResponse.json(report, { status: 201 });
-  } catch (err: any) {
-    console.error("Error creating leader report in API:", err);
-    return NextResponse.json({ error: err.message || "Unknown error" }, { status: 500 });
-  }
-}
+});

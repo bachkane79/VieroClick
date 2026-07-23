@@ -6,9 +6,9 @@ import { isAgentRequest } from "@/server/lib/agent-auth";
 import { agentSuggestionTypeSchema } from "@vieroc/validators";
 import { enforceRestRateLimit } from "@/server/lib/rate-limit";
 import { enforceSameOrigin } from "@/server/lib/csrf";
+import { withApiLogging } from "@/server/lib/api-handler";
 
-export async function POST(request: Request) {
-  try {
+export const POST = withApiLogging("api.suggestions.create", async (request) => {
     // Accept agent service key OR user session.
     // agent_jobs.requested_by_user_id is a nullable uuid FK — agent-originated
     // suggestions have no human user, so store null. (A sentinel string is not a
@@ -83,8 +83,4 @@ export async function POST(request: Request) {
 
     // Revalidate paths to refresh cache
     return NextResponse.json(suggestion, { status: 201 });
-  } catch (err: any) {
-    console.error("Error creating suggestion in API:", err);
-    return NextResponse.json({ error: err.message || "Unknown error" }, { status: 500 });
-  }
-}
+});

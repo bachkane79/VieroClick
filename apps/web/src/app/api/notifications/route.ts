@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { db, notifications } from "@vieroc/db";
 import { getUserId } from "@/server/lib/context";
 import { isAgentRequest } from "@/server/lib/agent-auth";
+import { withApiLogging } from "@/server/lib/api-handler";
 
-export async function POST(request: Request) {
-  try {
+export const POST = withApiLogging("api.notifications.create", async (request) => {
     // Accept agent service key OR user session
     if (!isAgentRequest(request)) {
       await getUserId();
@@ -39,8 +39,4 @@ export async function POST(request: Request) {
       .returning();
 
     return NextResponse.json(notification, { status: 201 });
-  } catch (err: any) {
-    console.error("Error creating notification in API:", err);
-    return NextResponse.json({ error: err.message || "Unknown error" }, { status: 500 });
-  }
-}
+});

@@ -3,12 +3,11 @@ import { db, workspaceMembers, workspaces, users } from "@vieroc/db";
 import { eq } from "drizzle-orm";
 import { getUserId } from "@/server/lib/context";
 import { createProject } from "@/modules/project/project.service";
-import { AppError } from "@/server/lib/errors";
 import { enforceRestRateLimit } from "@/server/lib/rate-limit";
 import { enforceSameOrigin } from "@/server/lib/csrf";
+import { withApiLogging } from "@/server/lib/api-handler";
 
-export async function POST(request: Request) {
-  try {
+export const POST = withApiLogging("api.projects.create", async (request) => {
     const csrf = enforceSameOrigin(request);
     if (csrf) return csrf;
     const limited = await enforceRestRateLimit(request, "projects", { limit: 30, windowSec: 60 });
@@ -69,17 +68,4 @@ export async function POST(request: Request) {
       workspaceSlug: workspace?.slug || "vieroc-hq",
       members: membersList,
     }, { status: 201 });
-  } catch (err) {
-    console.error("Error creating project in API:", err);
-    if (err instanceof AppError) {
-      return NextResponse.json(
-        { error: err.message, code: err.code },
-        { status: err.status }
-      );
-    }
-    if (err instanceof Error) {
-      return NextResponse.json({ error: err.message, code: "error" }, { status: 500 });
-    }
-    return NextResponse.json({ error: "Unknown error", code: "error" }, { status: 500 });
-  }
-}
+});
