@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useParams, useRouter } from "next/navigation";
@@ -21,7 +21,6 @@ import {
   AlertOctagon,
   BarChart3,
   BookText,
-  Briefcase,
   CalendarCheck,
   CalendarDays,
   CalendarRange,
@@ -42,7 +41,6 @@ import {
   ListTodo,
   LogOut,
   MessagesSquare,
-  MoreHorizontal,
   Network,
   PanelLeftClose,
   PanelLeftOpen,
@@ -92,6 +90,10 @@ function deriveTab(pathname: string): RailTab | null {
   if (/\/docs(\/|$)/.test(pathname)) return "docs";
   if (/\/my-tasks(\/|$)/.test(pathname)) return "planner";
   if (/\/projects\/[^/]+\/ai(\/|$)/.test(pathname)) return "ai";
+  // Inbox and the all-projects page have no panel of their own — keep the Home
+  // navigator beside them (matches the rail link's onClick).
+  if (/\/inbox(\/|$)/.test(pathname)) return "home";
+  if (pathname.endsWith("/projects")) return "home";
   return null;
 }
 
@@ -289,19 +291,56 @@ export function AppSidebar({ user, workspaces }: Props) {
       ]
     : [];
 
+  // The rail is the single gateway: a personal cluster (Home · Inbox · My
+  // Tasks) and a project cluster (Projects · Docs · AI · More), split by a
+  // divider. Inbox/Projects are plain nav links (the panel keeps the workspace
+  // navigator beside them); Home/My Tasks/Docs/AI own a contextual panel.
   const RAIL: Array<{
-    key: RailTab | "more";
+    key: RailTab | "more" | "inbox" | "projects";
     icon: LucideIcon;
     label: string;
     href?: string;
+    kind: "tab" | "link" | "more";
+    sepBefore?: boolean;
   }> = [
-    { key: "home", icon: Home, label: t(locale, "sb.home"), href: wsBase || "/dashboard" },
-    { key: "planner", icon: CalendarDays, label: t(locale, "sb.planner"), href: `${wsBase}/my-tasks` },
-    { key: "ai", icon: Sparkles, label: t(locale, "sb.ai") },
-    { key: "teams", icon: Users, label: t(locale, "sb.teams") },
-    { key: "docs", icon: BookText, label: t(locale, "sb.docs"), href: `${wsBase}/docs` },
-    { key: "more", icon: LayoutGrid, label: t(locale, "sb.more") },
+    { key: "home", icon: Home, label: t(locale, "sb.home"), href: wsBase || "/dashboard", kind: "tab" },
+    { key: "inbox", icon: Inbox, label: t(locale, "sb.inbox"), href: `${wsBase}/inbox`, kind: "link" },
+    { key: "planner", icon: ListTodo, label: t(locale, "sb.myTasks"), href: `${wsBase}/my-tasks`, kind: "tab" },
+    { key: "projects", icon: Layers, label: t(locale, "sb.projects"), href: `${wsBase}/projects`, kind: "link", sepBefore: true },
+    { key: "docs", icon: BookText, label: t(locale, "sb.docs"), href: `${wsBase}/docs`, kind: "tab" },
+    { key: "ai", icon: Sparkles, label: t(locale, "sb.ai"), kind: "tab" },
+    { key: "teams", icon: Users, label: t(locale, "sb.teams"), kind: "tab" },
+    { key: "more", icon: LayoutGrid, label: t(locale, "sb.more"), kind: "more" },
   ];
+
+  // Which rail item reads as active. Link items (Inbox/Projects) key off the
+  // pathname; panel tabs key off the open tab. Home yields to the link pages so
+  // only one item highlights at a time.
+  function railActive(key: string): boolean {
+    switch (key) {
+      case "inbox":
+        return pathname.endsWith("/inbox");
+      case "projects":
+        return pathname.endsWith("/projects");
+      case "planner":
+        return pathname.endsWith("/my-tasks") || tab === "planner";
+      case "docs":
+        return tab === "docs";
+      case "ai":
+        return tab === "ai";
+      case "teams":
+        return tab === "teams";
+      case "home":
+        return (
+          tab === "home" &&
+          !pathname.endsWith("/inbox") &&
+          !pathname.endsWith("/my-tasks") &&
+          !pathname.endsWith("/projects")
+        );
+      default:
+        return false;
+    }
+  }
 
   return (
     <div className="flex h-full shrink-0">
@@ -340,7 +379,7 @@ export function AppSidebar({ user, workspaces }: Props) {
 
           {RAIL.map((item) => {
             const Icon = item.icon;
-            const active = item.key !== "more" && tab === item.key;
+            const active = railActive(item.key);
             const disabled = !ws && item.key !== "home";
             const cls = cn(
               "group relative flex w-[54px] flex-col items-center gap-1 rounded-xl py-2 transition-[background-color,color] duration-150",
@@ -354,7 +393,7 @@ export function AppSidebar({ user, workspaces }: Props) {
                 )}
                 <span className="relative">
                   <Icon className="h-[19px] w-[19px]" strokeWidth={active ? 2.1 : 1.9} />
-                  {item.key === "home" && unread > 0 && (
+                  {item.key === "inbox" && unread > 0 && (
                     <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-white">
                       {unread > 9 ? "9+" : unread}
                     </span>
@@ -364,10 +403,14 @@ export function AppSidebar({ user, workspaces }: Props) {
               </>
             );
 
-            // "More" opens the launcher grid; the rest switch the panel tab.
-            if (item.key === "more") {
+            const sep = item.sepBefore ? (
+              <span className="my-1 h-px w-7 shrink-0 rounded-full bg-white/10" aria-hidden />
+            ) : null;
+
+            // "More" opens the launcher grid (per-project view jumps).
+            if (item.kind === "more") {
               return (
-                <DropdownMenu.Root key="more">
+                <DropdownMenu.Root key={item.key}>
                   <DropdownMenu.Trigger asChild>
                     <button disabled={disabled} title={item.label} className={cls}>
                       {inner}
@@ -425,30 +468,55 @@ export function AppSidebar({ user, workspaces }: Props) {
               );
             }
 
+            // Plain nav links (Inbox / Projects): navigate and keep the
+            // workspace navigator (Home panel) beside them, without forcing the
+            // collapsed panel open.
+            if (item.kind === "link") {
+              return (
+                <Fragment key={item.key}>
+                  {sep}
+                  <Link
+                    href={disabled ? "#" : item.href!}
+                    onClick={() => setTab("home")}
+                    title={item.label}
+                    className={cls}
+                  >
+                    {inner}
+                  </Link>
+                </Fragment>
+              );
+            }
+
+            // Panel tabs. Those with an href both navigate and open the panel;
+            // the AI tab has no page of its own, only a panel.
             if (item.href) {
               return (
-                <Link
-                  key={item.key}
-                  href={disabled ? "#" : item.href}
+                <Fragment key={item.key}>
+                  {sep}
+                  <Link
+                    href={disabled ? "#" : item.href}
+                    onClick={() => openTab(item.key as RailTab)}
+                    title={item.label}
+                    className={cls}
+                  >
+                    {inner}
+                  </Link>
+                </Fragment>
+              );
+            }
+            return (
+              <Fragment key={item.key}>
+                {sep}
+                <button
+                  type="button"
+                  disabled={disabled}
                   onClick={() => openTab(item.key as RailTab)}
                   title={item.label}
                   className={cls}
                 >
                   {inner}
-                </Link>
-              );
-            }
-            return (
-              <button
-                key={item.key}
-                type="button"
-                disabled={disabled}
-                onClick={() => openTab(item.key as RailTab)}
-                title={item.label}
-                className={cls}
-              >
-                {inner}
-              </button>
+                </button>
+              </Fragment>
             );
           })}
         </nav>
@@ -550,8 +618,10 @@ export function AppSidebar({ user, workspaces }: Props) {
               {panelTitle(tab, locale)}
             </p>
             <div className="flex items-center gap-0.5">
-              {/* Create — hidden until the header is hovered. */}
-              <div className="opacity-0 transition-opacity duration-150 group-hover/panel:opacity-100">
+              {/* Create — the single global "new project / new doc" entry, kept
+                  always visible so creating isn't a hunt (replaces the inline
+                  "New project" link that used to duplicate it). */}
+              <div>
               <DropdownMenu.Root>
                 <DropdownMenu.Trigger asChild>
                   <button
@@ -609,7 +679,6 @@ export function AppSidebar({ user, workspaces }: Props) {
               <HomePanel
                 wsBase={wsBase}
                 pathname={pathname}
-                unread={unread}
                 projects={projects}
                 expanded={expanded}
                 toggleExpanded={toggleExpanded}
@@ -638,7 +707,7 @@ export function AppSidebar({ user, workspaces }: Props) {
 function panelTitle(tab: RailTab, locale: ReturnType<typeof useLocale>): string {
   switch (tab) {
     case "planner":
-      return t(locale, "sb.planner");
+      return t(locale, "sb.myTasks");
     case "ai":
       return t(locale, "sb.ai");
     case "teams":
@@ -654,7 +723,6 @@ function panelTitle(tab: RailTab, locale: ReturnType<typeof useLocale>): string 
 function HomePanel({
   wsBase,
   pathname,
-  unread,
   projects,
   expanded,
   toggleExpanded,
@@ -665,7 +733,6 @@ function HomePanel({
 }: {
   wsBase: string;
   pathname: string;
-  unread: number;
   projects: SidebarProject[];
   expanded: Set<string>;
   toggleExpanded: (id: string) => void;
@@ -674,65 +741,23 @@ function HomePanel({
   chatDir: ChatDir | null;
   locale: ReturnType<typeof useLocale>;
 }) {
-  const [moreOpen, setMoreOpen] = useState(false);
   return (
     <>
+      {/* Inbox + My Tasks now live on the rail; workspace Settings on the
+          account menu. The dashboards overview is the one workspace destination
+          without another home in the sidebar, kept as a single labeled link. */}
       <div className="space-y-px">
         <PanelLink
-          href={`${wsBase}/inbox`}
-          icon={Inbox}
-          label={t(locale, "sb.inbox")}
-          active={pathname.endsWith("/inbox")}
-          badge={unread > 0 ? unread : undefined}
+          href={`${wsBase}/dashboards`}
+          icon={LayoutDashboard}
+          label={t(locale, "sb.allDashboards")}
+          active={pathname.endsWith("/dashboards")}
         />
-        <PanelLink
-          href={`${wsBase}/my-tasks`}
-          icon={ListTodo}
-          label={t(locale, "sb.myTasks")}
-          active={pathname.endsWith("/my-tasks")}
-        />
-        {/* "More" — secondary destinations, collapsed by default (image 3). */}
-        <button
-          type="button"
-          onClick={() => setMoreOpen((v) => !v)}
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
-        >
-          <MoreHorizontal className="h-4 w-4 shrink-0" />
-          <span className="flex-1 text-left">{t(locale, "sb.moreLinks")}</span>
-          <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", moreOpen && "rotate-180")} />
-        </button>
-        {moreOpen && (
-          <div className="ml-3 space-y-px border-l border-border pl-1">
-            <PanelLink href={`${wsBase}/projects`} icon={Layers} label={t(locale, "sb.allProjects")} active={pathname.endsWith("/projects")} />
-            <PanelLink href={`${wsBase}/chat`} icon={MessagesSquare} label={t(locale, "sb.allChannels")} active={pathname.endsWith("/chat")} />
-            <PanelLink href={`${wsBase}/dashboards`} icon={LayoutDashboard} label={t(locale, "sb.allDashboards")} active={pathname.endsWith("/dashboards")} />
-            <PanelLink href={`${wsBase}/settings`} icon={Settings} label={t(locale, "sb.settings")} active={pathname.endsWith("/settings")} />
-          </div>
-        )}
       </div>
 
-      <SectionTitle
-        action={
-          <div className="flex items-center gap-0.5">
-            <Link
-              href={`${wsBase}/settings`}
-              title={locale === "vi" ? "Cài đặt workspace" : "Workspace settings"}
-              className="rounded p-0.5 text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
-            >
-              <Settings className="h-3.5 w-3.5" />
-            </Link>
-            <Link
-              href={`${wsBase}/projects`}
-              title={t(locale, "sb.allProjects")}
-              className="rounded p-0.5 text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
-            >
-              <Briefcase className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-        }
-      >
-        {t(locale, "sb.spaces")}
-      </SectionTitle>
+      {/* No section action: "all projects" lives on the rail "Dự án" icon —
+          a briefcase here would duplicate that exact destination. */}
+      <SectionTitle>{t(locale, "sb.spaces")}</SectionTitle>
 
       {projects.length === 0 ? (
         <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.noProjects")}</p>
@@ -809,14 +834,6 @@ function HomePanel({
         })
       )}
 
-      <Link
-        href={`${wsBase}/projects/new`}
-        className="mt-0.5 flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] font-medium text-primary transition-colors hover:bg-primary/8"
-      >
-        <Plus className="h-4 w-4" />
-        {t(locale, "sb.newProject")}
-      </Link>
-
       {(chatDir === null || chatDir.ok) && (
         <>
           <SectionTitle
@@ -885,7 +902,6 @@ function PlannerPanel({
 }) {
   return (
     <>
-      <PanelLink href={`${wsBase}/my-tasks`} icon={ListTodo} label={t(locale, "sb.myTasks")} active={pathname.endsWith("/my-tasks")} />
       {projects.length > 0 ? (
         <>
           <SectionTitle>{t(locale, "sb.plannerCalendars")}</SectionTitle>
@@ -938,6 +954,7 @@ function AiPanel({
     </>
   );
 }
+
 
 /* ── Teams panel ────────────────────────────────────────────────────────── */
 function TeamsPanel({
