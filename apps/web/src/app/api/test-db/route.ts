@@ -16,7 +16,7 @@ import { aliasedTable, desc, eq } from "drizzle-orm";
 /**
  * GET /api/test-db
  *
- * Read-only project context for the Band agents (observer, daily-report,
+ * Read-only project context for the agents (observer, daily-report,
  * morning-briefing, qa-and-hole). Returns the live snapshot the agents'
  * `build_project_context()` expects: projects, members, tasks, blockers,
  * daily_updates, risks, recent_events. No mutation, demo/dev helper.

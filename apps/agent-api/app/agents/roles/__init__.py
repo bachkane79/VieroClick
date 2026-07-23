@@ -3,8 +3,8 @@ Interactive agent roles, invoked synchronously via POST /api/agents/{role}.
 
 Each role is a self-fetching `async def run(project_id, payload) -> dict` that
 reads live project state from the web API and applies its results back through
-the same REST surface (never the DB directly). Consolidated from the former
-band-agents/ service so agent-api is the single agent process.
+the same REST surface (never the DB directly). agent-api is the single agent
+process.
 """
 from __future__ import annotations
 

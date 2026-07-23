@@ -3,8 +3,7 @@ message_parser.py
 Utilities for extracting structured JSON from LLM responses.
 
 Agents ask Gemini for JSON but responses may arrive as a bare object or wrapped
-in a ```json ... ``` fence — this normalizes both. Consolidated from the former
-band-agents/shared/message_parser.py (chat-only helpers dropped).
+in a ```json ... ``` fence — this normalizes both.
 """
 from __future__ import annotations
 

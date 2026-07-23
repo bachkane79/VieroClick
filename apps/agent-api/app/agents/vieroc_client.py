@@ -9,10 +9,8 @@ the same REST surface. Auth uses the shared bearer token (VIEROC_API_KEY).
 Requests retry with exponential backoff on transient failures (network errors and
 retryable 5xx/429); non-retryable errors (4xx other than 429) fail fast. All
 public methods keep their best-effort contract (return {}/False on failure) so a
-web-side hiccup never crashes an agent run.
-
-Consolidated from the former band-agents/shared/vieroc_client.py; reads config
-from app.settings instead of raw os.getenv.
+web-side hiccup never crashes an agent run. Reads config from app.settings
+instead of raw os.getenv.
 """
 from __future__ import annotations
 
