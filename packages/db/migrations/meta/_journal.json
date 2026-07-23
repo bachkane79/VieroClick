@@ -57,6 +57,20 @@
       "when": 1784740473754,
       "tag": "0007_majestic_ronan",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784742982551,
+      "tag": "0008_reflective_the_stranger",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784744238234,
+      "tag": "0009_unusual_eternals",
+      "breakpoints": true
     }
   ]
 }

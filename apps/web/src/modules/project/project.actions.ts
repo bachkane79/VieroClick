@@ -35,6 +35,28 @@ export async function updateProjectAction(args: {
   });
 }
 
+export async function deleteProjectAction(args: { workspaceId: string; projectId: string; slug: string }) {
+  return runAction(async () => {
+    const result = await service.deleteProject(args.workspaceId, args.projectId);
+    revalidatePath(`/workspace/${args.slug}`);
+    revalidatePath(`/workspace/${args.slug}/projects`);
+    return result;
+  });
+}
+
+export async function restoreProjectAction(args: { workspaceId: string; projectId: string; slug: string }) {
+  return runAction(async () => {
+    const project = await service.restoreProject(args.workspaceId, args.projectId);
+    revalidatePath(`/workspace/${args.slug}`);
+    revalidatePath(`/workspace/${args.slug}/projects`);
+    return project;
+  });
+}
+
+export async function listDeletedProjectsAction(args: { workspaceId: string }) {
+  return runAction(() => service.listDeletedProjects(args.workspaceId));
+}
+
 export async function setAiLeaderAction(args: {
   workspaceId: string;
   projectId: string;

@@ -1,6 +1,6 @@
 import "server-only";
 import type { ActorContext } from "@/server/lib/context";
-import { requirePermission } from "@/server/lib/permissions";
+import { isWorkspaceAdmin, requirePermission } from "@/server/lib/permissions";
 
 /**
  * Chat visibility follows §4.2: guests only ever see explicitly shared
@@ -22,5 +22,13 @@ export function assertCanCreateChannel(ctx: ActorContext): void {
   requirePermission(
     ctx.workspaceRole !== "guest" && ctx.workspaceRole !== "viewer",
     "You do not have permission to create channels"
+  );
+}
+
+/** WP-D4: only the channel's creator or a workspace admin/owner may delete it. */
+export function assertCanManageChannel(ctx: ActorContext, createdByMemberId: string): void {
+  requirePermission(
+    ctx.workspaceMemberId === createdByMemberId || isWorkspaceAdmin(ctx),
+    "Only the channel creator or a workspace admin can delete this channel"
   );
 }

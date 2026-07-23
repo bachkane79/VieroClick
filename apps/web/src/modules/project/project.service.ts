@@ -17,7 +17,7 @@ import { ConflictError, NotFoundError, ValidationError } from "@/server/lib/erro
 import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
 import { enqueueNotifications } from "@/server/lib/notifications";
 import { dispatchAgent } from "@/server/lib/agent-dispatch";
-import { isWorkspaceAdmin, meetsLevel } from "@/server/lib/permissions";
+import { isWorkspaceAdmin, meetsLevel, requirePermission } from "@/server/lib/permissions";
 import { resolveGrantLevel } from "@/modules/permission/permission.access";
 import { createProjectSchema, updateProjectSchema } from "./project.schema";
 import { assertCanCreateProject, assertCanManageProject } from "./project.policy";
@@ -294,6 +294,48 @@ export async function updateProject(workspaceId: string, projectId: string, inpu
     await invalidateCache(`project:${projectId}`);
     return updated;
   });
+}
+
+/** WP-D4: soft-delete. Manager-only (project lead or workspace admin/owner). */
+export async function deleteProject(workspaceId: string, projectId: string) {
+  const ctx = await requireActor(workspaceId, projectId);
+  assertCanManageProject(ctx);
+
+  const existing = await repo.findById(projectId);
+  if (!existing) throw new NotFoundError("Project");
+
+  return db.transaction(async (tx) => {
+    await events.projectDeleted(tx, ctx, existing);
+    await repo.softDelete(projectId, tx);
+    await invalidateCache(`projects:${workspaceId}`);
+    await invalidateCache(`project:${projectId}`);
+    return { id: projectId };
+  });
+}
+
+/** WP-D4: undo a soft-delete. Manager-only, same as delete. */
+export async function restoreProject(workspaceId: string, projectId: string) {
+  const ctx = await requireActor(workspaceId, projectId);
+  assertCanManageProject(ctx);
+
+  const existing = await repo.findByIdIncludingDeleted(projectId);
+  if (!existing || existing.workspaceId !== workspaceId) throw new NotFoundError("Project");
+
+  return db.transaction(async (tx) => {
+    const restored = await repo.restore(projectId, tx);
+    if (!restored) throw new NotFoundError("Project");
+    await events.projectRestored(tx, ctx, restored);
+    await invalidateCache(`projects:${workspaceId}`);
+    await invalidateCache(`project:${projectId}`);
+    return restored;
+  });
+}
+
+/** WP-D4: soft-deleted projects in a workspace, for a restore panel. Workspace-admin only (broader than per-project manager). */
+export async function listDeletedProjects(workspaceId: string) {
+  const ctx = await requireActor(workspaceId);
+  requirePermission(isWorkspaceAdmin(ctx), "Only workspace owners/admins can view deleted projects");
+  return repo.listDeletedByWorkspace(workspaceId);
 }
 
 /**

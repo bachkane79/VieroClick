@@ -7,7 +7,7 @@ import { NotFoundError } from "@/server/lib/errors";
 import { getOrSetCache, invalidateCache, invalidateCachePattern } from "@/server/lib/cache";
 import { assertRateLimit } from "@/server/lib/rate-limit";
 import { createWorkspaceSchema, updateWorkspaceSchema, workspaceRoleSchema, memberIdSchema } from "./workspace.schema";
-import { assertCanManageWorkspace } from "./workspace.policy";
+import { assertCanManageWorkspace, assertIsWorkspaceOwner } from "./workspace.policy";
 import * as repo from "./workspace.repo";
 import * as events from "./workspace.events";
 
@@ -111,6 +111,44 @@ export async function updateWorkspace(workspaceId: string, input: unknown) {
     await invalidateCachePattern(`my_workspaces:`);
     await invalidateCachePattern(`workspace_by_slug:`);
     return updated;
+  });
+}
+
+/**
+ * WP-D4: hard-delete, owner-only (stricter than `assertCanManageWorkspace`,
+ * which also allows admins). Writes an audit row to `workspace_deletions`
+ * BEFORE the delete, in the same transaction — that table has no FK to
+ * `workspaces`, so it survives the cascade that destroys everything else
+ * (including any normal `activity_events` row, which cascades on workspaceId).
+ */
+export async function deleteWorkspace(workspaceId: string) {
+  const ctx = await requireActor(workspaceId);
+  assertIsWorkspaceOwner(ctx);
+
+  const workspace = await repo.findById(workspaceId);
+  if (!workspace) throw new NotFoundError("Workspace");
+
+  const [memberCount, projectCount] = await Promise.all([
+    repo.countMembers(workspaceId),
+    repo.countProjects(workspaceId),
+  ]);
+
+  return db.transaction(async (tx) => {
+    await repo.recordWorkspaceDeletion(
+      {
+        workspaceId,
+        workspaceName: workspace.name,
+        deletedByUserId: ctx.userId,
+        memberCount,
+        projectCount,
+        snapshot: { ...workspace },
+      },
+      tx
+    );
+    await repo.remove(workspaceId, tx);
+    await invalidateCachePattern(`my_workspaces:`);
+    await invalidateCachePattern(`workspace_by_slug:`);
+    return { id: workspaceId };
   });
 }
 

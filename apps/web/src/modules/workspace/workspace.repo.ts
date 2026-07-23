@@ -1,6 +1,15 @@
 import "server-only";
-import { and, eq } from "drizzle-orm";
-import { db, workspaces, workspaceMembers, memberProfiles, users, type Executor } from "@vieroc/db";
+import { and, count, eq } from "drizzle-orm";
+import {
+  db,
+  workspaces,
+  workspaceMembers,
+  memberProfiles,
+  users,
+  projects,
+  workspaceDeletions,
+  type Executor,
+} from "@vieroc/db";
 import type { WorkspaceRole } from "@vieroc/types";
 
 export type WorkspaceInsert = typeof workspaces.$inferInsert;
@@ -77,6 +86,44 @@ export async function update(
     .where(eq(workspaces.id, id))
     .returning();
   return row ?? null;
+}
+
+/** WP-D4: hard-delete — cascades members/projects/channels/everything workspace-scoped. */
+export async function remove(id: string, exec: Executor = db): Promise<void> {
+  await exec.delete(workspaces).where(eq(workspaces.id, id));
+}
+
+export async function countMembers(workspaceId: string, exec: Executor = db): Promise<number> {
+  const [row] = await exec
+    .select({ value: count() })
+    .from(workspaceMembers)
+    .where(eq(workspaceMembers.workspaceId, workspaceId));
+  return row?.value ?? 0;
+}
+
+export async function countProjects(workspaceId: string, exec: Executor = db): Promise<number> {
+  const [row] = await exec
+    .select({ value: count() })
+    .from(projects)
+    .where(eq(projects.workspaceId, workspaceId));
+  return row?.value ?? 0;
+}
+
+/** WP-D4: written in the SAME transaction as the workspace delete, into a table
+ *  with no FK to workspaces — so this audit row survives the cascade that
+ *  destroys everything else, including any normal `activity_events` row would. */
+export async function recordWorkspaceDeletion(
+  entry: {
+    workspaceId: string;
+    workspaceName: string;
+    deletedByUserId: string;
+    memberCount: number;
+    projectCount: number;
+    snapshot: Record<string, unknown>;
+  },
+  exec: Executor = db
+): Promise<void> {
+  await exec.insert(workspaceDeletions).values(entry);
 }
 
 export async function listMembers(workspaceId: string, exec: Executor = db) {

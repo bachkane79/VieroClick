@@ -21,6 +21,14 @@ export async function updateWorkspaceAction(args: { workspaceId: string; slug: s
   });
 }
 
+export async function deleteWorkspaceAction(args: { workspaceId: string }) {
+  return runAction(async () => {
+    const result = await service.deleteWorkspace(args.workspaceId);
+    revalidatePath("/dashboard");
+    return result;
+  });
+}
+
 export async function inviteMemberAction(args: { workspaceId: string; slug: string; data: unknown }) {
   return runAction(async () => {
     const res = await service.inviteWorkspaceMember(args.workspaceId, args.data);

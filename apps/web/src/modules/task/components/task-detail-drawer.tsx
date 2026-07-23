@@ -7,6 +7,7 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Button, cn, Input, Textarea } from "@vieroc/ui";
 import { Check, ChevronDown, Download, FileUp, Paperclip, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { uploadTaskAttachmentAction } from "@/modules/file/file.actions";
 import type { TaskAttachmentView } from "@/modules/file/file.view";
 import {
@@ -85,6 +86,7 @@ export function TaskDetailDrawer({
   const router = useRouter();
   const defaultStatusId = initialStatusId ?? statuses[0]?.id ?? "";
   const [submitting, setSubmitting] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [statusId, setStatusId] = useState(defaultStatusId);
@@ -705,6 +707,7 @@ export function TaskDetailDrawer({
                   <div className="grid gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-[minmax(0,1fr)_auto]">
                     <Input
                       type="file"
+                      accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,application/pdf,text/plain,text/csv,application/msword,.docx,application/vnd.ms-excel,.xlsx,application/vnd.ms-powerpoint,.pptx,application/zip,application/json"
                       onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
                       className="bg-background"
                     />
@@ -767,7 +770,7 @@ export function TaskDetailDrawer({
                   <Button
                     type="button"
                     variant="destructive"
-                    onClick={deleteTask}
+                    onClick={() => setConfirmDeleteOpen(true)}
                     disabled={submitting}
                   >
                     Delete
@@ -788,6 +791,15 @@ export function TaskDetailDrawer({
           </form>
         </Dialog.Content>
       </Dialog.Portal>
+      <ConfirmationDialog
+        isOpen={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title="Delete task"
+        description={task ? `Delete "${task.title}"? This can be restored later from the Deleted tasks panel.` : ""}
+        variant="destructive"
+        confirmLabel="Delete"
+        onConfirm={deleteTask}
+      />
     </Dialog.Root>
   );
 }

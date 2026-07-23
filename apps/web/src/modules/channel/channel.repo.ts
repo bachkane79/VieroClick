@@ -114,6 +114,11 @@ export async function createChannel(values: ChannelInsert, exec: Executor = db):
   return row!;
 }
 
+/** WP-D4: hard-delete (no soft-delete for channels) — cascades channelMembers/channelMessages. */
+export async function remove(id: string, exec: Executor = db): Promise<void> {
+  await exec.delete(channels).where(eq(channels.id, id));
+}
+
 export async function addMembers(
   channelId: string,
   memberIds: string[],

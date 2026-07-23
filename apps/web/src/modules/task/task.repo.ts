@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import {
   db,
   projects,
@@ -17,12 +17,35 @@ export type TaskDependencyInsert = typeof taskDependencies.$inferInsert;
 export type TaskDependencyRow = typeof taskDependencies.$inferSelect;
 
 export async function findById(id: string, exec: Executor = db): Promise<TaskRow | null> {
+  const [row] = await exec
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.id, id), isNull(tasks.deletedAt)))
+    .limit(1);
+  return row ?? null;
+}
+
+/** WP-D4: like `findById`, but also returns soft-deleted rows — used only by restore(). */
+export async function findByIdIncludingDeleted(id: string, exec: Executor = db): Promise<TaskRow | null> {
   const [row] = await exec.select().from(tasks).where(eq(tasks.id, id)).limit(1);
   return row ?? null;
 }
 
 export async function listByProject(projectId: string, exec: Executor = db): Promise<TaskRow[]> {
-  return exec.select().from(tasks).where(eq(tasks.projectId, projectId)).orderBy(asc(tasks.position));
+  return exec
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.projectId, projectId), isNull(tasks.deletedAt)))
+    .orderBy(asc(tasks.position));
+}
+
+/** WP-D4: soft-deleted tasks in a project, most recently deleted first — feeds the "Deleted tasks" restore panel. */
+export async function listDeletedByProject(projectId: string, exec: Executor = db): Promise<TaskRow[]> {
+  return exec
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.projectId, projectId), sql`${tasks.deletedAt} IS NOT NULL`))
+    .orderBy(desc(tasks.deletedAt));
 }
 
 export async function listStatuses(projectId: string, exec: Executor = db) {
@@ -119,6 +142,17 @@ export async function update(
 
 export async function remove(id: string, exec: Executor = db): Promise<void> {
   await exec.delete(tasks).where(eq(tasks.id, id));
+}
+
+/** WP-D4: soft-delete — recoverable via `restore`. */
+export async function softDelete(id: string, exec: Executor = db): Promise<TaskRow | null> {
+  const [row] = await exec.update(tasks).set({ deletedAt: new Date() }).where(eq(tasks.id, id)).returning();
+  return row ?? null;
+}
+
+export async function restore(id: string, exec: Executor = db): Promise<TaskRow | null> {
+  const [row] = await exec.update(tasks).set({ deletedAt: null }).where(eq(tasks.id, id)).returning();
+  return row ?? null;
 }
 
 export async function removeDependency(id: string, exec: Executor = db): Promise<void> {
@@ -229,6 +263,12 @@ export async function listByAssigneeWithProject(
     .from(tasks)
     .innerJoin(projects, eq(projects.id, tasks.projectId))
     .innerJoin(taskStatuses, eq(taskStatuses.id, tasks.statusId))
-    .where(and(eq(projects.workspaceId, workspaceId), eq(tasks.assigneeMemberId, assigneeMemberId)))
+    .where(
+      and(
+        eq(projects.workspaceId, workspaceId),
+        eq(tasks.assigneeMemberId, assigneeMemberId),
+        isNull(tasks.deletedAt)
+      )
+    )
     .orderBy(asc(tasks.dueDate), desc(tasks.createdAt));
 }

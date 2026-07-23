@@ -58,6 +58,9 @@ export const projects = pgTable("projects", {
   // stale `version` on PATCH is rejected with a 409 conflict instead of silently
   // overwriting a concurrent edit.
   version: integer("version").notNull().default(1),
+  // WP-D4: soft-delete. Non-null means the project was deleted (recoverable via
+  // restoreProject). Child rows (tasks, statuses, dependencies...) are left as-is.
+  deletedAt: timestamptz("deleted_at"),
 });
 
 export const projectMembers = pgTable(

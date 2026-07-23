@@ -24,6 +24,14 @@ export async function openDmAction(args: { workspaceId: string; slug: string; da
   });
 }
 
+export async function deleteChannelAction(args: { workspaceId: string; channelId: string; slug: string }) {
+  return runAction(async () => {
+    const result = await service.deleteChannel({ workspaceId: args.workspaceId, channelId: args.channelId });
+    revalidatePath(`/workspace/${args.slug}/chat`);
+    return result;
+  });
+}
+
 export async function listChannelMessagesAction(args: {
   workspaceId: string;
   channelId: string;

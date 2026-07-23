@@ -90,6 +90,22 @@ export async function deleteTaskAction(args: BaseArgs & { taskId: string }) {
   });
 }
 
+export async function restoreTaskAction(args: BaseArgs & { taskId: string }) {
+  return runAction(async () => {
+    const task = await service.restoreTask({
+      workspaceId: args.workspaceId,
+      projectId: args.projectId,
+      taskId: args.taskId,
+    });
+    revalidateBoard(args.slug, args.projectId);
+    return task;
+  });
+}
+
+export async function listDeletedTasksAction(args: { workspaceId: string; projectId: string }) {
+  return runAction(() => service.listDeletedTasks(args.workspaceId, args.projectId));
+}
+
 export async function assignTaskAction(args: BaseArgs & { taskId: string; memberId: string | null }) {
   return runAction(async () => {
     const task = await service.assignTask({

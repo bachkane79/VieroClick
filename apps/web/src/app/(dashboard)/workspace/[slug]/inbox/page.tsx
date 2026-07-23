@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getWorkspace } from "@/modules/workspace/workspace.service";
-import { listMyNotifications } from "@/modules/notification/notification.service";
+import { listInbox } from "@/modules/notification/notification.service";
 import { toNotificationView } from "@/modules/notification/notification.view";
 import { InboxClient } from "@/modules/notification/components/inbox-client";
 import { NotFoundError } from "@/server/lib/errors";
@@ -20,7 +20,7 @@ export default async function InboxPage({ params }: Props) {
     throw err;
   }
 
-  const notifications = await listMyNotifications(workspace.id);
+  const notifications = await listInbox(workspace.id, "primary");
 
   return (
     <div className="px-6 py-6">

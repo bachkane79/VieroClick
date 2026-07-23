@@ -93,6 +93,11 @@ export const tasks = pgTable(
     planRef: text("plan_ref"),
     // WP-D3: optimistic concurrency token, see projects.version for the same pattern.
     version: integer("version").notNull().default(1),
+    // WP-D4: soft-delete. Non-null means the task was deleted (recoverable via
+    // restoreTask). Child rows (comments, dependencies, attachments...) are
+    // intentionally left as-is — they become unreachable through the app once
+    // the parent task disappears from every list/find query below.
+    deletedAt: timestamptz("deleted_at"),
   },
   (t) => [
     uniqueIndex("tasks_project_plan_ref_idx")

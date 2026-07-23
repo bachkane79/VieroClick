@@ -722,10 +722,33 @@ export async function deleteTask(p: { workspaceId: string; projectId: string; ta
 
   return db.transaction(async (tx) => {
     await events.taskDeleted(tx, ctx, existing);
-    await repo.remove(p.taskId, tx);
+    await repo.softDelete(p.taskId, tx);
     await invalidateCache(`board:${p.projectId}`);
     return { id: p.taskId };
   });
+}
+
+/** WP-D4: undo a soft-delete. Manager-only, same as delete. */
+export async function restoreTask(p: { workspaceId: string; projectId: string; taskId: string }) {
+  const ctx = await requireActor(p.workspaceId, p.projectId);
+  assertCanManageTasks(ctx);
+
+  const existing = await repo.findByIdIncludingDeleted(p.taskId);
+  if (!existing || existing.projectId !== p.projectId) throw new NotFoundError("Task");
+
+  return db.transaction(async (tx) => {
+    const restored = await repo.restore(p.taskId, tx);
+    if (!restored) throw new NotFoundError("Task");
+    await events.taskRestored(tx, ctx, restored);
+    await invalidateCache(`board:${p.projectId}`);
+    return restored;
+  });
+}
+
+/** WP-D4: soft-deleted tasks in a project, for the "Deleted tasks" restore panel. */
+export async function listDeletedTasks(workspaceId: string, projectId: string) {
+  await requireActor(workspaceId, projectId);
+  return repo.listDeletedByProject(projectId);
 }
 
 /** Diacritic/case-insensitive normalize for fuzzy assignee matching. */

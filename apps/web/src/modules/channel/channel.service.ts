@@ -10,6 +10,7 @@ import {
   assertCanAccessChat,
   assertCanPostMessage,
   assertCanCreateChannel,
+  assertCanManageChannel,
 } from "./channel.policy";
 
 /**
@@ -138,6 +139,21 @@ export async function listMessages(p: { workspaceId: string; channelId: string; 
   assertCanAccessChat(ctx);
   await requireChannelAccess(ctx, p.channelId, p.workspaceId);
   return repo.listMessages(p.channelId, { after: p.after });
+}
+
+/** WP-D4: hard-delete (no restore). Creator or workspace admin/owner only; DMs cannot be deleted this way. */
+export async function deleteChannel(p: { workspaceId: string; channelId: string }) {
+  const ctx = await requireActor(p.workspaceId);
+  assertCanAccessChat(ctx);
+  const channel = await requireChannelAccess(ctx, p.channelId, p.workspaceId);
+  if (channel.type === "dm") throw new ForbiddenError("Direct messages cannot be deleted here");
+  assertCanManageChannel(ctx, channel.createdByMemberId);
+
+  return db.transaction(async (tx) => {
+    await events.channelDeleted(tx, ctx, channel);
+    await repo.remove(p.channelId, tx);
+    return { id: p.channelId };
+  });
 }
 
 export async function sendMessage(p: { workspaceId: string; channelId: string; input: unknown }) {

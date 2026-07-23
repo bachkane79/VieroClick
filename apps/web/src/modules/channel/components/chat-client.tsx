@@ -7,9 +7,12 @@ import { toast } from "sonner";
 import { cn } from "@vieroc/ui";
 import { useLocale } from "@/lib/i18n/client";
 import { t } from "@/lib/i18n/dict";
-import { Hash, MessagesSquare, Plus, SendHorizonal, UserCircle } from "lucide-react";
+import { Hash, MessagesSquare, Plus, SendHorizonal, Trash2, UserCircle } from "lucide-react";
+import { Button } from "@vieroc/ui";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import {
   createChannelAction,
+  deleteChannelAction,
   listChannelMessagesAction,
   openDmAction,
   sendChannelMessageAction,
@@ -69,6 +72,18 @@ export function ChatClient({
   const [sending, setSending] = useState(false);
   const [creatingChannel, setCreatingChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
+  const [confirmDeleteChannel, setConfirmDeleteChannel] = useState(false);
+
+  async function handleDeleteChannel() {
+    const result = await deleteChannelAction({ workspaceId, channelId: channel.id, slug });
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success("Channel deleted");
+    router.push(`/workspace/${slug}/chat`);
+    router.refresh();
+  }
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastCreatedAt = useRef<string | null>(
     initialMessages.length > 0 ? initialMessages[initialMessages.length - 1]!.createdAt : null
@@ -296,7 +311,28 @@ export function ChatClient({
               {channel.topic}
             </span>
           )}
+          {channel.type !== "dm" && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Delete channel"
+              className="ml-auto h-7 w-7 text-muted-foreground hover:text-destructive"
+              onClick={() => setConfirmDeleteChannel(true)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </header>
+        <ConfirmationDialog
+          isOpen={confirmDeleteChannel}
+          onOpenChange={setConfirmDeleteChannel}
+          title="Delete channel"
+          description={`Delete #${channel.displayName}? Messages cannot be recovered.`}
+          variant="destructive"
+          confirmLabel="Delete"
+          onConfirm={handleDeleteChannel}
+        />
 
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
           {timeline.length === 0 && (

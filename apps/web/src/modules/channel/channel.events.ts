@@ -23,3 +23,18 @@ export async function channelCreated(
     after: { name: channel.name, type: channel.type },
   });
 }
+
+/** WP-D4: `channel` carries the full row for a complete before-snapshot (hard-delete, no restore). */
+export async function channelDeleted(
+  exec: Executor,
+  ctx: ActorContext,
+  channel: { id: string; name: string; type: string }
+): Promise<void> {
+  await recordEvent(exec, {
+    ...actorFields(ctx),
+    entityType: "channel",
+    entityId: channel.id,
+    eventType: "channel.deleted",
+    before: { ...channel },
+  });
+}

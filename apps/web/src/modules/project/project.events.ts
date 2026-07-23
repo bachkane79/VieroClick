@@ -34,3 +34,27 @@ export function projectUpdated(
     after,
   });
 }
+
+/** WP-D4: `project` carries the full row (caller passes the loaded entity) so
+ *  the audit trail has a complete before-snapshot even though the delete is soft. */
+export function projectDeleted(exec: Executor, ctx: ActorContext, project: ProjectLike) {
+  return recordEvent(exec, {
+    ...actorFields(ctx),
+    projectId: project.id,
+    entityType: "project",
+    entityId: project.id,
+    eventType: "project.deleted",
+    before: { ...project },
+  });
+}
+
+export function projectRestored(exec: Executor, ctx: ActorContext, project: ProjectLike) {
+  return recordEvent(exec, {
+    ...actorFields(ctx),
+    projectId: project.id,
+    entityType: "project",
+    entityId: project.id,
+    eventType: "project.restored",
+    after: { name: project.name },
+  });
+}

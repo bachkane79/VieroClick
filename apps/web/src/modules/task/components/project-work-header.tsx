@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { CalendarDays, GanttChartSquare, KanbanSquare, ListChecks, Table2 } from "lucide-react";
 import type { Locale } from "@/lib/i18n/dict";
 
@@ -39,11 +40,13 @@ export function ProjectWorkHeader({
   projectName,
   taskCount,
   locale,
+  actions,
 }: {
   view: WorkView;
   projectName: string;
   taskCount: number;
   locale: Locale;
+  actions?: ReactNode;
 }) {
   const meta = VIEW_META[view];
   const Icon = meta.icon;
@@ -67,6 +70,7 @@ export function ProjectWorkHeader({
           </p>
         </div>
       </div>
+      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
     </header>
   );
 }

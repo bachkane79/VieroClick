@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { TaskBoard } from "@/modules/task/components/task-board";
 import { ProjectWorkHeader } from "@/modules/task/components/project-work-header";
+import { DeletedTasksPanel } from "@/modules/task/components/deleted-tasks-panel";
 import { loadProjectViewData } from "@/modules/task/task-page-data";
 import { NotFoundError } from "@/server/lib/errors";
 import { getLocale } from "@/lib/i18n/server";
@@ -28,6 +29,9 @@ export default async function ProjectBoardPage({ params }: Props) {
         projectName={data.project.name}
         taskCount={data.tasks.length}
         locale={locale}
+        actions={
+          <DeletedTasksPanel workspaceId={data.workspace.id} workspaceSlug={slug} projectId={projectId} />
+        }
       />
       <div className="min-h-0 flex-1">
         <TaskBoard

@@ -14,7 +14,29 @@ import { assertCanContribute } from "./file.policy";
 import * as events from "./file.events";
 import * as repo from "./file.repo";
 
-const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
+export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
+
+/** WP-D6: MIME whitelist — enforced on BOTH write paths (uploadAndAttachToTask
+ *  and registerFile). Before this, registerFile trusted client-supplied
+ *  mimeType/sizeBytes with zero validation — the actual security gap. */
+export const ALLOWED_MIME_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "image/svg+xml",
+  "application/pdf",
+  "text/plain",
+  "text/csv",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/zip",
+  "application/json",
+]);
 
 async function getTaskInProject(taskId: string, projectId: string) {
   const task = await taskRepo.findById(taskId);
@@ -22,10 +44,35 @@ async function getTaskInProject(taskId: string, projectId: string) {
   return task;
 }
 
+/** WP-D6: single validation gate for file metadata, used by every write path
+ *  (upload with real bytes, or register-by-reference) so neither can bypass
+ *  the size/MIME rules the other one enforces. */
+export function assertUploadableMeta(meta: { sizeBytes: number | null | undefined; mimeType: string | null | undefined }) {
+  if (!meta.sizeBytes || meta.sizeBytes <= 0) throw new ValidationError("Choose a file to upload");
+  if (meta.sizeBytes > MAX_FILE_SIZE_BYTES) throw new ValidationError("File must be 25 MB or smaller");
+  if (!meta.mimeType || !ALLOWED_MIME_TYPES.has(meta.mimeType)) {
+    throw new ValidationError(`File type "${meta.mimeType ?? "unknown"}" is not allowed`);
+  }
+}
+
 function assertUploadableFile(file: File) {
-  if (!file.name || file.size === 0) throw new ValidationError("Choose a file to upload");
-  if (file.size > MAX_FILE_SIZE_BYTES) {
-    throw new ValidationError("File must be 25 MB or smaller");
+  if (!file.name) throw new ValidationError("Choose a file to upload");
+  assertUploadableMeta({ sizeBytes: file.size, mimeType: file.type });
+}
+
+/** WP-D6: per-workspace storage cap. Overridable via env for testing (see
+ *  test-wp-d6-file-hardening.ts, which sets a low quota to exercise the guard
+ *  without uploading gigabytes of test data). */
+export function getWorkspaceQuotaBytes(): number {
+  const mb = Number(process.env.WORKSPACE_STORAGE_QUOTA_MB);
+  return Number.isFinite(mb) && mb > 0 ? mb * 1024 * 1024 : 5 * 1024 * 1024 * 1024; // default 5GB
+}
+
+export async function assertWithinWorkspaceQuota(workspaceId: string, incomingBytes: number) {
+  const quota = getWorkspaceQuotaBytes();
+  const used = await repo.sumSizeByWorkspace(workspaceId);
+  if (used + incomingBytes > quota) {
+    throw new ValidationError("Workspace storage quota exceeded");
   }
 }
 
@@ -34,6 +81,8 @@ export async function registerFile(p: { workspaceId: string; input: unknown }) {
   const data = registerFileSchema.parse(p.input);
   const ctx = await requireActor(p.workspaceId);
   assertCanContribute(ctx);
+  assertUploadableMeta({ sizeBytes: data.sizeBytes, mimeType: data.mimeType });
+  await assertWithinWorkspaceQuota(ctx.workspaceId, data.sizeBytes ?? 0);
 
   return db.transaction(async (tx) => {
     const file = await repo.createFile(
@@ -64,6 +113,7 @@ export async function uploadAndAttachToTask(p: {
   const ctx = await requireActor(p.workspaceId, p.projectId);
   assertCanContribute(ctx);
   assertUploadableFile(p.file);
+  await assertWithinWorkspaceQuota(ctx.workspaceId, p.file.size);
   const task = await getTaskInProject(p.taskId, p.projectId);
   const stored = await putLocalFileObject(ctx.workspaceId, p.file);
 

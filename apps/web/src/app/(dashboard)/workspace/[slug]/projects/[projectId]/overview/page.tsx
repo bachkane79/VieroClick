@@ -11,6 +11,7 @@ import {
   AiLeaderBanner,
   AiLeaderSettingsMenu,
 } from "@/modules/project/components/ai-leader-controls";
+import { DeleteProjectButton } from "@/modules/project/components/delete-project-button";
 import { Target } from "lucide-react";
 import { NotFoundError } from "@/server/lib/errors";
 import { ShareDialog } from "@/modules/permission/components/share-dialog";
@@ -112,6 +113,12 @@ export default async function ProjectOverviewPage({ params }: Props) {
             projectId={projectId}
             slug={slug}
             aiEnabled={project.aiEnabled}
+          />
+          <DeleteProjectButton
+            workspaceId={workspace.id}
+            projectId={projectId}
+            slug={slug}
+            projectName={project.name}
           />
           <Link
             href={`/workspace/${slug}/projects/${projectId}/tasks`}

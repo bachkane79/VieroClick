@@ -10,6 +10,8 @@ export interface NotificationView {
   entityId: string | null;
   isRead: boolean;
   createdAt: string;
+  category: "primary" | "other";
+  snoozedUntil: string | null;
 }
 
 export function toNotificationView(row: NotificationRow): NotificationView {
@@ -23,6 +25,8 @@ export function toNotificationView(row: NotificationRow): NotificationView {
     entityId: row.entityId,
     isRead: row.isRead,
     createdAt: row.createdAt.toISOString(),
+    category: row.category === "primary" ? "primary" : "other",
+    snoozedUntil: row.snoozedUntil ? row.snoozedUntil.toISOString() : null,
   };
 }
 

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull, lt, sum } from "drizzle-orm";
 import { db, files, taskAttachments, tasks, type Executor } from "@vieroc/db";
 
 export type FileInsert = typeof files.$inferInsert;
@@ -74,4 +74,28 @@ export async function attach(
 
 export async function removeAttachment(id: string, exec: Executor = db): Promise<void> {
   await exec.delete(taskAttachments).where(eq(taskAttachments.id, id));
+}
+
+/** WP-D6: total bytes stored for a workspace — the quota check's usage side. */
+export async function sumSizeByWorkspace(workspaceId: string, exec: Executor = db): Promise<number> {
+  const [row] = await exec
+    .select({ total: sum(files.sizeBytes) })
+    .from(files)
+    .where(eq(files.workspaceId, workspaceId));
+  return Number(row?.total ?? 0);
+}
+
+/** WP-D6: files with no `task_attachments` row, older than the grace period —
+ *  candidates for the orphan-cleanup cron. The grace period avoids deleting a
+ *  file that was just uploaded but hasn't been attached yet (e.g. mid-request). */
+export async function listOrphanFiles(olderThan: Date, exec: Executor = db) {
+  return exec
+    .select({ id: files.id, storageKey: files.storageKey, createdAt: files.createdAt })
+    .from(files)
+    .leftJoin(taskAttachments, eq(taskAttachments.fileId, files.id))
+    .where(and(isNull(taskAttachments.id), lt(files.createdAt, olderThan)));
+}
+
+export async function removeFile(id: string, exec: Executor = db): Promise<void> {
+  await exec.delete(files).where(eq(files.id, id));
 }

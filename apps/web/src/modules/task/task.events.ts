@@ -64,7 +64,19 @@ export function taskDeleted(exec: Executor, ctx: ActorContext, task: TaskLike) {
     entityType: "task",
     entityId: task.id,
     eventType: "task.deleted",
-    before: { title: task.title },
+    // WP-D4: full before-snapshot (not just title) so the audit trail is
+    // useful even though the row itself is only soft-deleted, not gone.
+    before: { ...task },
+  });
+}
+
+export function taskRestored(exec: Executor, ctx: ActorContext, task: TaskLike) {
+  return recordEvent(exec, {
+    ...actorFields(ctx),
+    entityType: "task",
+    entityId: task.id,
+    eventType: "task.restored",
+    after: { title: task.title },
   });
 }
 

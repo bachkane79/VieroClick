@@ -1,6 +1,25 @@
 import { notifications, type Executor } from "@vieroc/db";
 import { notifyWorkspaceBot } from "@/modules/telegram/telegram.notify";
 
+/** WP-D5: Primary = directly actionable/addressed-to-me events; everything
+ *  else defaults to Other (broadcast/informational). Computed once at insert
+ *  time so a later mapping change never retroactively reclassifies old rows. */
+const PRIMARY_TYPES = new Set([
+  "task.assigned",
+  "task.review_requested",
+  "task.approved",
+  "task.rework_requested",
+  "blocker.assigned",
+  "comment.assigned",
+  "comment.mention",
+  "decision.created",
+  "resource.shared",
+]);
+
+export function categorizeType(type: string): "primary" | "other" {
+  return PRIMARY_TYPES.has(type) ? "primary" : "other";
+}
+
 export interface NotificationInput {
   workspaceId: string;
   recipientMemberId: string;
@@ -40,6 +59,7 @@ export async function enqueueNotifications(
       entityType: n.entityType ?? null,
       entityId: n.entityId ?? null,
       metadata: n.metadata ?? {},
+      category: categorizeType(n.type),
     }))
   );
 
