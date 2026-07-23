@@ -1,7 +1,7 @@
 /**
  * Agent Service Authentication
  *
- * Validates requests from Band AI agents using a static Bearer token.
+ * Validates requests from the agent-api service using a static Bearer token.
  * Token must match the AGENT_API_SECRET environment variable.
  *
  * Usage:

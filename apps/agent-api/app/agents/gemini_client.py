@@ -6,8 +6,7 @@ Replaces the previous OpenAI client. Exposes small async helpers instead of the
 OpenAI chat/embeddings surface so call sites stay simple.
 
 LLM calls retry with exponential backoff + jitter on transient rate-limit /
-overload errors (429, RESOURCE_EXHAUSTED, quota, 503, overloaded). This retry
-loop was consolidated from the former band-agents/shared/llm.py so both the
+overload errors (429, RESOURCE_EXHAUSTED, quota, 503, overloaded), so both the
 scheduled and interactive agent paths get the same resilience.
 """
 import asyncio

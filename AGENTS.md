@@ -7,7 +7,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 pnpm monorepo (Turborepo) with two apps and five shared packages:
 
 - `apps/web` — Next.js 15 App Router (TypeScript)
-- `apps/agent-api` — Python 3.11 FastAPI + Celery worker; the single agent service. Hosts the 6 agent roles (`app/agents/roles/`), the Celery worker/beat rhythms, and the sync dispatch route `POST /api/agents/{role}`. (Band.ai and the former standalone `band-agents/` service have been removed; their agent logic was consolidated here.)
+- `apps/agent-api` — Python 3.11 FastAPI + Celery worker; the single agent service. Hosts the 6 agent roles (`app/agents/roles/`), the Celery worker/beat rhythms, and the sync dispatch route `POST /api/agents/{role}`.
 - `packages/db` — Drizzle ORM schema + Neon client (shared by web)
 - `packages/types` — shared TypeScript interfaces
 - `packages/validators` — shared Zod schemas
@@ -104,7 +104,7 @@ FastAPI docs available at `http://localhost:8000/docs` only when `DEBUG=true`.
 
 ### Agent roles (inside `apps/agent-api`)
 
-> Band.ai and the standalone `band-agents/` service have been removed. The six agent roles (planning, assignment, observer, daily_report, morning_briefing, project_qa) now live in `apps/agent-api/app/agents/roles/` and are dispatched **synchronously** via `POST /api/agents/{role}` — no separate :8001 process, no cross-service hop. All LLM calls go to the company **Gemini API** (`gemini-2.5-flash`; the planner uses `gemini-2.5-pro`) through `app/agents/gemini_client.py`, which retries transient rate-limit/overload errors.
+> The six agent roles (planning, assignment, observer, daily_report, morning_briefing, project_qa) live in `apps/agent-api/app/agents/roles/` and are dispatched **synchronously** via `POST /api/agents/{role}` — no separate :8001 process, no cross-service hop. All LLM calls go to the company **Gemini API** (`gemini-2.5-flash`; the planner uses `gemini-2.5-pro`) through `app/agents/gemini_client.py`, which retries transient rate-limit/overload errors.
 
 Each role is a self-fetching `async def run(project_id, payload) -> dict`: it reads live state from the web `GET /api/project-data` and submits results back through the REST API (`app/agents/vieroc_client.py`) — never the DB directly. Run the service with the `uvicorn`/`celery` commands in the agent-api section above; config comes from the same `.env` (`GEMINI_API_KEY`, `VIEROC_API_URL`/`VIEROC_API_KEY`).
 
@@ -201,7 +201,7 @@ Next.js calls the Python service only for AI jobs (planning, assignment, report 
 
 The 6 agent roles live in `apps/agent-api/app/agents/roles/` and read/write project state only over HTTP — not the DB directly. Each reads live state from `GET /api/project-data` (authenticated with `VIEROC_API_KEY`) and submits suggestions/actions back through the same REST API. `apps/agent-api/app/agents/vieroc_client.py` wraps these calls.
 
-Band.ai is gone: the 6 roles (planning, assignment, observer, daily_report, morning_briefing, project_qa) are plain `async def run(project_id, payload) -> dict` callables registered in `app/agents/roles/__init__.py` (`AGENT_RUNNERS`). Each is invoked **synchronously** via `POST /api/agents/{role}` (`app/api/routes/agents.py`) and returns a structured JSON result — normal request/response I/O. Inter-agent orchestration is driven by the web layer: creating a project dispatches `planning`; `apply-plan` dispatches `assignment`; `triggerObserver`/deviation handling dispatch `observer` (the cron path enters via the secret-authed `POST /api/agent/trigger-observer` web route, which dispatches `observer` with a valid dispatch record). All reasoning uses the company Gemini API via `app/agents/gemini_client.py`.
+The 6 roles (planning, assignment, observer, daily_report, morning_briefing, project_qa) are plain `async def run(project_id, payload) -> dict` callables registered in `app/agents/roles/__init__.py` (`AGENT_RUNNERS`). Each is invoked **synchronously** via `POST /api/agents/{role}` (`app/api/routes/agents.py`) and returns a structured JSON result — normal request/response I/O. Inter-agent orchestration is driven by the web layer: creating a project dispatches `planning`; `apply-plan` dispatches `assignment`; `triggerObserver`/deviation handling dispatch `observer` (the cron path enters via the secret-authed `POST /api/agent/trigger-observer` web route, which dispatches `observer` with a valid dispatch record). All reasoning uses the company Gemini API via `app/agents/gemini_client.py`.
 
 The web app's `apps/web/src/server/lib/agent-dispatch.ts` (`dispatchAgent`) POSTs directly to `{AGENT_API_URL}/api/agents/{role}` with the `X-Api-Secret` header. This is separate from the async Celery job path (`POST /api/jobs/` → poll `GET /api/jobs/{id}`) used by `agent-job.service.ts`.
 

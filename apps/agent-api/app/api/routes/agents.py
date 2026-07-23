@@ -8,8 +8,7 @@ planning, assignment, and observer; the automated rhythms run via Celery Beat.
     POST /api/agents/{role}
     body: { projectId, payload?, message?, question?, senderRole?, targetRole? }
 
-Consolidated from the former band-agents server.py — agent-api is now the single
-agent process, so there is no cross-service HTTP hop to :8001.
+agent-api is the single agent process, so there is no cross-service HTTP hop.
 """
 import logging
 

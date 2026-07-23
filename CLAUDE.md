@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 pnpm monorepo (Turborepo) with two apps and five shared packages:
 
 - `apps/web` — Next.js 15 App Router (TypeScript)
-- `apps/agent-api` — Python 3.11 FastAPI + Celery worker; the single agent service. Hosts the 6 agent roles (`app/agents/roles/`), the Celery worker/beat rhythms, and the sync dispatch route `POST /api/agents/{role}`. (Band.ai and the former standalone `band-agents/` service have been removed; their agent logic was consolidated here.)
+- `apps/agent-api` — Python 3.11 FastAPI + Celery worker; the single agent service. Hosts the 6 agent roles (`app/agents/roles/`), the Celery worker/beat rhythms, and the sync dispatch route `POST /api/agents/{role}`.
 - `packages/db` — Drizzle ORM schema + Neon client (shared by web)
 - `packages/types` — shared TypeScript interfaces
 - `packages/validators` — shared Zod schemas
@@ -104,7 +104,7 @@ FastAPI docs available at `http://localhost:8000/docs` only when `DEBUG=true`.
 
 ### Agent roles (inside `apps/agent-api`)
 
-> Band.ai and the standalone `band-agents/` service have been removed. The six agent roles (planning, assignment, observer, daily_report, morning_briefing, project_qa) now live in `apps/agent-api/app/agents/roles/` and are dispatched **synchronously** via `POST /api/agents/{role}` — no separate :8001 process, no cross-service hop. All LLM calls go to the company **Gemini API** (`gemini-2.5-flash`; the planner uses `gemini-2.5-pro`) through `app/agents/gemini_client.py`, which retries transient rate-limit/overload errors.
+> The six agent roles (planning, assignment, observer, daily_report, morning_briefing, project_qa) live in `apps/agent-api/app/agents/roles/` and are dispatched **synchronously** via `POST /api/agents/{role}` — no separate :8001 process, no cross-service hop. All LLM calls go to the company **Gemini API** (`gemini-2.5-flash`; the planner uses `gemini-2.5-pro`) through `app/agents/gemini_client.py`, which retries transient rate-limit/overload errors.
 
 Each role is a self-fetching `async def run(project_id, payload) -> dict`: it reads live state from the web `GET /api/project-data` and submits results back through the REST API (`app/agents/vieroc_client.py`) — never the DB directly. Run the service with the `uvicorn`/`celery` commands in the agent-api section above; config comes from the same `.env` (`GEMINI_API_KEY`, `VIEROC_API_URL`/`VIEROC_API_KEY`).
 
@@ -125,7 +125,8 @@ Key variables (see `.env.example` for the full list):
 
 | Variable | Used by |
 |---|---|
-| `DATABASE_URL` | web, agent-api (postgres URL with `sslmode=require`) |
+| `DATABASE_URL` | web, agent-api (postgres URL with `sslmode=require`) — the DB **owner** connection, bypasses RLS |
+| `DATABASE_APP_URL` | web (**required** for `withActor()`/`scopedDb()` — the least-privilege `app_runtime` RLS connection). Missing → every RLS-scoped page throws. Generate with `node packages/db/scripts/setup-rls-role.mjs`; set it in every deploy env too. See §RLS runtime below |
 | `AUTH_SECRET` / `NEXTAUTH_URL` | web auth |
 | `AGENT_API_URL` / `AGENT_API_SECRET` | web → agent-api calls |
 | `REDIS_URL` | agent-api Celery broker/backend |
@@ -141,6 +142,8 @@ Key variables (see `.env.example` for the full list):
 SQL migrations in `packages/db/migrations/` are the **single source of truth** for the schema. The Drizzle schema (`packages/db/src/schema/`) must match the SQL. The Python service reads the same Postgres database using raw SQLAlchemy — it never uses Drizzle.
 
 Migration gotcha: `migrations/meta/_journal.json` is what `pnpm db:migrate` actually replays, and it tracks only two entries — the `0000_previous_ultimates` baseline and `0001_premium_gamora` (dead-letter, telegram tables, `agent_autonomy`/`agent_confidence_threshold` on projects, comment threads). The other named `.sql` files in that dir (`0000_initial_schema.sql` and `0001_notifications`–`0006_telegram_pending_actions`) are legacy, un-journaled history — `db:migrate` won't apply them. For dev, `pnpm db:push` reconciles the live Neon DB to the Drizzle schema directly. Regenerate via `pnpm db:generate` after schema edits rather than hand-editing the journal.
+
+Because the shared Neon DB is managed via `db:push` (not `db:migrate`), its `drizzle.__drizzle_migrations` tracking table is **empty** — `db:migrate` would try to replay from `0000` and fail. Consequently, migrations that create **roles or RLS policies** (`0005_wp_c6_rls_foundation.sql` — the `app_runtime` role + `ENABLE ROW LEVEL SECURITY` on ~17 tables) are **not** applied by `db:push` (it only syncs tables/columns). Apply that SQL directly against the owner connection, then run `node packages/db/scripts/setup-rls-role.mjs` to set the role password and write `DATABASE_APP_URL`. The DB is a single shared Neon instance (no dev branch) — DB commands are guarded and require `ALLOW_PROD_MIGRATION=1`.
 
 The `timestamptz` column helper lives in `packages/db/src/schema/_helpers.ts` because Drizzle has no native `timestamptz` builder. All schema files import it from there; never from `drizzle-orm/pg-core`.
 
@@ -166,7 +169,15 @@ Authorization has two layers that compose:
 1. **Coarse role predicates** (`server/lib/permissions.ts`, e.g. `isWorkspaceAdmin`, `isProjectManager`, `isReadOnly`) — the original §4.2 model, keyed off `workspaceRole` × `projectRole` from `requireActor`. `.policy.ts` files wrap these in `assert*` helpers via `requirePermission(...)`. This is what almost every existing module still enforces.
 2. **Fine-grained per-item grants** — the "Hybrid" ClickUp-style layer (new `permission/` module + `packages/db/src/schema/permissions.ts`). Four levels ranked `full > edit > comment > view`. `permission.access.ts#resolveEffectiveLevel(ctx, resource)` is the resolver, first-match-wins: creator → `full`; workspace owner/admin → `full`; explicit `permission_grants` row (personal `member` grant over `team` grant, most-specific scope, highest level; grants inherit `task/doc ← project`); private item w/o grant → no access; `guest` w/o grant → no access; else `roleDefaultLevel(ctx)`. `assertLevel(ctx, resource, required)` throws `ForbiddenError` below `required`.
 
-Layer 2 is **additive and not yet wired into existing policies** — it maps ClickUp Space/List ≈ project, Task ≈ task, Doc ≈ doc onto the existing `workspace → project → task` hierarchy (no separate Space/Folder tree). Schema (enums + `teams`/`team_members`/`permission_grants`), the `guest` workspace role, and `PermissionLevel` are migrated; `projects.is_private` is **deliberately deferred** (adding a column to a `.select()`-ed table breaks reads until the migration lands — see the comment in `projects.ts`). Teams are directories only — membership confers no access; a `team`-subject grant does. When adding per-item sharing to a module, resolve/assert via the `permission` module rather than adding new coarse predicates.
+Layer 2 is **additive and not yet wired into existing policies** — it maps ClickUp Space/List ≈ project, Task ≈ task, Doc ≈ doc onto the existing `workspace → project → task` hierarchy (no separate Space/Folder tree). Schema (enums + `teams`/`team_members`/`permission_grants`), the `guest` workspace role, and `PermissionLevel` are migrated; `projects.is_private` is now applied in **both** the Drizzle schema and the DB (they must move together — adding the column to a `.select()`-ed table breaks every projects read until the DB has it, which is exactly what happens if `db:push` is skipped). Teams are directories only — membership confers no access; a `team`-subject grant does. When adding per-item sharing to a module, resolve/assert via the `permission` module rather than adding new coarse predicates.
+
+### RLS runtime (§WP-C6) — defense-in-depth at the DB
+
+On top of the two app-layer permission layers, a Postgres **row-level-security** layer scopes queries at the DB. It has a hard runtime dependency that is easy to miss:
+
+- The default `db` client (`client.ts`) connects as the DB **owner**, which bypasses RLS — every legacy repo/service call keeps working unchanged. System/cron paths (secret-authed) intentionally use this and are not RLS-scoped.
+- `withActor(userId, fn)` / `scopedDb()` open one transaction on the least-privilege **`app_runtime`** role and `SET LOCAL app.user_id`, so RLS policies scope every query inside. This path **requires `DATABASE_APP_URL`** (+ the `app_runtime` role + migration `0005` applied). If `DATABASE_APP_URL` is unset, `createAppRuntimeDb()` throws — surfacing as a generic server-side exception (digest) on the page.
+- `context.ts#requireScopedActor(workspaceId, projectId?, fn)` is the RLS-scoped counterpart of `requireActor` — it runs `fn(ctx, exec)` inside `withActor` and you thread `exec` to repo calls. Migrating a module to RLS means switching `requireActor` → `requireScopedActor`. The workspace-overview path is already migrated, so **any authenticated workspace page hits this** — the env var is not optional in practice, and every deploy environment must set it. Verify DB state with `packages/db/scripts/verify-rls-setup.mjs`.
 
 ### The mandatory mutation flow (§4.3)
 
@@ -201,7 +212,7 @@ Next.js calls the Python service only for AI jobs (planning, assignment, report 
 
 The 6 agent roles live in `apps/agent-api/app/agents/roles/` and read/write project state only over HTTP — not the DB directly. Each reads live state from `GET /api/project-data` (authenticated with `VIEROC_API_KEY`) and submits suggestions/actions back through the same REST API. `apps/agent-api/app/agents/vieroc_client.py` wraps these calls.
 
-Band.ai is gone: the 6 roles (planning, assignment, observer, daily_report, morning_briefing, project_qa) are plain `async def run(project_id, payload) -> dict` callables registered in `app/agents/roles/__init__.py` (`AGENT_RUNNERS`). Each is invoked **synchronously** via `POST /api/agents/{role}` (`app/api/routes/agents.py`) and returns a structured JSON result — normal request/response I/O. Inter-agent orchestration is driven by the web layer: creating a project dispatches `planning`; `apply-plan` dispatches `assignment`; `triggerObserver`/deviation handling dispatch `observer` (the cron path enters via the secret-authed `POST /api/agent/trigger-observer` web route, which dispatches `observer` with a valid dispatch record). All reasoning uses the company Gemini API via `app/agents/gemini_client.py`.
+The 6 roles (planning, assignment, observer, daily_report, morning_briefing, project_qa) are plain `async def run(project_id, payload) -> dict` callables registered in `app/agents/roles/__init__.py` (`AGENT_RUNNERS`). Each is invoked **synchronously** via `POST /api/agents/{role}` (`app/api/routes/agents.py`) and returns a structured JSON result — normal request/response I/O. Inter-agent orchestration is driven by the web layer: creating a project dispatches `planning`; `apply-plan` dispatches `assignment`; `triggerObserver`/deviation handling dispatch `observer` (the cron path enters via the secret-authed `POST /api/agent/trigger-observer` web route, which dispatches `observer` with a valid dispatch record). All reasoning uses the company Gemini API via `app/agents/gemini_client.py`.
 
 The web app's `apps/web/src/server/lib/agent-dispatch.ts` (`dispatchAgent`) POSTs directly to `{AGENT_API_URL}/api/agents/{role}` with the `X-Api-Secret` header. This is separate from the async Celery job path (`POST /api/jobs/` → poll `GET /api/jobs/{id}`) used by `agent-job.service.ts`.
 
