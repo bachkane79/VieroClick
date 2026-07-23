@@ -1,17 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { cn } from "@vieroc/ui";
 import { CreateWorkspaceDialog } from "@/modules/workspace/components/create-workspace-dialog";
 import { CreateOrganizationDialog } from "@/modules/organization/components/create-organization-dialog";
-import { unreadCountAction } from "@/modules/notification/notification.actions";
 import { useLocale } from "@/lib/i18n/client";
 import { t } from "@/lib/i18n/dict";
-import { useDock } from "./use-dock";
-import { Bell, Building2, ChevronsUpDown, HelpCircle, Plus, Search, Sparkles } from "lucide-react";
+import { Building2, ChevronsUpDown, Plus, Search } from "lucide-react";
 
 interface Props {
   workspaces: Array<{ id: string; name: string; slug: string; organizationId: string | null }>;
@@ -19,45 +17,28 @@ interface Props {
 }
 
 /**
- * Global top bar (redesign §10.1). Owns the workspace switcher, command
- * search and a small macOS-Dock action cluster (notifications, Ask AI, Help).
- * Filter, sort and view controls never live here — they belong to the surface
- * toolbar; global create lives on the panel +.
+ * Global top bar (redesign §10.1). Owns only the workspace switcher and the
+ * command search — the two things that are genuinely global and have no home
+ * on the rail. The old action cluster (Inbox / Ask AI / Help) was removed: it
+ * duplicated the sidebar rail (Inbox + My Tasks are dedicated rail icons; AI is
+ * a rail tab + per-project view) and search itself (Help just re-opened this
+ * palette). Filter/sort/view controls belong to the surface toolbar; global
+ * create lives on the sidebar panel header.
  */
 export function TopBar({ workspaces, organizations }: Props) {
   const params = useParams() as { slug?: string; projectId?: string };
   const locale = useLocale();
   const [wsDialog, setWsDialog] = useState(false);
   const [orgDialog, setOrgDialog] = useState(false);
-  const [unread, setUnread] = useState(0);
-  const dock = useDock(3, "x", { radius: 68, max: 0.5, shift: 8 });
 
   const activeWorkspace = workspaces.find((w) => w.slug === params.slug) ?? workspaces[0];
   const activeOrg = organizations.find((o) => o.id === activeWorkspace?.organizationId) ?? null;
-  const wsBase = activeWorkspace ? `/workspace/${activeWorkspace.slug}` : "";
-  const askAiHref = params.projectId
-    ? `${wsBase}/projects/${params.projectId}/ai`
-    : `${wsBase}/projects`;
-
-  useEffect(() => {
-    if (!activeWorkspace) return;
-    let cancelled = false;
-    unreadCountAction({ workspaceId: activeWorkspace.id }).then((res) => {
-      if (!cancelled && res.ok) setUnread(res.data);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeWorkspace?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function openCommand() {
     window.dispatchEvent(new Event("vc:open-command"));
   }
 
   const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
-
-  const dockCls =
-    "relative grid h-8 w-8 place-items-center rounded-md text-text-secondary transition-[transform,background-color,color] duration-100 ease-out hover:bg-surface-hover hover:text-foreground";
 
   return (
     <header className="relative z-30 flex h-12 shrink-0 items-center gap-3 border-b border-border bg-surface px-3">
@@ -145,49 +126,6 @@ export function TopBar({ workspaces, organizations }: Props) {
           {isMac ? "⌘" : "Ctrl"} K
         </kbd>
       </button>
-
-      {/* macOS-Dock action cluster — icons magnify on hover and rise from the
-          bar (moved here from the rail so the primary nav stays stable). */}
-      <div
-        ref={dock.containerRef as React.RefObject<HTMLDivElement>}
-        onMouseMove={dock.onMove}
-        onMouseLeave={dock.onLeave}
-        className="ml-auto flex items-center gap-1"
-      >
-        <Link
-          ref={dock.setItemRef(0)}
-          style={dock.style(0)}
-          href={activeWorkspace ? `${wsBase}/inbox` : "/dashboard"}
-          title={t(locale, "sb.inbox")}
-          className={cn(dockCls, !activeWorkspace && "pointer-events-none opacity-40")}
-        >
-          <Bell className="h-[18px] w-[18px]" />
-          {unread > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
-              {unread > 9 ? "9+" : unread}
-            </span>
-          )}
-        </Link>
-        <Link
-          ref={dock.setItemRef(1)}
-          style={dock.style(1)}
-          href={activeWorkspace ? askAiHref : "/dashboard"}
-          title={t(locale, "tb.askAi")}
-          className={cn(dockCls, "text-ai hover:bg-ai/10 hover:text-ai", !activeWorkspace && "pointer-events-none opacity-40")}
-        >
-          <Sparkles className="h-[18px] w-[18px]" />
-        </Link>
-        <button
-          ref={dock.setItemRef(2)}
-          style={dock.style(2)}
-          type="button"
-          onClick={openCommand}
-          title={t(locale, "sb.help")}
-          className={dockCls}
-        >
-          <HelpCircle className="h-[18px] w-[18px]" />
-        </button>
-      </div>
 
       <CreateWorkspaceDialog open={wsDialog} onOpenChange={setWsDialog} />
       <CreateOrganizationDialog open={orgDialog} onOpenChange={setOrgDialog} />
