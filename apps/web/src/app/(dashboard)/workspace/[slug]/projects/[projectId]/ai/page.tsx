@@ -32,23 +32,19 @@ export default async function ProjectAiPage({ params }: Props) {
   }));
 
   return (
-    <div className="px-6 py-6 space-y-6">
-      <div>
-        <h2 className="text-lg font-bold tracking-tight">AI Virtual Project Manager</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Ask questions, audit project risks, and apply automated planning roadmap recommendations
-        </p>
+    <div className="mx-auto max-w-[1240px] px-4 py-5 lg:px-6">
+      {/* Giant Unified White Shell Container */}
+      <div className="rounded-3xl border border-border bg-surface p-5 sm:p-6 shadow-soft">
+        <AiViewClient
+          workspaceId={workspace.id}
+          projectId={projectId}
+          workspaceSlug={slug}
+          initialSuggestions={adaptedSuggestions}
+          agentAutonomy={project.agentAutonomy}
+          agentConfidenceThreshold={project.agentConfidenceThreshold}
+          projectVersion={project.version}
+        />
       </div>
-
-      <AiViewClient
-        workspaceId={workspace.id}
-        projectId={projectId}
-        workspaceSlug={slug}
-        initialSuggestions={adaptedSuggestions}
-        agentAutonomy={project.agentAutonomy}
-        agentConfidenceThreshold={project.agentConfidenceThreshold}
-        projectVersion={project.version}
-      />
     </div>
   );
 }

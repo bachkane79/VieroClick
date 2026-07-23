@@ -28,12 +28,15 @@ export default async function NewProjectPage({ params }: Props) {
   }));
 
   return (
-    <div>
-      <div className="border-b px-6 py-4">
-        <h1 className="text-xl font-bold tracking-tight">New project intake</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{workspace.name}</p>
+    <div className="mx-auto max-w-[1240px] px-4 py-5 lg:px-6">
+      {/* Giant Unified White Shell Container */}
+      <div className="rounded-3xl border border-border bg-surface p-6 lg:p-8 shadow-soft space-y-6">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{workspace.name}</p>
+          <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-foreground">New project intake</h1>
+        </div>
+        <ProjectIntakeForm workspaceId={workspace.id} workspaceSlug={slug} members={members} />
       </div>
-      <ProjectIntakeForm workspaceId={workspace.id} workspaceSlug={slug} members={members} />
     </div>
   );
 }

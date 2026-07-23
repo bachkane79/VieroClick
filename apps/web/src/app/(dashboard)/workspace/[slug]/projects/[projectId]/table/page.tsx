@@ -22,14 +22,9 @@ export default async function ProjectTablePage({ params }: Props) {
   const locale = await getLocale();
 
   return (
-    <div className="min-w-0">
-      <ProjectWorkHeader
-        view="table"
-        projectName={data.project.name}
-        taskCount={data.tasks.length}
-        locale={locale}
-      />
-      <div className="px-4 py-4 sm:px-6">
+    <div className="mx-auto max-w-[1240px] px-4 py-5 lg:px-6">
+      {/* Giant Unified White Shell Container */}
+      <div className="rounded-3xl border border-border bg-surface p-5 sm:p-6 shadow-soft">
         <TableViewClient
           workspaceId={data.workspace.id}
           workspaceSlug={slug}

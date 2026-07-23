@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Roboto } from "next/font/google";
 import "@/styles/globals.css";
 import { Toaster } from "sonner";
 import { getLocale } from "@/lib/i18n/server";
 
-const inter = Inter({
+// Roboto (static weights — plain Roboto has no variable axis in next/font).
+// 400/500/700 loaded; the UI baseline sits at 500 (globals.css body weight).
+// font-semibold (600) has no matching face and rounds up to 700 per CSS.
+const roboto = Roboto({
   subsets: ["latin", "vietnamese"],
+  weight: ["400", "500", "700"],
   variable: "--font-sans",
   display: "swap",
 });
@@ -24,8 +28,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const locale = await getLocale();
 
   return (
-    <html lang={locale} suppressHydrationWarning className={inter.variable}>
-      <body className={`${inter.className} min-h-screen antialiased`}>
+    <html lang={locale} suppressHydrationWarning className={roboto.variable}>
+      <body className={`${roboto.className} min-h-screen antialiased`}>
         {children}
         <Toaster
           position="top-right"

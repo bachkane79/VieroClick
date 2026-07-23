@@ -27,26 +27,22 @@ export function DashboardToolbar({ askAiHref }: { askAiHref: string }) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <h2 className="flex items-center gap-2 text-lg font-bold tracking-tight">
-        <LayoutDashboard className="h-[18px] w-[18px] text-primary" />
-        Dashboard
-      </h2>
-      <span className="text-xs text-muted-foreground">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/80 pb-3">
+      <span className="text-xs font-semibold text-muted-foreground">
         {refreshedAt && t(locale, "dash.refreshed", { time: refreshedAt })}
       </span>
-      <div className="ml-auto flex items-center gap-1.5">
+      <div className="ml-auto flex items-center gap-2">
         <button
           type="button"
           onClick={refresh}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-surface px-4 text-xs font-semibold text-text-secondary shadow-xs transition-colors hover:bg-surface-hover hover:text-foreground"
         >
           <RefreshCw className={spinning ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
           {t(locale, "dash.refresh")}
         </button>
         <Link
           href={askAiHref}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-2.5 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+          className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-xs transition-colors hover:bg-primary-hover"
         >
           <Sparkles className="h-3.5 w-3.5" />
           {t(locale, "dash.askAi")}

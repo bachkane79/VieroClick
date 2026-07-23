@@ -263,7 +263,7 @@ function GroupSection({
       </div>
 
       {!collapsed && (
-        <div className="overflow-x-auto rounded-lg border bg-card shadow-sm">
+        <div className="overflow-x-auto rounded-card border border-border bg-card shadow-sm">
           <div className="grid min-w-[780px] grid-cols-[minmax(260px,1fr)_150px_130px_90px_40px] border-b bg-muted/40 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             <span>Task</span>
             <span>Assignee</span>

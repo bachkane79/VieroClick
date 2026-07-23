@@ -158,7 +158,7 @@ export function ReportsViewClient({
                 return (
                   <div
                     key={rep.id}
-                    className="p-4 border border-neutral-200/40 dark:border-neutral-800/40 rounded-xl bg-card space-y-4 shadow-sm hover:border-neutral-300 transition-all"
+                    className="p-4 border border-border rounded-card bg-card space-y-4 shadow-sm hover:border-neutral-300 transition-all"
                   >
                     <div className="flex items-start justify-between gap-3 border-b pb-2 border-neutral-100 dark:border-neutral-800">
                       <div>
@@ -286,7 +286,7 @@ export function ReportsViewClient({
         {isCompiling && (
           <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4 animate-in fade-in duration-200">
             <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
-              <h3 className="text-sm font-bold text-foreground">Compile Status Report</h3>
+              <h3 className="text-sm font-semibold text-foreground">Compile Status Report</h3>
               <Button variant="ghost" size="sm" onClick={() => setIsCompiling(false)}>
                 Cancel
               </Button>

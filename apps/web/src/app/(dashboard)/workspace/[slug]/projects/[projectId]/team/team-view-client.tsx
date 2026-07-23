@@ -60,7 +60,7 @@ export function TeamViewClient({ members }: Props) {
           >
             <div className="flex items-center justify-between gap-2">
               <div>
-                <div className="text-sm font-bold">{m.fullName}</div>
+                <div className="text-sm font-semibold">{m.fullName}</div>
                 <div className="text-[11px] text-muted-foreground">
                   {m.role.replace(/_/g, " ")} · {m.allocationPercent}% allocation
                 </div>
@@ -92,11 +92,11 @@ export function TeamViewClient({ members }: Props) {
 
             {/* Delivery */}
             <div className="mt-4 grid grid-cols-2 gap-3">
-              <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+              <div className="rounded-xl border border-border bg-surface-subtle px-3 py-2">
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">On-time</div>
                 <div className="text-lg font-bold tabular-nums">{pct(m.onTimeRate)}</div>
               </div>
-              <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+              <div className="rounded-xl border border-border bg-surface-subtle px-3 py-2">
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Est. accuracy</div>
                 <div className="text-lg font-bold tabular-nums">{pct(m.estimateAccuracy)}</div>
               </div>

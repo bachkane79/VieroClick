@@ -92,7 +92,7 @@ export function TableViewClient({
       <div className="flex flex-col gap-4">
         <ViewControls api={api} statuses={statuses} members={members} />
 
-        <div className="overflow-x-auto rounded-lg border bg-card shadow-sm">
+        <div className="overflow-x-auto rounded-card border border-border bg-card shadow-sm">
           {/* Header */}
           <div
             className={cn(

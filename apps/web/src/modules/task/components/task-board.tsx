@@ -27,6 +27,8 @@ import { TaskDetailDrawer } from "./task-detail-drawer";
 import { TaskQuickActions } from "./task-quick-actions";
 import { useOptimisticTasks } from "./use-optimistic-tasks";
 import type { MemberOptionView, TaskDependencyView, TaskStatusView, TaskView } from "../task.view";
+import { useViewPrefs } from "./use-view-prefs";
+import { ViewControls } from "./view-controls";
 import type { TaskAttachmentView } from "@/modules/file/file.view";
 
 interface Props {
@@ -38,6 +40,7 @@ interface Props {
   members: MemberOptionView[];
   dependencies: TaskDependencyView[];
   attachments: TaskAttachmentView[];
+  actions?: React.ReactNode;
 }
 
 export function TaskBoard({
@@ -49,12 +52,14 @@ export function TaskBoard({
   members,
   dependencies,
   attachments,
+  actions,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TaskView | null>(null);
   const [initialStatusId, setInitialStatusId] = useState<string | undefined>();
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 
+  const api = useViewPrefs(projectId, "status");
   const { effectiveTasks, applyOptimistic } = useOptimisticTasks(tasks);
 
   const currentSelectedTask = useMemo(() => {
@@ -122,14 +127,26 @@ export function TaskBoard({
 
   return (
     <>
-      <DndContext
-        id="task-board-dnd"
-        sensors={sensors}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        onDragCancel={() => setActiveTaskId(null)}
-      >
-        <div className="flex h-full gap-3 overflow-x-auto p-4">
+      <div className="flex flex-col gap-4 h-full">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <ViewControls api={api} statuses={statuses} members={members} />
+          <div className="flex items-center gap-2">
+            {actions}
+            <Button type="button" className="h-8 gap-2" onClick={() => createInStatus(statuses[0]?.id ?? "")}>
+              <Plus className="h-4 w-4" />
+              New task
+            </Button>
+          </div>
+        </div>
+
+        <DndContext
+          id="task-board-dnd"
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => setActiveTaskId(null)}
+        >
+          <div className="flex h-full gap-3 overflow-x-auto py-1">
           {statuses.map((status) => (
             <BoardColumn
               key={status.id}
@@ -168,6 +185,7 @@ export function TaskBoard({
           ) : null}
         </DragOverlay>
       </DndContext>
+      </div>
 
       <TaskDetailDrawer
         open={open}

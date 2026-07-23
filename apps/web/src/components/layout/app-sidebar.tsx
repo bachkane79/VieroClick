@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useParams, useRouter } from "next/navigation";
+import { usePathname, useParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { User } from "next-auth";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -16,7 +16,6 @@ import { listWorkspaceDocsAction } from "@/modules/workspace-doc/workspace-doc.a
 import { chatUnreadCountsAction, listChatDirectoryAction } from "@/modules/channel/channel.actions";
 import { useLocale } from "@/lib/i18n/client";
 import { t } from "@/lib/i18n/dict";
-import { setLocaleAction } from "@/lib/i18n/actions";
 import {
   AlertOctagon,
   BarChart3,
@@ -30,7 +29,6 @@ import {
   FileText,
   FolderPlus,
   Gauge,
-  Globe,
   Hash,
   Home,
   Inbox,
@@ -52,7 +50,6 @@ import {
   Target,
   Users,
   UserCircle,
-  UserCog,
   type LucideIcon,
 } from "lucide-react";
 
@@ -103,9 +100,8 @@ function deriveTab(pathname: string): RailTab | null {
  * the macOS-Dock magnification now lives on the TopBar. The panel header's
  * create (+) and collapse controls reveal on hover.
  */
-export function AppSidebar({ user, workspaces }: Props) {
+export function AppSidebar({ workspaces }: Props) {
   const pathname = usePathname();
-  const router = useRouter();
   const locale = useLocale();
   const params = useParams() as { slug?: string; projectId?: string };
   const currentSlug = params.slug;
@@ -266,12 +262,6 @@ export function AppSidebar({ user, workspaces }: Props) {
     };
   }, [expanded, wsId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function switchLocale() {
-    const next = locale === "vi" ? "en" : "vi";
-    await setLocaleAction(next);
-    router.refresh();
-  }
-
   // Project context for the "More" launcher grid.
   const moreProjectId = currentProjectId ?? projects[0]?.id ?? null;
   const moreProject = projects.find((p) => p.id === moreProjectId) ?? null;
@@ -344,19 +334,19 @@ export function AppSidebar({ user, workspaces }: Props) {
 
   return (
     <div className="flex h-full shrink-0">
-      {/* ── Dark icon rail with Dock magnification ─────────────────────── */}
-      <aside className="flex w-[68px] shrink-0 flex-col items-center bg-[#282521] py-3 text-white">
+      {/* ── Light icon rail (reference spacing) ─────────────────────────── */}
+      <aside className="flex w-20 shrink-0 flex-col items-center border-r border-border bg-surface py-6 text-foreground">
         <Link
           href={wsBase || "/dashboard"}
-          className="mb-2 grid h-9 w-9 place-items-center rounded-lg"
+          className="mb-6 grid h-10 w-10 place-items-center rounded-xl"
           title="VierocClick"
         >
           <Image
             src="/logo_transparent.png"
             alt="VierocClick"
-            width={30}
-            height={30}
-            className="h-[30px] w-[30px] object-contain"
+            width={34}
+            height={34}
+            className="h-[34px] w-[34px] object-contain"
             priority
           />
         </Link>
@@ -369,42 +359,38 @@ export function AppSidebar({ user, workspaces }: Props) {
             onClick={() => setCollapsedPersist(false)}
             title={t(locale, "sb.expand")}
             aria-label={t(locale, "sb.expand")}
-            className="mb-1.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+            className="mb-1.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
           >
             <PanelLeftOpen className="h-[18px] w-[18px]" />
           </button>
         )}
 
-        <nav className="relative flex flex-1 flex-col items-center gap-1">
+        <nav className="relative flex flex-1 flex-col items-center gap-3">
 
           {RAIL.map((item) => {
             const Icon = item.icon;
             const active = railActive(item.key);
             const disabled = !ws && item.key !== "home";
             const cls = cn(
-              "group relative flex w-[54px] flex-col items-center gap-1 rounded-xl py-2 transition-[background-color,color] duration-150",
+              "group relative flex h-10 w-10 items-center justify-center rounded-xl transition-[background-color,color] duration-150",
               disabled && "pointer-events-none opacity-30",
-              active ? "bg-white/15 text-white" : "text-white/60 hover:bg-white/10 hover:text-white"
+              active
+                ? "bg-primary/10 text-primary"
+                : "text-text-secondary hover:bg-surface-hover hover:text-foreground"
             );
             const inner = (
-              <>
-                {active && (
-                  <span className="absolute -left-3 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-white" />
+              <span className="relative">
+                <Icon className="h-5 w-5" strokeWidth={active ? 2 : 1.75} />
+                {item.key === "inbox" && unread > 0 && (
+                  <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-white">
+                    {unread > 9 ? "9+" : unread}
+                  </span>
                 )}
-                <span className="relative">
-                  <Icon className="h-[19px] w-[19px]" strokeWidth={active ? 2.1 : 1.9} />
-                  {item.key === "inbox" && unread > 0 && (
-                    <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-white">
-                      {unread > 9 ? "9+" : unread}
-                    </span>
-                  )}
-                </span>
-                <span className="text-[9.5px] font-semibold leading-none">{item.label}</span>
-              </>
+              </span>
             );
 
             const sep = item.sepBefore ? (
-              <span className="my-1 h-px w-7 shrink-0 rounded-full bg-white/10" aria-hidden />
+              <span className="my-1 h-px w-7 shrink-0 rounded-full bg-border" aria-hidden />
             ) : null;
 
             // "More" opens the launcher grid (per-project view jumps).
@@ -521,100 +507,34 @@ export function AppSidebar({ user, workspaces }: Props) {
           })}
         </nav>
 
-        <div className="mt-auto flex flex-col items-center gap-1.5 pt-2">
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger asChild>
-              <button
-                title={user.name ?? "Account"}
-                className="mt-0.5 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-              >
-                {user.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={user.image}
-                    alt=""
-                    className="h-8 w-8 rounded-full object-cover ring-1 ring-white/30"
-                  />
-                ) : (
-                  <span className="grid h-8 w-8 place-items-center rounded-full bg-white/15 text-[12px] font-bold uppercase text-white">
-                    {(user.name ?? user.email ?? "?").charAt(0)}
-                  </span>
-                )}
-              </button>
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Portal>
-              <DropdownMenu.Content
-                side="right"
-                align="end"
-                sideOffset={10}
-                className="z-50 w-60 rounded-lg border border-border bg-popover p-1.5 text-foreground shadow-elevated focus:outline-none"
-              >
-                <div className="px-2.5 py-2">
-                  <p className="truncate text-sm font-semibold">{user.name}</p>
-                  <p className="truncate text-xs text-muted-foreground">{user.email}</p>
-                </div>
-                <DropdownMenu.Separator className="my-1 h-px bg-border" />
-                <DropdownMenu.Item asChild>
-                  <Link
-                    href="/profile"
-                    className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
-                  >
-                    <UserCircle className="h-4 w-4 text-muted-foreground" />
-                    {t(locale, "sb.profile")}
-                  </Link>
-                </DropdownMenu.Item>
-                {ws && (
-                  <DropdownMenu.Item asChild>
-                    <Link
-                      href={`${wsBase}/settings`}
-                      className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
-                    >
-                      <Settings className="h-4 w-4 text-muted-foreground" />
-                      {locale === "vi" ? "Cài đặt workspace" : "Workspace settings"}
-                    </Link>
-                  </DropdownMenu.Item>
-                )}
-                <DropdownMenu.Item asChild>
-                  <Link
-                    href="/settings"
-                    className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
-                  >
-                    <UserCog className="h-4 w-4 text-muted-foreground" />
-                    {locale === "vi" ? "Cài đặt cá nhân" : "Personal settings"}
-                  </Link>
-                </DropdownMenu.Item>
-                <DropdownMenu.Item
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    void switchLocale();
-                  }}
-                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
-                >
-                  <Globe className="h-4 w-4 text-muted-foreground" />
-                  <span className="flex-1">{t(locale, "sb.language")}</span>
-                  <span className="rounded border border-border px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
-                    {locale === "vi" ? "EN" : "VI"}
-                  </span>
-                </DropdownMenu.Item>
-                <DropdownMenu.Separator className="my-1 h-px bg-border" />
-                <DropdownMenu.Item
-                  onSelect={() => signOut({ callbackUrl: "/login" })}
-                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 focus:bg-destructive/10 focus:outline-none"
-                >
-                  <LogOut className="h-4 w-4" />
-                  {t(locale, "sb.signOut")}
-                </DropdownMenu.Item>
-              </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-          </DropdownMenu.Root>
+        {/* Bottom system cluster — chat + sign-out (account menu now lives on
+            the header, matching the reference). */}
+        <div className="mt-auto flex flex-col items-center gap-3 pt-2">
+          {ws && (
+            <Link
+              href={`${wsBase}/chat`}
+              title={t(locale, "sb.openChat")}
+              className="grid h-10 w-10 place-items-center rounded-xl text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
+            >
+              <MessagesSquare className="h-5 w-5" strokeWidth={1.75} />
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            title={t(locale, "sb.signOut")}
+            className="grid h-10 w-10 place-items-center rounded-xl text-text-secondary transition-colors hover:bg-destructive/10 hover:text-destructive"
+          >
+            <LogOut className="h-5 w-5" strokeWidth={1.75} />
+          </button>
         </div>
       </aside>
 
       {/* ── Scale-out context panel ────────────────────────────────────── */}
       {!collapsed ? (
         <div className="group/panel flex w-72 shrink-0 flex-col border-r border-border bg-surface">
-          <div className="flex h-12 shrink-0 items-center justify-between gap-1 border-b border-border px-3">
-            <p className="truncate text-[13px] font-semibold text-foreground">
+          <div className="flex h-16 shrink-0 items-center justify-between gap-1 border-b border-border px-4">
+            <p className="truncate text-sm font-semibold text-foreground">
               {panelTitle(tab, locale)}
             </p>
             <div className="flex items-center gap-0.5">
@@ -626,9 +546,9 @@ export function AppSidebar({ user, workspaces }: Props) {
                 <DropdownMenu.Trigger asChild>
                   <button
                     title={t(locale, "tb.create")}
-                    className="grid h-7 w-7 place-items-center rounded-md text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
+                    className="grid h-8 w-8 place-items-center rounded-lg text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="h-[18px] w-[18px]" />
                   </button>
                 </DropdownMenu.Trigger>
                 <DropdownMenu.Portal>
@@ -665,14 +585,14 @@ export function AppSidebar({ user, workspaces }: Props) {
                 onClick={() => setCollapsedPersist(true)}
                 title={t(locale, "sb.collapse")}
                 aria-label={t(locale, "sb.collapse")}
-                className="grid h-7 w-7 place-items-center rounded-md text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
+                className="grid h-8 w-8 place-items-center rounded-lg text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
               >
-                <PanelLeftClose className="h-4 w-4" />
+                <PanelLeftClose className="h-[18px] w-[18px]" />
               </button>
             </div>
           </div>
 
-          <nav className="min-h-0 flex-1 overflow-y-auto p-2">
+          <nav className="min-h-0 flex-1 overflow-y-auto p-2.5">
             {!ws ? (
               <p className="px-2 pt-2 text-xs text-muted-foreground">{t(locale, "sb.selectWs")}</p>
             ) : tab === "home" ? (
@@ -789,8 +709,8 @@ function HomePanel({
                 <Link
                   href={`${base}/dashboard`}
                   className={cn(
-                    "flex min-w-0 flex-1 items-center gap-2 py-1.5 pr-1 text-[13px]",
-                    isCurrent ? "font-semibold text-foreground" : "text-foreground/90"
+                    "flex min-w-0 flex-1 items-center gap-2.5 py-2 pr-1 text-sm",
+                    isCurrent ? "font-semibold text-foreground" : "font-medium text-foreground/90"
                   )}
                 >
                   <span className={cn("h-2 w-2 shrink-0 rounded-[3px]", PROJECT_STATUS_DOT[project.status] ?? "bg-text-disabled")} />
@@ -820,7 +740,7 @@ function HomePanel({
                           key={phase.id}
                           href={`${base}/tasks?phase=${phase.id}`}
                           title={phase.title}
-                          className="flex items-center gap-2 rounded-md py-1.5 pl-4 pr-2 text-[13px] text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
+                          className="flex items-center gap-2 rounded-lg py-1.5 pl-4 pr-2 text-[13px] text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
                         >
                           <span className="truncate">{phase.title}</span>
                         </Link>
@@ -994,7 +914,7 @@ function TeamsPanel({
               key={team.id}
               href={`${wsBase}/settings`}
               title={t(locale, "sb.membersN", { n: team.memberIds.length })}
-              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
+              className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
             >
               <Users className="h-4 w-4 shrink-0" />
               <span className="min-w-0 flex-1 truncate">{team.name}</span>
@@ -1087,7 +1007,7 @@ function DocTree({
           <Link
             href={`${baseHref}?doc=${d.id}`}
             title={d.title}
-            className="flex items-center gap-1.5 rounded-md py-1.5 pr-2 text-[13px] text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
+            className="flex items-center gap-2 rounded-lg py-1.5 pr-2 text-[13px] text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
             style={{ paddingLeft: 8 + depth * 14 }}
           >
             <FileText className="h-3.5 w-3.5 shrink-0" />
@@ -1103,8 +1023,8 @@ function DocTree({
 /* ── Panel primitives ──────────────────────────────────────────────────────── */
 function SectionTitle({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between px-2 pb-1 pt-3">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">{children}</p>
+    <div className="flex items-center justify-between px-2.5 pb-1 pt-4">
+      <p className="text-[11px] font-bold uppercase tracking-wider text-text-secondary">{children}</p>
       {action}
     </div>
   );
@@ -1115,11 +1035,11 @@ function TreeLeaf({ href, icon: Icon, label, active, ai = false }: { href: strin
     <Link
       href={href}
       className={cn(
-        "flex items-center gap-2 rounded-md py-1.5 pl-2 pr-2 text-[13px] transition-colors",
-        active ? "bg-primary/10 font-medium text-foreground" : "text-text-secondary hover:bg-surface-hover hover:text-foreground"
+        "flex items-center gap-2.5 rounded-lg py-1.5 pl-2.5 pr-2 text-[13px] transition-colors",
+        active ? "bg-primary/10 font-semibold text-foreground" : "text-text-secondary hover:bg-surface-hover hover:text-foreground"
       )}
     >
-      <Icon className={cn("h-3.5 w-3.5 shrink-0", ai && "text-ai")} />
+      <Icon className={cn("h-4 w-4 shrink-0", ai && "text-ai")} />
       <span className="truncate">{label}</span>
     </Link>
   );
@@ -1144,14 +1064,14 @@ function PanelLink({
     <Link
       href={href}
       className={cn(
-        "flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] transition-colors",
-        active ? "bg-primary/10 font-medium text-foreground" : "text-text-secondary hover:bg-surface-hover hover:text-foreground"
+        "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
+        active ? "bg-primary/10 font-semibold text-foreground" : "text-text-secondary hover:bg-surface-hover hover:text-foreground"
       )}
     >
-      <Icon className={cn("h-4 w-4 shrink-0", ai && "text-ai")} />
+      <Icon className={cn("h-[18px] w-[18px] shrink-0", ai && "text-ai")} />
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {badge !== undefined && badge > 0 && (
-        <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">
+        <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
           {badge > 9 ? "9+" : badge}
         </span>
       )}

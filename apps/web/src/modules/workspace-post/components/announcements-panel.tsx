@@ -106,35 +106,35 @@ export function AnnouncementsPanel({
   );
 
   return (
-    <div className="rounded-lg border bg-card p-4 shadow-sm">
-      <h2 className="mb-3 flex items-center gap-2 text-base font-semibold">
+    <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-soft">
+      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
         <Megaphone className="h-4 w-4 text-primary" />
         Team board
       </h2>
 
-      <div className="mb-3 rounded-md border bg-muted/20 p-2">
+      <div className="mb-3.5 rounded-xl border border-border/70 bg-surface-subtle p-2.5">
         <Textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
           placeholder="Chia sẻ với cả team…"
-          className="min-h-16 border-0 bg-transparent shadow-none focus-visible:ring-0"
+          className="min-h-16 border-0 bg-transparent shadow-none focus-visible:ring-0 text-xs"
         />
-        <div className="flex items-center justify-between gap-2 px-1">
+        <div className="flex items-center justify-between gap-2 px-1 pt-1">
           {canManage ? (
-            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+            <label className="flex cursor-pointer items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
               <input
                 type="checkbox"
                 checked={pinned}
                 onChange={(e) => setPinned(e.target.checked)}
-                className="h-3.5 w-3.5"
+                className="h-3.5 w-3.5 rounded text-primary focus:ring-primary/40"
               />
               <Pin className="h-3 w-3" /> Ghim
             </label>
           ) : (
             <span />
           )}
-          <Button type="button" size="sm" className="h-8 gap-1.5" disabled={submitting || !body.trim()} onClick={submit}>
-            <Send className="h-3.5 w-3.5" />
+          <Button type="button" variant="dark" size="sm" className="h-7 px-3.5 text-xs gap-1.5" disabled={submitting || !body.trim()} onClick={submit}>
+            <Send className="h-3 w-3" />
             Đăng
           </Button>
         </div>

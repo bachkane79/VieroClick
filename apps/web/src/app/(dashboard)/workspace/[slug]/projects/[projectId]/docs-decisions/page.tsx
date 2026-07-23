@@ -43,26 +43,22 @@ export default async function ProjectDocsDecisionsPage({ params }: Props) {
   }));
 
   return (
-    <div className="px-6 py-6 space-y-6">
-      <div>
-        <h2 className="text-lg font-bold tracking-tight">Docs & Decision Logs</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Record project requirements, technical specs, and team decisions
-        </p>
+    <div className="mx-auto max-w-[1240px] px-4 py-5 lg:px-6">
+      {/* Giant Unified White Shell Container */}
+      <div className="rounded-3xl border border-border bg-surface p-5 sm:p-6 shadow-soft">
+        <DocsDecisionsClient
+          workspaceId={workspace.id}
+          projectId={projectId}
+          workspaceSlug={slug}
+          initialDocs={adaptedDocs as any}
+          initialDecisions={adaptedDecisions}
+          members={workspaceMembers.map((m) => ({
+            id: m.id,
+            fullName: m.fullName,
+          }))}
+          tasks={tasks.map((t) => ({ id: t.id, title: t.title }))}
+        />
       </div>
-
-      <DocsDecisionsClient
-        workspaceId={workspace.id}
-        projectId={projectId}
-        workspaceSlug={slug}
-        initialDocs={adaptedDocs as any}
-        initialDecisions={adaptedDecisions}
-        members={workspaceMembers.map((m) => ({
-          id: m.id,
-          fullName: m.fullName,
-        }))}
-        tasks={tasks.map((t) => ({ id: t.id, title: t.title }))}
-      />
     </div>
   );
 }

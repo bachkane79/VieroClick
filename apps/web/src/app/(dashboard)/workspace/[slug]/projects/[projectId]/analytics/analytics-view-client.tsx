@@ -221,7 +221,7 @@ export function AnalyticsViewClient({ projectName, health, schedule, burndown, s
           outside the internal team.
         </p>
         {showReport && (
-          <pre className="text-[11px] leading-relaxed whitespace-pre-wrap bg-muted/40 border border-border rounded-xl p-4 overflow-x-auto">
+          <pre className="text-[11px] leading-relaxed whitespace-pre-wrap bg-surface-subtle border border-border rounded-2xl p-4 overflow-x-auto">
             {stakeholderMarkdown}
           </pre>
         )}

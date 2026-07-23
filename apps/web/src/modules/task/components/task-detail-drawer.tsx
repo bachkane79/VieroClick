@@ -704,7 +704,7 @@ export function TaskDetailDrawer({
                     <span className="text-xs text-muted-foreground">{taskAttachments.length}</span>
                   </div>
 
-                  <div className="grid gap-2 rounded-md border bg-muted/20 p-3 md:grid-cols-[minmax(0,1fr)_auto]">
+                  <div className="grid gap-2 rounded-2xl border border-border bg-surface-subtle p-3 md:grid-cols-[minmax(0,1fr)_auto]">
                     <Input
                       type="file"
                       accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,application/pdf,text/plain,text/csv,application/msword,.docx,application/vnd.ms-excel,.xlsx,application/vnd.ms-powerpoint,.pptx,application/zip,application/json"

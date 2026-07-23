@@ -70,21 +70,17 @@ export default async function ProjectAnalyticsPage({ params }: Props) {
   });
 
   return (
-    <div className="px-6 py-6 space-y-6">
-      <div>
-        <h2 className="text-lg font-bold tracking-tight">Analytics & Forecast</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Critical path, completion forecast, burndown, and a shareable stakeholder report.
-        </p>
+    <div className="mx-auto max-w-[1240px] px-4 py-5 lg:px-6">
+      {/* Giant Unified White Shell Container */}
+      <div className="rounded-3xl border border-border bg-surface p-5 sm:p-6 shadow-soft">
+        <AnalyticsViewClient
+          projectName={project.name}
+          health={health}
+          schedule={schedule}
+          burndown={burndown}
+          stakeholderMarkdown={stakeholderReport.markdown}
+        />
       </div>
-
-      <AnalyticsViewClient
-        projectName={project.name}
-        health={health}
-        schedule={schedule}
-        burndown={burndown}
-        stakeholderMarkdown={stakeholderReport.markdown}
-      />
     </div>
   );
 }

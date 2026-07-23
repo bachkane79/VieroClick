@@ -53,15 +53,15 @@ export function ProjectWorkHeader({
   const [label, description] = meta[locale];
 
   return (
-    <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b bg-card/60 px-4 py-3 sm:px-6">
+    <header className="flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-border/80 pb-3">
       <div className="flex min-w-0 items-center gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md border bg-background text-muted-foreground">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
           <Icon className="h-4 w-4" />
         </span>
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
-            <h1 className="truncate text-base font-semibold">{label}</h1>
-            <span className="shrink-0 rounded bg-secondary px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-muted-foreground">
+            <h1 className="truncate text-sm font-bold text-foreground">{label}</h1>
+            <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold tabular-nums text-muted-foreground">
               {taskCount}
             </span>
           </div>

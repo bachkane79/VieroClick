@@ -20,7 +20,7 @@ export function MyTasksList({ workspaceSlug, tasks }: Props) {
   }
 
   return (
-    <div className="divide-y rounded-lg border bg-card shadow-sm">
+    <div className="divide-y rounded-card border border-border bg-card shadow-sm">
       {tasks.map((task) => (
         <div key={task.id} className="grid gap-3 px-4 py-4 md:grid-cols-[minmax(0,1fr)_180px_120px] md:items-center">
           <div className="min-w-0">

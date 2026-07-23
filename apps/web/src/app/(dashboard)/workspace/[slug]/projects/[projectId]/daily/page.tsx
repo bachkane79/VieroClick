@@ -35,28 +35,24 @@ export default async function ProjectDailyPage({ params }: Props) {
   }));
 
   return (
-    <div className="px-6 py-6 space-y-6">
-      <div>
-        <h2 className="text-lg font-bold tracking-tight">Daily Standup Updates</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Log standup status and keep team members updated on progress
-        </p>
+    <div className="mx-auto max-w-[1240px] px-4 py-5 lg:px-6">
+      {/* Giant Unified White Shell Container */}
+      <div className="rounded-3xl border border-border bg-surface p-5 sm:p-6 shadow-soft">
+        <DailyViewClient
+          workspaceId={workspace.id}
+          projectId={projectId}
+          workspaceSlug={slug}
+          initialUpdates={adaptedUpdates}
+          members={workspaceMembers.map((m) => ({
+            id: m.id,
+            fullName: m.fullName,
+            email: m.email,
+          }))}
+          projectMembers={projectMembers.map((pm) => ({
+            workspaceMemberId: pm.workspaceMemberId,
+          }))}
+        />
       </div>
-
-      <DailyViewClient
-        workspaceId={workspace.id}
-        projectId={projectId}
-        workspaceSlug={slug}
-        initialUpdates={adaptedUpdates}
-        members={workspaceMembers.map((m) => ({
-          id: m.id,
-          fullName: m.fullName,
-          email: m.email,
-        }))}
-        projectMembers={projectMembers.map((pm) => ({
-          workspaceMemberId: pm.workspaceMemberId,
-        }))}
-      />
     </div>
   );
 }

@@ -117,7 +117,7 @@ export function GanttClient({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card shadow-sm">
+    <div className="rounded-card border border-border bg-card shadow-sm">
       <div className="flex items-center justify-between border-b border-border bg-muted/10 p-4">
         <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
           <Calendar className="h-3.5 w-3.5" />

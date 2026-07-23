@@ -361,7 +361,7 @@ export function RisksMilestonesViewClient({
             {showAddMilestone && (
               <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
                 <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
-                  <h3 className="text-sm font-bold text-foreground">Create Milestone</h3>
+                  <h3 className="text-sm font-semibold text-foreground">Create Milestone</h3>
                   <Button variant="ghost" size="sm" onClick={() => setShowAddMilestone(false)}>
                     Cancel
                   </Button>
@@ -468,7 +468,7 @@ export function RisksMilestonesViewClient({
                         </div>
 
                         {r.mitigation && (
-                          <div className="p-2.5 rounded bg-muted/30 border border-neutral-200/20 text-xs">
+                          <div className="p-2.5 rounded-xl border border-border bg-surface-subtle text-xs">
                             <span className="font-bold text-[10px] text-muted-foreground block mb-1">
                               Mitigation Plan:
                             </span>
@@ -495,7 +495,7 @@ export function RisksMilestonesViewClient({
             {showAddRisk && (
               <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4 animate-in fade-in duration-200">
                 <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
-                  <h3 className="text-sm font-bold text-foreground">Log Project Risk</h3>
+                  <h3 className="text-sm font-semibold text-foreground">Log Project Risk</h3>
                   <Button variant="ghost" size="sm" onClick={() => setShowAddRisk(false)}>
                     Cancel
                   </Button>
@@ -597,7 +597,7 @@ export function RisksMilestonesViewClient({
             )}
 
             <div className="p-5 border border-border rounded-2xl bg-card shadow-sm text-xs space-y-3">
-              <h4 className="font-bold text-foreground flex items-center gap-1">
+              <h4 className="font-semibold text-foreground flex items-center gap-1">
                 <AlertTriangle className="w-4 h-4 text-amber-500" />
                 Risk Calculations
               </h4>

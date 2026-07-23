@@ -8,6 +8,31 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: [
+          "var(--font-sans)",
+          "ui-sans-serif",
+          "system-ui",
+          "-apple-system",
+          "Segoe UI",
+          "sans-serif",
+        ],
+      },
+      // Type scale bumped ~1–2px over Tailwind's defaults (most at the small
+      // end) — the reference's 12px base reads cramped in Vietnamese, whose
+      // stacked diacritics also need a touch more line-height. Spacing is left
+      // untouched so only text grows.
+      fontSize: {
+        "2xs": ["0.6875rem", { lineHeight: "0.95rem" }], // 11 / 15.2
+        xs: ["0.8125rem", { lineHeight: "1.15rem" }], // 13 / 18.4
+        sm: ["0.9375rem", { lineHeight: "1.4rem" }], // 15 / 22.4
+        base: ["1.0625rem", { lineHeight: "1.65rem" }], // 17 / 26.4
+        lg: ["1.1875rem", { lineHeight: "1.8rem" }], // 19 / 28.8
+        xl: ["1.375rem", { lineHeight: "1.9rem" }], // 22 / 30.4
+        "2xl": ["1.625rem", { lineHeight: "2.1rem" }], // 26 / 33.6
+        "3xl": ["2rem", { lineHeight: "2.4rem" }], // 32 / 38.4
+        "4xl": ["2.375rem", { lineHeight: "2.65rem" }], // 38 / 42.4
+      },
       colors: {
         border: {
           DEFAULT: "hsl(var(--border))",
@@ -17,6 +42,7 @@ const config: Config = {
         ring: "hsl(var(--ring))",
         "focus-ring": "hsl(var(--focus-ring))",
         background: "hsl(var(--background))",
+        backdrop: "hsl(var(--backdrop))",
         canvas: "hsl(var(--canvas))",
         surface: {
           DEFAULT: "hsl(var(--surface))",
@@ -79,8 +105,11 @@ const config: Config = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        card: "var(--radius-card)",
+        shell: "var(--radius-shell)",
       },
       boxShadow: {
+        xs: "rgba(16,24,40,0.04) 0 1px 2px",
         soft: "rgba(16,24,40,0.03) 0 1px 2px, rgba(16,24,40,0.04) 0 2px 6px",
         elevated: "rgba(16,24,40,0.06) 0 4px 12px, rgba(16,24,40,0.08) 0 12px 28px",
       },

@@ -44,26 +44,22 @@ export default async function ProjectReportsPage({ params }: Props) {
   }));
 
   return (
-    <div className="px-6 py-6 space-y-6">
-      <div>
-        <h2 className="text-lg font-bold tracking-tight">Status Reports</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Compile and approve formal status reports for stakeholder tracking
-        </p>
+    <div className="mx-auto max-w-[1240px] px-4 py-5 lg:px-6">
+      {/* Giant Unified White Shell Container */}
+      <div className="rounded-3xl border border-border bg-surface p-5 sm:p-6 shadow-soft">
+        <ReportsViewClient
+          workspaceId={workspace.id}
+          projectId={projectId}
+          workspaceSlug={slug}
+          initialReports={adaptedReports}
+          members={workspaceMembers.map((m) => ({
+            id: m.id,
+            fullName: m.fullName,
+          }))}
+          isManager={isManager}
+          currentDeviations={deviations}
+        />
       </div>
-
-      <ReportsViewClient
-        workspaceId={workspace.id}
-        projectId={projectId}
-        workspaceSlug={slug}
-        initialReports={adaptedReports}
-        members={workspaceMembers.map((m) => ({
-          id: m.id,
-          fullName: m.fullName,
-        }))}
-        isManager={isManager}
-        currentDeviations={deviations}
-      />
     </div>
   );
 }

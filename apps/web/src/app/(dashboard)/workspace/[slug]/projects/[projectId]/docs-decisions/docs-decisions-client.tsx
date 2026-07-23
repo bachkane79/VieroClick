@@ -343,7 +343,7 @@ export function DocsDecisionsClient({
                         </Button>
                       </div>
 
-                      <div className="p-3 rounded-xl bg-muted/30 border border-neutral-200/20 text-xs leading-relaxed text-foreground whitespace-pre-wrap font-normal max-h-48 overflow-y-auto">
+                      <div className="p-3 rounded-2xl border border-border bg-surface-subtle text-xs leading-relaxed text-foreground whitespace-pre-wrap font-normal max-h-48 overflow-y-auto">
                         {doc.content}
                       </div>
                     </div>
@@ -358,7 +358,7 @@ export function DocsDecisionsClient({
             {showAddDoc && (
               <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
                 <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
-                  <h3 className="text-sm font-bold text-foreground">Write Document</h3>
+                  <h3 className="text-sm font-semibold text-foreground">Write Document</h3>
                   <Button variant="ghost" size="sm" onClick={() => setShowAddDoc(false)}>
                     Cancel
                   </Button>
@@ -511,7 +511,7 @@ export function DocsDecisionsClient({
             {showAddDecision && (
               <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
                 <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
-                  <h3 className="text-sm font-bold text-foreground">Log Project Decision</h3>
+                  <h3 className="text-sm font-semibold text-foreground">Log Project Decision</h3>
                   <Button variant="ghost" size="sm" onClick={() => setShowAddDecision(false)}>
                     Cancel
                   </Button>
@@ -593,7 +593,7 @@ export function DocsDecisionsClient({
             )}
 
             <div className="p-5 border border-border rounded-2xl bg-card shadow-sm text-xs space-y-3">
-              <h4 className="font-bold text-foreground flex items-center gap-1">
+              <h4 className="font-semibold text-foreground flex items-center gap-1">
                 <Sparkles className="w-4 h-4 text-primary" />
                 Decision Logs Trigger
               </h4>

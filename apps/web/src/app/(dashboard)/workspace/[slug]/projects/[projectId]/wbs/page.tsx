@@ -28,21 +28,17 @@ export default async function ProjectWbsPage({ params }: Props) {
   ]);
 
   return (
-    <div className="px-6 py-6 space-y-6">
-      <div>
-        <h2 className="text-lg font-bold tracking-tight">Work Breakdown Structure (WBS)</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Decompose and organize project deliverables hierarchically
-        </p>
+    <div className="mx-auto max-w-[1240px] px-4 py-5 lg:px-6">
+      {/* Giant Unified White Shell Container */}
+      <div className="rounded-3xl border border-border bg-surface p-5 sm:p-6 shadow-soft">
+        <WbsViewClient
+          workspaceId={workspace.id}
+          projectId={projectId}
+          workspaceSlug={slug}
+          initialNodes={nodes}
+          tasks={tasks.map((t) => ({ id: t.id, title: t.title }))}
+        />
       </div>
-
-      <WbsViewClient
-        workspaceId={workspace.id}
-        projectId={projectId}
-        workspaceSlug={slug}
-        initialNodes={nodes}
-        tasks={tasks.map((t) => ({ id: t.id, title: t.title }))}
-      />
     </div>
   );
 }

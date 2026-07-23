@@ -242,7 +242,7 @@ export function AiViewClient({
   return (
     <div className="space-y-6">
       {/* Agent autonomy settings */}
-      <div className="flex flex-wrap items-center gap-4 rounded-lg border border-border bg-muted/30 px-4 py-3">
+      <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-surface-subtle px-4 py-3">
         <div className="flex items-center gap-2">
           <ShieldAlert className="w-4 h-4 text-muted-foreground" />
           <span className="text-xs font-bold">Agent autonomy</span>

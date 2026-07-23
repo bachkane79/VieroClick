@@ -120,35 +120,38 @@ export function CalendarViewClient({
   return (
     <>
       <div className="flex flex-col gap-4">
+        {/* Top Controls Toolbar */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <ViewControls api={api} statuses={statuses} members={members} showGroupBy={false} />
           <div className="flex items-center gap-2">
+            <div className="flex items-center rounded-full border border-border bg-card p-0.5 shadow-soft">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 rounded-full text-muted-foreground hover:text-foreground"
+                onClick={() => shiftMonth(-1)}
+                aria-label={locale === "vi" ? "Tháng trước" : "Previous month"}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="min-w-[130px] px-2 text-center text-xs font-bold capitalize text-foreground">{monthLabel}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 rounded-full text-muted-foreground hover:text-foreground"
+                onClick={() => shiftMonth(1)}
+                aria-label={locale === "vi" ? "Tháng sau" : "Next month"}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
             <Button
               type="button"
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => shiftMonth(-1)}
-              aria-label={locale === "vi" ? "Tháng trước" : "Previous month"}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="min-w-[140px] text-center text-sm font-semibold">{monthLabel}</span>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => shiftMonth(1)}
-              aria-label={locale === "vi" ? "Tháng sau" : "Next month"}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
+              variant="dark"
               size="sm"
-              className="h-8"
+              className="h-8 rounded-full px-3 text-xs"
               onClick={() => setCursor({ year: now.getFullYear(), month: now.getMonth() })}
             >
               {locale === "vi" ? "Hôm nay" : "Today"}
@@ -156,10 +159,11 @@ export function CalendarViewClient({
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
-          <div className="grid grid-cols-7 border-b bg-muted/40 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {/* 7-Column Calendar Grid */}
+        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
+          <div className="grid grid-cols-7 border-b border-border bg-surface-subtle text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             {WEEKDAYS[locale].map((d) => (
-              <div key={d} className="px-2 py-1.5 text-center">
+              <div key={d} className="px-2 py-2 text-center">
                 {d}
               </div>
             ))}
@@ -174,49 +178,49 @@ export function CalendarViewClient({
                 <div
                   key={i}
                   className={cn(
-                    "min-h-[104px] border-b border-r p-1.5",
+                    "min-h-[110px] border-b border-r border-border/60 p-2 transition-colors",
                     i % 7 === 6 && "border-r-0",
-                    !inMonth && "bg-muted/20"
+                    !inMonth ? "bg-surface-subtle/50" : "bg-card"
                   )}
                 >
-                  <div className="mb-1 flex justify-end">
+                  <div className="mb-1.5 flex justify-end">
                     <span
                       className={cn(
-                        "flex h-5 w-5 items-center justify-center rounded-full text-[11px]",
+                        "flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-all",
                         isToday
-                          ? "bg-primary font-semibold text-primary-foreground"
+                          ? "bg-primary text-white shadow-xs"
                           : inMonth
                             ? "text-foreground"
-                            : "text-muted-foreground/50"
+                            : "text-muted-foreground/40"
                       )}
                     >
                       {date.getDate()}
                     </span>
                   </div>
                   <div className="space-y-1">
-                    {dayTasks.slice(0, 4).map((task) => {
+                    {dayTasks.slice(0, 3).map((task) => {
                       const color = statusColor(statusById.get(task.statusId)?.type);
                       return (
                         <button
                           key={task.id}
                           type="button"
                           onClick={() => openTask(task)}
-                          className="flex w-full items-center gap-1 rounded border bg-background px-1.5 py-1 text-left text-[11px] transition-colors hover:border-primary/60"
+                          className="flex w-full items-center gap-1.5 rounded-lg border border-border/80 bg-surface-subtle px-2 py-1 text-left text-[11px] font-medium transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-xs"
                         >
-                          <span className={cn("h-2 w-2 shrink-0 rounded-sm", color.dot)} />
+                          <span className={cn("h-2 w-2 shrink-0 rounded-full", color.dot)} />
                           <Flag
                             className={cn(
-                              "h-2.5 w-2.5 shrink-0",
+                              "h-3 w-3 shrink-0",
                               PRIORITY_FLAG_COLORS[task.priority] ?? "text-neutral-400"
                             )}
                           />
-                          <span className="truncate">{task.title}</span>
+                          <span className="truncate text-foreground/90">{task.title}</span>
                         </button>
                       );
                     })}
-                    {dayTasks.length > 4 && (
-                      <p className="px-1 text-[10px] text-muted-foreground">
-                        +{dayTasks.length - 4} {locale === "vi" ? "việc" : "more"}
+                    {dayTasks.length > 3 && (
+                      <p className="px-1 text-[10px] font-semibold text-primary">
+                        +{dayTasks.length - 3} {locale === "vi" ? "việc" : "more"}
                       </p>
                     )}
                   </div>
@@ -226,9 +230,10 @@ export function CalendarViewClient({
           </div>
         </div>
 
+        {/* Undated Tasks Section */}
         {undated.length > 0 && (
-          <div className="rounded-lg border bg-card p-3 shadow-sm">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="rounded-2xl border border-border bg-surface-subtle p-4 shadow-soft">
+            <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {locale === "vi" ? "Chưa có hạn" : "No due date"} ({undated.length})
             </p>
             <div className="flex flex-wrap gap-2">
@@ -239,10 +244,10 @@ export function CalendarViewClient({
                     key={task.id}
                     type="button"
                     onClick={() => openTask(task)}
-                    className="flex items-center gap-1.5 rounded border bg-background px-2 py-1 text-xs transition-colors hover:border-primary/60"
+                    className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-medium transition-all hover:border-primary/50 hover:shadow-xs"
                   >
-                    <span className={cn("h-2 w-2 shrink-0 rounded-sm", color.dot)} />
-                    <span className="max-w-[200px] truncate">{task.title}</span>
+                    <span className={cn("h-2 w-2 shrink-0 rounded-full", color.dot)} />
+                    <span className="max-w-[220px] truncate text-foreground">{task.title}</span>
                   </button>
                 );
               })}

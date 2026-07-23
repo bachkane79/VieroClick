@@ -134,7 +134,7 @@ export function AssignByProfile({
   return (
     <div className="space-y-6">
       {/* Trigger */}
-      <section className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5 shadow-soft sm:flex-row sm:items-center sm:justify-between">
+      <section className="flex flex-col gap-3 rounded-card border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ai/10 text-ai">
             <Sparkles className="h-5 w-5" />
@@ -167,7 +167,7 @@ export function AssignByProfile({
             Đề xuất chờ duyệt
           </h3>
           {pending.map((s) => (
-            <div key={s.suggestionId} className="overflow-hidden rounded-xl border border-border bg-card shadow-soft">
+            <div key={s.suggestionId} className="overflow-hidden rounded-card border border-border bg-card shadow-sm">
               <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-ai" />
@@ -241,7 +241,7 @@ export function AssignByProfile({
               const loadPct =
                 m.capacityHours > 0 ? Math.min(100, Math.round((m.committedHours / m.capacityHours) * 100)) : 0;
               return (
-                <div key={m.workspaceMemberId} className="rounded-xl border border-border bg-card p-4 shadow-soft">
+                <div key={m.workspaceMemberId} className="rounded-card border border-border bg-card p-4 shadow-sm">
                   <div className="flex items-center gap-3">
                     {m.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element

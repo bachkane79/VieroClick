@@ -363,7 +363,7 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
       </div>
 
       {/* Composer */}
-      <div className="relative grid gap-2 rounded-md border bg-muted/20 p-3">
+      <div className="relative grid gap-2 rounded-2xl border border-border bg-surface-subtle p-3">
         {replyTo && (
           <div className="flex items-center justify-between rounded bg-primary/5 px-2 py-1 text-[11px] text-primary">
             <span className="truncate">

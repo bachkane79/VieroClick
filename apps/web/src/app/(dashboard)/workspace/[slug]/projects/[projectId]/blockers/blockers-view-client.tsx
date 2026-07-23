@@ -360,7 +360,7 @@ export function BlockersViewClient({
         {isAdding && (
           <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4 animate-in fade-in slide-in-from-right-3 duration-250">
             <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
-              <h3 className="text-sm font-bold text-foreground">File Blocker Report</h3>
+              <h3 className="text-sm font-semibold text-foreground">File Blocker Report</h3>
               <Button variant="ghost" size="sm" onClick={() => setIsAdding(false)}>
                 Cancel
               </Button>
@@ -443,7 +443,7 @@ export function BlockersViewClient({
         )}
 
         <div className="p-5 border border-border rounded-2xl bg-card shadow-sm text-xs space-y-3">
-          <h4 className="font-bold text-foreground flex items-center gap-1">
+          <h4 className="font-semibold text-foreground flex items-center gap-1">
             <AlertTriangle className="w-4 h-4 text-amber-500" />
             Blocker Escalations
           </h4>

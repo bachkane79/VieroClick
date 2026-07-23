@@ -47,7 +47,7 @@ export function LoginForm({ showDevBypass = false }: Props) {
         <button
           onClick={() => handleOAuthSignIn("github")}
           disabled={!!loading}
-          className="w-full flex items-center justify-center gap-3 rounded-md border border-border bg-card hover:bg-accent px-4 py-2.5 text-sm font-medium shadow-sm transition-all duration-150 active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
+          className="w-full flex items-center justify-center gap-3 rounded-full border border-border bg-card hover:bg-accent px-4 py-2.5 text-sm font-medium shadow-xs transition-all duration-150 active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
         >
           {loading === "github" ? (
             <span className="flex items-center gap-2">
@@ -66,7 +66,7 @@ export function LoginForm({ showDevBypass = false }: Props) {
         <button
           onClick={() => handleOAuthSignIn("google")}
           disabled={!!loading}
-          className="w-full flex items-center justify-center gap-3 rounded-md border border-border bg-card hover:bg-accent px-4 py-2.5 text-sm font-medium shadow-sm transition-all duration-150 active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
+          className="w-full flex items-center justify-center gap-3 rounded-full border border-border bg-card hover:bg-accent px-4 py-2.5 text-sm font-medium shadow-xs transition-all duration-150 active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
         >
           {loading === "google" ? (
             <span className="flex items-center gap-2">
@@ -113,7 +113,7 @@ export function LoginForm({ showDevBypass = false }: Props) {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="developer@viero.click"
             disabled={!!loading}
-            className="w-full px-3.5 py-2.5 rounded-md border border-input bg-card placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-ring/25 focus:border-primary transition-all text-sm"
+            className="w-full px-4 py-2.5 rounded-full border border-input bg-card placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-ring/25 focus:border-primary transition-all text-sm"
           />
         </div>
 
@@ -128,14 +128,14 @@ export function LoginForm({ showDevBypass = false }: Props) {
             onChange={(e) => setName(e.target.value)}
             placeholder="Jane Doe"
             disabled={!!loading}
-            className="w-full px-3.5 py-2.5 rounded-md border border-input bg-card placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-ring/25 focus:border-primary transition-all text-sm"
+            className="w-full px-4 py-2.5 rounded-full border border-input bg-card placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-ring/25 focus:border-primary transition-all text-sm"
           />
         </div>
 
         <button
           type="submit"
           disabled={!email || !!loading}
-          className="w-full flex items-center justify-center gap-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2.5 text-sm font-semibold shadow-soft transition-all duration-150 active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
+          className="w-full flex items-center justify-center gap-2 rounded-full bg-primary text-primary-foreground hover:bg-primary-hover px-4 py-2.5 text-sm font-semibold shadow-soft transition-all duration-150 active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
         >
           {loading === "credentials" ? (
             <span className="flex items-center gap-2">

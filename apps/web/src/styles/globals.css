@@ -3,86 +3,91 @@
 @tailwind utilities;
 
 /*
-  VierocClick design language — "one shell, one system"
+  VieroClick design language — "warm daylight, one orange voice"
   ----------------------------------------------------------------
-  Unified UX/UI redesign (docs/ux-ui-system-redesign-plan.md §8).
-  · Neutral, near-white cool canvas over pure-white surfaces.
-  · ONE action colour — primary blue (#2563EB) — reserved for actions,
-    links and selection. Semantic colours only carry status meaning.
-  · No gradients in the application shell, sidebar, toolbar or panels.
-  · AI purple (#6757C8) is a classification signal only — never a wash.
+  Redesign tone policy (see CLAUDE.md §Tone policy).
+  · Warm, cool-tinted off-white canvas over pure-white cards.
+  · ONE action colour — ORANGE (#F26B3A) — reserved for primary
+    buttons, links, active navigation and selection.
+  · Green (#22A565) and yellow (#F5C042) are SECONDARY accents:
+    status, illustration, progress, category tiles — never a full CTA.
+  · Soft, friendly geometry: pill buttons/inputs, ~22px cards.
   · Elevation by hairline border; shadow only on hover/focus/overlay.
+  · Type: Plus Jakarta Sans, small/compact (Notion sizing scale).
 
   Token names keep the legacy HSL-variable contract (--background,
-  --foreground, --primary, …) so every existing component adopts the new
-  system through the cascade. New tokens are added, none renamed away.
+  --foreground, --primary, …) so every existing component adopts the
+  new system through the cascade. New tokens are added, none renamed.
 */
 
 @layer base {
   :root {
     /* ── Surfaces ─────────────────────────────────────────────── */
-    --canvas: 220 22% 97%; /* #F6F7F9 app background */
-    --background: 220 22% 97%;
-    --surface: 0 0% 100%; /* #FFFFFF content, popover, dialog */
-    --surface-subtle: 216 20% 95%; /* #F0F2F5 sidebar / secondary areas */
-    --surface-hover: 214 24% 93%; /* #E9EDF2 soft hover */
+    --backdrop: 220 15% 90%; /* cement grey backdrop */
+    --canvas: 225 22% 96%; /* #F3F4F7 cement grey canvas background */
+    --background: 225 22% 96%;
+    --surface: 0 0% 100%; /* #FFFFFF pure white cards & inner shell */
+    --surface-subtle: 220 25% 97.5%; /* #F8F9FC inner boxes */
+    --surface-hover: 220 20% 95%; /* #EEF0F4 soft hover */
 
     --card: 0 0% 100%;
-    --card-foreground: 218 14% 15%;
+    --card-foreground: 222 24% 13%;
     --popover: 0 0% 100%;
-    --popover-foreground: 218 14% 15%;
+    --popover-foreground: 222 24% 13%;
 
     /* ── Text ─────────────────────────────────────────────────── */
-    --foreground: 218 14% 15%; /* #20242A primary ink */
-    --text-secondary: 218 10% 45%; /* #68707C metadata */
-    --text-disabled: 214 8% 64%; /* #9AA1AB disabled */
+    --foreground: 222 24% 13%; /* #1A1F2B primary ink */
+    --text-secondary: 220 9% 46%; /* #6B7280 metadata */
+    --text-disabled: 218 11% 65%; /* #9AA1AF disabled / placeholder */
 
     /* ── Lines ────────────────────────────────────────────────── */
-    --border: 214 16% 89%; /* #DFE3E8 default divider */
-    --border-strong: 214 14% 81%; /* #C8CED6 interactive / selected */
-    --input: 214 14% 81%;
+    --border: 220 16% 86%; /* #D8DCE4 crisp hairline border */
+    --border-strong: 220 16% 76%; /* #BFC5CE interactive / selected */
+    --input: 220 16% 86%;
 
-    /* ── Action & selection (brand = logo coral) ─────────────────── */
-    --primary: 14 82% 60%; /* #ED6C45 logo coral */
+    /* ── Action & selection (Primary = Vibrant Orange #FF6835) ── */
+    --primary: 18 95% 56%; /* #FF6835 vibrant orange */
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 14 74% 51%; /* #DA5730 */
-    --ring: 14 82% 60%;
-    --focus-ring: 16 92% 78%; /* #FBB79C keyboard focus */
+    --primary-hover: 18 90% 48%; /* #E54510 */
+    --ring: 18 95% 56%;
+    --focus-ring: 18 95% 75%;
 
     /* ── Neutrals (chips, hover, muted text) ──────────────────── */
-    --secondary: 216 20% 95%;
-    --secondary-foreground: 218 14% 22%;
-    --muted: 216 20% 95%;
-    --muted-foreground: 218 10% 45%;
-    --accent: 214 24% 93%;
-    --accent-foreground: 218 14% 18%;
+    --secondary: 220 20% 95%;
+    --secondary-foreground: 222 20% 20%;
+    --muted: 220 20% 95%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 220 20% 95%;
+    --accent-foreground: 222 20% 18%;
 
-    /* ── Semantic status ──────────────────────────────────────── */
-    --success: 154 72% 31%; /* #16875B */
-    --warning: 36 100% 36%; /* #B76E00 */
-    --destructive: 357 60% 53%; /* #CF3F46 */
+    /* ── Secondary Accents (Green & Yellow) + Status ───────────── */
+    --success: 152 69% 40%; /* #10B981 emerald green */
+    --warning: 42 93% 53%; /* #F59E0B amber yellow */
+    --destructive: 356 72% 55%; /* #D93A48 rose-red */
     --destructive-foreground: 0 0% 100%;
 
     /* ── AI classification signal (icon/chip only) ────────────── */
-    --ai: 249 52% 56%; /* #6757C8 */
+    --ai: 262 60% 58%; /* #7C55D6 */
     --ai-foreground: 0 0% 100%;
 
-    /* ── Brand alias → primary (logo coral) ───────────────────── */
-    --brand: 14 82% 60%;
+    /* ── Brand alias → primary (orange) ───────────────────────── */
+    --brand: 18 95% 56%;
     --brand-foreground: 0 0% 100%;
-    --brand-soft: 18 100% 95%;
+    --brand-soft: 18 100% 96%;
 
-    /* Accent family — status / illustration / project colour dots only.
-       Never a full-card wash (redesign §8.1). Each has a soft partner. */
-    --coral: 4 74% 58%;        --coral-soft: 6 78% 96%;
-    --peach: 27 84% 52%;       --peach-soft: 33 90% 95%;
-    --lavender: 249 52% 60%;   --lavender-soft: 250 90% 96%;
-    --sky: 210 74% 50%;        --sky-soft: 210 90% 95%;
-    --mint: 154 60% 36%;       --mint-soft: 152 45% 93%;
+    /* Soft pastel accent family */
+    --coral: 18 95% 58%;       --coral-soft: 18 100% 96%;
+    --peach: 42 93% 53%;       --peach-soft: 42 95% 93%;   /* yellow */
+    --mint: 152 69% 40%;       --mint-soft: 152 55% 94%;   /* green  */
+    --sky: 214 84% 56%;        --sky-soft: 214 95% 94%;
+    --lavender: 265 62% 60%;   --lavender-soft: 267 78% 95%;
 
-    --radius: 0.5rem; /* 8px card/dialog; controls derive to 6px */
+    /* ── Radius ─────────────────────────────────────────────────── */
+    --radius: 0.75rem; /* 12px base */
+    --radius-card: 1.25rem; /* 20px content cards (Notion compact) */
+    --radius-shell: 1.75rem; /* 28px floating app shell */
 
-    /* ── Motion (Dock-inspired, §9.1) ─────────────────────────── */
+    /* ── Motion ───────────────────────────────────────────────── */
     --motion-fast: 120ms;
     --motion-standard: 180ms;
     --motion-slow: 240ms;
@@ -91,55 +96,56 @@
   }
 
   .dark {
-    --canvas: 220 16% 8%;
-    --background: 220 16% 8%;
-    --surface: 220 14% 11%;
-    --surface-subtle: 220 12% 13%;
-    --surface-hover: 218 12% 18%;
+    --backdrop: 224 20% 5%;
+    --canvas: 224 18% 8%;
+    --background: 224 18% 8%;
+    --surface: 224 15% 11%;
+    --surface-subtle: 224 13% 13%;
+    --surface-hover: 222 12% 18%;
 
-    --card: 220 14% 11%;
-    --card-foreground: 210 16% 92%;
-    --popover: 220 14% 13%;
-    --popover-foreground: 210 16% 92%;
+    --card: 224 15% 11%;
+    --card-foreground: 220 16% 92%;
+    --popover: 224 15% 13%;
+    --popover-foreground: 220 16% 92%;
 
-    --foreground: 210 16% 92%;
-    --text-secondary: 216 10% 62%;
-    --text-disabled: 216 8% 46%;
+    --foreground: 220 16% 92%;
+    --text-secondary: 220 10% 62%;
+    --text-disabled: 220 8% 46%;
 
-    --border: 216 12% 20%;
-    --border-strong: 216 12% 30%;
-    --input: 216 12% 26%;
+    --border: 220 12% 20%;
+    --border-strong: 220 12% 30%;
+    --input: 220 12% 26%;
 
-    --primary: 15 88% 67%; /* #F58C63 logo coral (dark) */
+    --primary: 18 95% 60%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 14 82% 60%;
-    --ring: 15 88% 67%;
-    --focus-ring: 15 78% 60%;
+    --primary-hover: 18 90% 52%;
+    --ring: 18 95% 60%;
+    --focus-ring: 18 85% 55%;
 
     --secondary: 220 12% 16%;
-    --secondary-foreground: 210 16% 92%;
+    --secondary-foreground: 220 16% 92%;
     --muted: 220 12% 16%;
-    --muted-foreground: 216 10% 62%;
-    --accent: 218 12% 20%;
-    --accent-foreground: 210 16% 92%;
+    --muted-foreground: 220 10% 62%;
+    --accent: 222 12% 20%;
+    --accent-foreground: 220 16% 92%;
 
-    --success: 154 55% 46%;
-    --warning: 38 92% 56%;
-    --destructive: 357 68% 60%;
+    --success: 152 65% 48%;
+    --warning: 42 90% 58%;
+    --destructive: 356 70% 62%;
     --destructive-foreground: 0 0% 100%;
 
-    --ai: 249 72% 72%;
+    --ai: 262 72% 74%;
     --ai-foreground: 0 0% 100%;
 
-    --brand: 15 88% 67%;
+    --brand: 18 95% 60%;
     --brand-foreground: 0 0% 100%;
-    --brand-soft: 16 40% 22%;
+    --brand-soft: 18 40% 22%;
 
-    --coral: 6 80% 66%;        --coral-soft: 6 30% 18%;
-    --peach: 30 84% 62%;       --peach-soft: 28 32% 17%;
-    --lavender: 249 72% 74%;   --lavender-soft: 250 28% 22%;
-    --sky: 210 78% 64%;        --sky-soft: 212 36% 18%;
-    --mint: 154 52% 52%;       --mint-soft: 154 32% 16%;
+    --coral: 18 95% 64%;       --coral-soft: 18 32% 18%;
+    --peach: 42 84% 62%;       --peach-soft: 42 34% 17%;
+    --mint: 152 52% 52%;       --mint-soft: 152 32% 16%;
+    --sky: 214 82% 66%;        --sky-soft: 214 36% 18%;
+    --lavender: 265 72% 74%;   --lavender-soft: 266 28% 22%;
   }
 }
 
@@ -154,19 +160,23 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "cv11", "ss01", "lnum";
-    letter-spacing: 0;
+    font-feature-settings: "ss01", "cv01", "lnum";
+    /* Medium UI baseline — matches the reference's chrome weight and keeps
+       Plus Jakarta from reading feather-light at small sizes. Elements that
+       need lighter text set `font-normal` explicitly. */
+    font-weight: 500;
+    letter-spacing: -0.003em;
   }
 
-  /* Product headings: clean, no landing-page display sizes (§8.2). */
+  /* Product headings: clean, compact — no landing-page display sizes. */
   h1 {
-    @apply font-semibold;
-    letter-spacing: -0.011em;
+    @apply font-bold;
+    letter-spacing: -0.014em;
   }
   h2,
   h3 {
     @apply font-semibold;
-    letter-spacing: -0.006em;
+    letter-spacing: -0.008em;
   }
 
   ::selection {
@@ -174,7 +184,7 @@
     color: hsl(var(--foreground));
   }
 
-  /* Consistent, visible keyboard focus at the same weight as hover (§9.4). */
+  /* Consistent, visible keyboard focus at the same weight as hover. */
   :focus-visible {
     outline: 2px solid hsl(var(--focus-ring));
     outline-offset: 2px;
@@ -183,13 +193,24 @@
 
 @layer utilities {
   /* Legacy "gradient" utilities repointed to flat fills — the redesign
-     removes gradients from the shell. Kept as aliases so any remaining
-     consumer degrades to a solid, on-brand surface. */
+     keeps the shell flat. Kept as aliases so any remaining consumer
+     degrades to a solid, on-brand surface. */
   .bg-sidebar-gradient {
-    background-color: hsl(var(--surface-subtle));
+    background-color: hsl(var(--surface));
   }
   .bg-brand-gradient {
     background-color: hsl(var(--primary));
+  }
+
+  /* The reference's signature warm progress fill: orange → yellow → green.
+     Use for progress/goal bars only (tone policy §Secondary). */
+  .bg-tone-progress {
+    background-image: linear-gradient(
+      90deg,
+      #ff8d6b 0%,
+      #ffd56b 55%,
+      #7be6a3 100%
+    );
   }
 
   /* Hide scrollbar but keep scroll (tab strips). */
@@ -213,10 +234,8 @@
       rgba(16, 24, 40, 0.08) 0 12px 28px;
   }
 
-  /* ── Dock-inspired interaction primitives (§9.2–9.3) ──────────
-     Icon/nav items may lift + scale; panels and rows only translate
-     slightly. Container must reserve space so transforms never shift
-     layout. Only transform/opacity/colours are animated. */
+  /* Interaction primitives. Icon/nav items may lift + scale; panels and
+     rows only translate slightly. Only transform/opacity/colours animate. */
   .dock-item {
     transition:
       transform var(--motion-standard) var(--ease-spring),
@@ -242,7 +261,7 @@
   }
 }
 
-/* Reduced motion — drop scale/translate, keep colour changes (§9.4). */
+/* Reduced motion — drop scale/translate, keep colour changes. */
 @media (prefers-reduced-motion: reduce) {
   .dock-item,
   .lift {

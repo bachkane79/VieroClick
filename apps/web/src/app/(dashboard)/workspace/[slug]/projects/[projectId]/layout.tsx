@@ -79,7 +79,7 @@ async function ProjectAccessDenied({ slug }: { slug: string }) {
   const locale = await getLocale();
   return (
     <div className="flex h-full min-h-0 items-center justify-center bg-canvas px-6">
-      <div className="w-full max-w-md rounded-xl border border-border bg-surface p-8 text-center shadow-soft">
+      <div className="w-full max-w-md rounded-card border border-border bg-surface p-8 text-center shadow-sm">
         <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-surface-subtle text-text-secondary">
           <Lock className="h-5 w-5" />
         </div>

@@ -31,10 +31,13 @@ export default async function SettingsLayout({ children, params }: Props) {
   if (!canAdmin) redirect(`/workspace/${slug}`);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-6">
-      <div className="flex flex-col gap-6 md:flex-row md:gap-8">
-        <SettingsNav slug={slug} />
-        <div className="min-w-0 flex-1">{children}</div>
+    <div className="mx-auto max-w-[1240px] px-4 py-5 lg:px-6">
+      {/* Giant Unified White Shell Container */}
+      <div className="rounded-3xl border border-border bg-surface p-6 lg:p-8 shadow-soft">
+        <div className="flex flex-col gap-6 md:flex-row md:gap-8">
+          <SettingsNav slug={slug} />
+          <div className="min-w-0 flex-1">{children}</div>
+        </div>
       </div>
     </div>
   );

@@ -26,14 +26,11 @@ export default async function ProjectTeamPage({ params }: Props) {
   const members = await computeTeamMetrics(projectId);
 
   return (
-    <div className="px-6 py-6 space-y-6">
-      <div>
-        <h2 className="text-lg font-bold tracking-tight">Team</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Workload, reliability, and operational scores per member — scores update automatically as tasks are approved.
-        </p>
+    <div className="mx-auto max-w-[1240px] px-4 py-5 lg:px-6">
+      {/* Giant Unified White Shell Container */}
+      <div className="rounded-3xl border border-border bg-surface p-5 sm:p-6 shadow-soft">
+        <TeamViewClient members={members} />
       </div>
-      <TeamViewClient members={members} />
     </div>
   );
 }

@@ -23,6 +23,21 @@ The section numbers cited throughout this file and the codebase (`§4.2`, `§4.3
 - `nextjs_ai_monorepo_project_manager_design.md` — the product/architecture spec. `§4.1` domain modules, `§4.2` permission model, `§4.3` event-writing rule, `§7.1–7.3` agent service architecture, `§7.4–7.9` the six agents. This is where the rules the modules implement are defined.
 - `DESIGN-notion.md` — the visual design system (Notion-style: colors, typography, spacing tokens). Consult before UI work.
 
+## Tone policy & Design system (VieroClick Redesign)
+
+All UI components and pages follow the unified **Dribbble & Notion Pro** aesthetic:
+
+- **Primary Action Accent**: Vibrant Orange (`#FF6835` / HSL `18 95% 56%`). Used for primary CTAs, active selection, active navigation tabs, and primary focus rings.
+- **Secondary Accents**: Emerald Green (`#10B981`) and Amber Yellow (`#F59E0B`). Used exclusively for status badges, metric indicators, and progress illustrations.
+- **Canvas & Backdrop**: Cement Grey (`#F3F4F7` / HSL `225 22% 96%`).
+- **Unified White Shell Container**: All main workspace content, dashboards, and project views MUST be enclosed inside a **Giant White Shell Container**:
+  `<div className="mx-auto max-w-[1240px] px-4 py-5 lg:px-6"><div className="rounded-3xl border border-border bg-surface p-5 sm:p-6 shadow-soft">`
+- **Crisp Hairline Borders**: `--border: 220 16% 86%` (`#D8DCE4`) and `--border-strong: 220 16% 76%` (`#BFC5CE`).
+- **Dark Pill Buttons**: High-contrast primary action CTAs use `<Button variant="dark">` (`bg-slate-900 text-white hover:bg-slate-800 rounded-full`).
+- **Multi-color Progress Fill**: `.bg-tone-progress` (`Cam #FF8D6B → Vàng #FFD56B → Xanh lá #7BE6A3`).
+- **Notion Typography & Scale**: Compact font sizes, medium UI baseline, `letter-spacing: -0.014em` for headings.
+- **No Duplicate Headings**: Page views rely on top breadcrumbs & view tabs; avoid adding duplicate section `<h1>`/`<h2>` headers inside the main shell container.
+
 The 6 agent roles and the `POST /api/agents/{role}` dispatch interface live in `apps/agent-api/app/agents/roles/` and `app/api/routes/agents.py`.
 
 ## Commands

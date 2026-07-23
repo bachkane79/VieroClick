@@ -38,10 +38,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <LocaleProvider locale={locale}>
+      {/* Fullscreen, edge-to-edge shell — reference styling (white icon rail,
+          canvas content, pill header), no floating container. */}
       <div className="flex h-screen overflow-hidden bg-canvas">
         <AppSidebar user={session.user} workspaces={workspaces} organizations={organizations} />
         <div className="flex min-w-0 flex-1 flex-col">
-          <TopBar workspaces={workspaces} organizations={organizations} />
+          <TopBar user={session.user} workspaces={workspaces} organizations={organizations} />
           <main className="min-h-0 flex-1 overflow-y-auto bg-canvas">{children}</main>
         </div>
         <CommandPalette workspaces={workspaces} />

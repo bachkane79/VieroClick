@@ -267,7 +267,7 @@ export function WbsViewClient({
         {isAdding && (
           <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
-              <h3 className="text-sm font-bold text-foreground">Create WBS Node</h3>
+              <h3 className="text-sm font-semibold text-foreground">Create WBS Node</h3>
               <Button variant="ghost" size="sm" onClick={() => setIsAdding(false)}>
                 Cancel
               </Button>
@@ -350,7 +350,7 @@ export function WbsViewClient({
         )}
 
         <div className="p-5 border border-border rounded-2xl bg-card shadow-sm text-xs space-y-3">
-          <h4 className="font-bold text-foreground">WBS Integration Info</h4>
+          <h4 className="font-semibold text-foreground">WBS Integration Info</h4>
           <p className="text-muted-foreground leading-relaxed">
             A Work Breakdown Structure (WBS) is a hierarchical decomposition of the total scope of work to be carried out by the project team.
           </p>
