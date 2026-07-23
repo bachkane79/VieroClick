@@ -2,6 +2,7 @@ import "server-only";
 import { and, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { db, tasks, taskStatuses, activityEvents, users, workspaceMembers } from "@vieroc/db";
 import { computeHealthDetails, type HealthDetails } from "./project.service";
+import { getOrSetCache } from "@/server/lib/cache";
 
 /**
  * Read-model for the ClickUp-style project dashboard (full-system spec §16.2):
@@ -78,11 +79,35 @@ export interface ProjectDashboard {
 
 const OPEN_TYPES = ["todo", "in_progress", "in_review", "blocked"] as const;
 
+/**
+ * WP-I2 — the dashboard has no natural single mutation point to invalidate
+ * precisely (health/KPIs shift on task/blocker/risk writes), so this is cached
+ * with a short TTL (30s) rather than event-driven invalidation alone. Every
+ * task/blocker/risk mutation also explicitly invalidates this key (see
+ * `invalidateProjectCaches` in cache.ts) so the common case still refreshes
+ * immediately — the TTL is just the fallback for anything that doesn't.
+ */
 export async function computeProjectDashboard(projectId: string): Promise<ProjectDashboard> {
+  const result = await getOrSetCache(`dashboard:${projectId}`, () => computeProjectDashboardUncached(projectId), {
+    ttlSeconds: 30,
+  });
+  // Cached values round-trip Dates as ISO strings (see cache.ts) — rewrap so
+  // callers (e.g. dashboard/page.tsx's `event.createdAt.toLocaleString(...)`)
+  // always get a real Date regardless of cache hit/miss.
+  return {
+    ...result,
+    latestActivity: result.latestActivity.map((a) => ({ ...a, createdAt: new Date(a.createdAt) })),
+  };
+}
+
+async function computeProjectDashboardUncached(projectId: string): Promise<ProjectDashboard> {
   const todayStr = new Date().toISOString().split("T")[0]!;
   const weekAhead = new Date(Date.now() + 7 * 86_400_000).toISOString().split("T")[0]!;
 
-  const [health, statusRows, assigneeRows, dueRows, activityRows] = await Promise.all([
+  // WP-I1: unassignedRow used to be a 6th query awaited *after* this Promise.all
+  // resolved, despite having no dependency on the other five — a free extra
+  // round-trip on every dashboard load. Folded in as a 6th parallel branch.
+  const [health, statusRows, assigneeRows, dueRows, activityRows, unassignedRows] = await Promise.all([
     computeHealthDetails(projectId),
 
     db
@@ -147,25 +172,25 @@ export async function computeProjectDashboard(projectId: string): Promise<Projec
       .where(eq(activityEvents.projectId, projectId))
       .orderBy(desc(activityEvents.createdAt))
       .limit(10),
-  ]);
 
-  const [unassignedRow] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(tasks)
-    .innerJoin(taskStatuses, eq(taskStatuses.id, tasks.statusId))
-    .where(
-      and(
-        eq(tasks.projectId, projectId),
-        inArray(taskStatuses.type, [...OPEN_TYPES]),
-        isNull(tasks.assigneeMemberId)
-      )
-    );
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(tasks)
+      .innerJoin(taskStatuses, eq(taskStatuses.id, tasks.statusId))
+      .where(
+        and(
+          eq(tasks.projectId, projectId),
+          inArray(taskStatuses.type, [...OPEN_TYPES]),
+          isNull(tasks.assigneeMemberId)
+        )
+      ),
+  ]);
 
   const countOf = (type: string) =>
     statusRows.filter((s) => s.type === type).reduce((sum, s) => sum + s.count, 0);
 
   const kpis: DashboardKpis = {
-    unassigned: unassignedRow?.count ?? 0,
+    unassigned: unassignedRows[0]?.count ?? 0,
     inProgress: countOf("in_progress") + countOf("in_review"),
     completed: countOf("done"),
     overdue: health.overdueTaskCount,

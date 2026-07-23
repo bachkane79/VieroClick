@@ -24,23 +24,28 @@ async function getTaskInProject(taskId: string, projectId: string) {
   return task;
 }
 
+// WP-I1: was 1 query per link (N+1 — a comment can carry several mentions/
+// attachments). Batched into at most 3 queries total (one per link type)
+// regardless of how many links are on the comment.
 async function assertLinksBelongToProject(links: CommentLink[], projectId: string) {
+  const idsOfType = (type: CommentLink["type"]) =>
+    links.filter((l) => l.type === type).map((l) => l.id);
+
+  const [validTaskIds, validCommentIds, validDocIds] = await Promise.all([
+    taskRepo.existingIdsInProject(idsOfType("task"), projectId),
+    repo.existingIdsInProject(idsOfType("comment"), projectId),
+    repo.existingDocIdsInProject(idsOfType("doc"), projectId),
+  ]);
+
   for (const link of links) {
-    if (link.type === "task") {
-      const task = await taskRepo.findById(link.id);
-      if (!task || task.projectId !== projectId) {
-        throw new ValidationError("Linked task must belong to this project");
-      }
+    if (link.type === "task" && !validTaskIds.has(link.id)) {
+      throw new ValidationError("Linked task must belong to this project");
     }
-
-    if (link.type === "comment") {
-      const comment = await repo.findByIdInProject(link.id, projectId);
-      if (!comment) throw new ValidationError("Linked comment must belong to this project");
+    if (link.type === "comment" && !validCommentIds.has(link.id)) {
+      throw new ValidationError("Linked comment must belong to this project");
     }
-
-    if (link.type === "doc") {
-      const exists = await repo.linkedDocExists(link.id, projectId);
-      if (!exists) throw new ValidationError("Linked doc must belong to this project");
+    if (link.type === "doc" && !validDocIds.has(link.id)) {
+      throw new ValidationError("Linked doc must belong to this project");
     }
   }
 }

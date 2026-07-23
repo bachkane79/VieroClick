@@ -72,6 +72,50 @@ export async function resolveGrantLevel(
 }
 
 /**
+ * WP-I1: batched form of `resolveGrantLevel` for a list of same-type resources
+ * (e.g. private projects in a workspace listing) — was 1 `resolveGrantLevel`
+ * call (2 queries each: teamIds + grants) per resource; this issues exactly 2
+ * queries total regardless of list size. Returns the set of resource ids the
+ * subject can at least "view" via creator/admin/grant (role-default level is
+ * NOT applied here — matches `resolveGrantLevel`'s semantics, not
+ * `resolveEffectiveLevel`'s).
+ */
+export async function resolveViewableSetBatch(
+  ctx: ActorContext,
+  resources: { id: string; createdBy?: string | null }[],
+  exec: Executor = db
+): Promise<Set<string>> {
+  const viewable = new Set(
+    resources.filter((r) => r.createdBy && r.createdBy === ctx.userId).map((r) => r.id)
+  );
+  if (isWorkspaceAdmin(ctx)) {
+    resources.forEach((r) => viewable.add(r.id));
+    return viewable;
+  }
+
+  const remaining = resources.filter((r) => !viewable.has(r.id));
+  if (remaining.length === 0) return viewable;
+
+  const scopes: repo.ResourceScope[] = remaining.map((r) => ({ type: "project", id: r.id }));
+  const [teamIds, grants] = await Promise.all([
+    repo.listTeamIdsForMember(ctx.workspaceMemberId, exec),
+    repo.listGrantsForScopes(ctx.workspaceId, scopes, exec),
+  ]);
+
+  for (const r of remaining) {
+    const applicable = grants.filter(
+      (g) =>
+        g.resourceType === "project" &&
+        g.resourceId === r.id &&
+        ((g.subjectType === "member" && g.subjectId === ctx.workspaceMemberId) ||
+          (g.subjectType === "team" && teamIds.includes(g.subjectId)))
+    );
+    if (applicable.some((g) => meetsLevel(g.level, "view"))) viewable.add(r.id);
+  }
+  return viewable;
+}
+
+/**
  * Compute the subject's effective permission level on a resource, following the
  * §4.2 resolution order (first match wins):
  *   1. creator → full

@@ -10,6 +10,7 @@ import {
   jsonb,
   unique,
   uniqueIndex,
+  index,
   check,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
@@ -103,6 +104,12 @@ export const tasks = pgTable(
     uniqueIndex("tasks_project_plan_ref_idx")
       .on(t.projectId, t.planRef)
       .where(sql`plan_ref IS NOT NULL`),
+    // WP-I1: `tasks` had no index on any FK/filter column besides the above —
+    // every board/list/dashboard query (all filtered by project_id, most also
+    // by deleted_at IS NULL) was a sequential scan. Partial indexes since the
+    // soft-deleted rows (WP-D4) are dead weight for every live query.
+    index("tasks_project_active_idx").on(t.projectId).where(sql`deleted_at IS NULL`),
+    index("tasks_assignee_active_idx").on(t.assigneeMemberId).where(sql`deleted_at IS NULL`),
   ]
 );
 

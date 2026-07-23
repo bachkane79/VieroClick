@@ -78,6 +78,13 @@
       "when": 1784776446151,
       "tag": "0010_daily_yellow_claw",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784809155312,
+      "tag": "0011_wp_i1_task_blocker_indexes",
+      "breakpoints": true
     }
   ]
 }

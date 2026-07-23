@@ -55,8 +55,10 @@ export async function countActive(
   recipientMemberId: string,
   exec: Executor = db
 ): Promise<number> {
-  const rows = await exec
-    .select({ id: notifications.id })
+  // WP-I1: was select-all-rows-then-.length — count(*) instead of fetching
+  // every matching row just to discard its contents.
+  const [row] = await exec
+    .select({ count: sql<number>`count(*)::int` })
     .from(notifications)
     .where(
       and(
@@ -66,7 +68,7 @@ export async function countActive(
         NOT_CURRENTLY_SNOOZED
       )
     );
-  return rows.length;
+  return row?.count ?? 0;
 }
 
 export async function snooze(
@@ -124,8 +126,9 @@ export async function countUnread(
   recipientMemberId: string,
   exec: Executor = db
 ): Promise<number> {
-  const rows = await exec
-    .select({ id: notifications.id })
+  // WP-I1: was select-all-rows-then-.length — count(*) instead.
+  const [row] = await exec
+    .select({ count: sql<number>`count(*)::int` })
     .from(notifications)
     .where(
       and(
@@ -134,7 +137,7 @@ export async function countUnread(
         eq(notifications.isRead, false)
       )
     );
-  return rows.length;
+  return row?.count ?? 0;
 }
 
 export async function markRead(

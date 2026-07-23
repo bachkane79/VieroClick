@@ -15,6 +15,7 @@ import {
 import { and, eq, gte } from "drizzle-orm";
 import * as repo from "./member-score.repo";
 import type { MemberScores } from "./member-score.repo";
+import { getOrSetCache } from "@/server/lib/cache";
 
 const RECENT_DAYS = 14;
 const EXPECTED_UPDATES_PER_WINDOW = 10; // ~working days in a 2-week window
@@ -188,7 +189,17 @@ export async function listProjectMemberProfiles(projectId: string) {
   }));
 }
 
+/** WP-I2: was uncached (2 full queries — roster + every task in the project —
+ *  recomputed on every workload/assign page load). Short TTL for the same
+ *  reason as `dashboard:` — invalidated explicitly on task/blocker/risk writes
+ *  (`invalidateProjectCaches`), TTL is just the fallback. */
 export async function computeTeamMetrics(projectId: string): Promise<TeamMemberMetrics[]> {
+  return getOrSetCache(`team-metrics:${projectId}`, () => computeTeamMetricsUncached(projectId), {
+    ttlSeconds: 30,
+  });
+}
+
+async function computeTeamMetricsUncached(projectId: string): Promise<TeamMemberMetrics[]> {
   const roster = await db
     .select({
       workspaceMemberId: projectMembers.workspaceMemberId,

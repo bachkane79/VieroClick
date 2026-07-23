@@ -9,6 +9,7 @@ import {
   boolean,
   check,
   unique,
+  index,
 } from "drizzle-orm/pg-core";
 import { timestamptz } from "./_helpers";
 import { sql } from "drizzle-orm";
@@ -49,24 +50,30 @@ export const blockerStatusEnum = pgEnum("blocker_status", [
   "ignored",
 ]);
 
-export const blockers = pgTable("blockers", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  projectId: uuid("project_id")
-    .notNull()
-    .references(() => projects.id, { onDelete: "cascade" }),
-  taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
-  reportedByMemberId: uuid("reported_by_member_id").references(() => workspaceMembers.id),
-  title: text("title").notNull(),
-  description: text("description"),
-  status: blockerStatusEnum("status").notNull().default("open"),
-  severity: taskPriorityEnum("severity").notNull().default("medium"),
-  ownerMemberId: uuid("owner_member_id").references(() => workspaceMembers.id),
-  resolvedByMemberId: uuid("resolved_by_member_id").references(() => workspaceMembers.id),
-  resolvedAt: timestamptz("resolved_at"),
-  escalatedAt: timestamptz("escalated_at"),
-  createdAt: timestamptz("created_at").notNull().defaultNow(),
-  updatedAt: timestamptz("updated_at").notNull().defaultNow(),
-});
+export const blockers = pgTable(
+  "blockers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+    reportedByMemberId: uuid("reported_by_member_id").references(() => workspaceMembers.id),
+    title: text("title").notNull(),
+    description: text("description"),
+    status: blockerStatusEnum("status").notNull().default("open"),
+    severity: taskPriorityEnum("severity").notNull().default("medium"),
+    ownerMemberId: uuid("owner_member_id").references(() => workspaceMembers.id),
+    resolvedByMemberId: uuid("resolved_by_member_id").references(() => workspaceMembers.id),
+    resolvedAt: timestamptz("resolved_at"),
+    escalatedAt: timestamptz("escalated_at"),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+    updatedAt: timestamptz("updated_at").notNull().defaultNow(),
+  },
+  // WP-I1: no index existed on this FK — computeHealthDetails/dashboard/test-db
+  // all filter blockers by project_id.
+  (t) => [index("blockers_project_idx").on(t.projectId)]
+);
 
 export const leaderReports = pgTable(
   "leader_reports",

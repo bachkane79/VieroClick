@@ -73,6 +73,25 @@ export async function listTeamMemberIds(teamId: string, exec: Executor = db): Pr
   return rows.map((r) => r.id);
 }
 
+/** WP-I1: batched form of listTeamMemberIds — 1 query for N teams instead of N. */
+export async function listMemberIdsForTeams(
+  teamIds: string[],
+  exec: Executor = db
+): Promise<Map<string, string[]>> {
+  const byTeam = new Map<string, string[]>();
+  if (teamIds.length === 0) return byTeam;
+  const rows = await exec
+    .select({ teamId: teamMembers.teamId, memberId: teamMembers.workspaceMemberId })
+    .from(teamMembers)
+    .where(inArray(teamMembers.teamId, teamIds));
+  for (const r of rows) {
+    const list = byTeam.get(r.teamId);
+    if (list) list.push(r.memberId);
+    else byTeam.set(r.teamId, [r.memberId]);
+  }
+  return byTeam;
+}
+
 export async function listTeamIdsForMember(
   workspaceMemberId: string,
   exec: Executor = db

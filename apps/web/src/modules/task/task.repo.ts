@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import {
   db,
   projects,
@@ -23,6 +23,20 @@ export async function findById(id: string, exec: Executor = db): Promise<TaskRow
     .where(and(eq(tasks.id, id), isNull(tasks.deletedAt)))
     .limit(1);
   return row ?? null;
+}
+
+/** WP-I1: batched existence-check for `findById` — 1 query for N ids instead of N. */
+export async function existingIdsInProject(
+  ids: string[],
+  projectId: string,
+  exec: Executor = db
+): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const rows = await exec
+    .select({ id: tasks.id })
+    .from(tasks)
+    .where(and(inArray(tasks.id, ids), eq(tasks.projectId, projectId), isNull(tasks.deletedAt)));
+  return new Set(rows.map((r) => r.id));
 }
 
 /** WP-D4: like `findById`, but also returns soft-deleted rows — used only by restore(). */

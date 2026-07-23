@@ -199,7 +199,7 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
             pinned: p.pinned,
             authorMemberId: p.authorMemberId,
             authorName: p.authorName,
-            createdAt: p.createdAt.toISOString(),
+            createdAt: new Date(p.createdAt).toISOString(),
           }))}
           canManage={canManage}
           currentMemberId={ctx.workspaceMemberId}

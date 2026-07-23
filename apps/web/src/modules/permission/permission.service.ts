@@ -160,13 +160,13 @@ export async function listTeams(workspaceId: string) {
 export async function listTeamsWithMembers(workspaceId: string) {
   await requireActor(workspaceId);
   const teams = await repo.listTeams(workspaceId);
-  return Promise.all(
-    teams.map(async (t) => ({
-      id: t.id,
-      name: t.name,
-      memberIds: await repo.listTeamMemberIds(t.id),
-    }))
-  );
+  // WP-I1: was 1 query per team (N+1); batched into a single query + in-memory group.
+  const membersByTeam = await repo.listMemberIdsForTeams(teams.map((t) => t.id));
+  return teams.map((t) => ({
+    id: t.id,
+    name: t.name,
+    memberIds: membersByTeam.get(t.id) ?? [],
+  }));
 }
 
 export async function deleteTeam(p: { workspaceId: string; teamId: string }) {

@@ -3,7 +3,7 @@ import { cache } from "react";
 import { db } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
 import { NotFoundError } from "@/server/lib/errors";
-import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
+import { getOrSetCache, invalidateCache, invalidateProjectCaches } from "@/server/lib/cache";
 import { createRiskSchema, updateRiskSchema } from "./risk.schema";
 import { assertCanManageRisks } from "./risk.policy";
 import * as repo from "./risk.repo";
@@ -37,6 +37,7 @@ export async function createRisk(p: { workspaceId: string; projectId: string; in
 
     await events.riskCreated(tx, ctx, risk);
     await invalidateCache(`risks:${p.projectId}`);
+    await invalidateProjectCaches(p.projectId); // WP-I2: dashboard health score counts high-risk items
 
     return risk;
   });
@@ -71,6 +72,7 @@ export async function updateRisk(p: {
 
     await events.riskUpdated(tx, ctx, existing, updated);
     await invalidateCache(`risks:${p.projectId}`);
+    await invalidateProjectCaches(p.projectId); // WP-I2: dashboard health score counts high-risk items
 
     return updated;
   });
@@ -87,6 +89,7 @@ export async function deleteRisk(p: { workspaceId: string; projectId: string; ri
   return db.transaction(async (tx) => {
     await repo.remove(p.riskId, tx);
     await invalidateCache(`risks:${p.projectId}`);
+    await invalidateProjectCaches(p.projectId); // WP-I2: dashboard health score counts high-risk items
     return { id: p.riskId };
   });
 }

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { db, projectDocs, taskComments, tasks, type Executor } from "@vieroc/db";
 
 export type CommentInsert = typeof taskComments.$inferInsert;
@@ -70,6 +70,35 @@ export async function linkedDocExists(
     .where(and(eq(projectDocs.id, docId), eq(projectDocs.projectId, projectId)))
     .limit(1);
   return Boolean(row);
+}
+
+/** WP-I1: batched form of `findByIdInProject` (existence only) — 1 query for N ids. */
+export async function existingIdsInProject(
+  ids: string[],
+  projectId: string,
+  exec: Executor = db
+): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const rows = await exec
+    .select({ id: taskComments.id })
+    .from(taskComments)
+    .innerJoin(tasks, eq(tasks.id, taskComments.taskId))
+    .where(and(inArray(taskComments.id, ids), eq(tasks.projectId, projectId)));
+  return new Set(rows.map((r) => r.id));
+}
+
+/** WP-I1: batched form of `linkedDocExists` — 1 query for N ids. */
+export async function existingDocIdsInProject(
+  ids: string[],
+  projectId: string,
+  exec: Executor = db
+): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const rows = await exec
+    .select({ id: projectDocs.id })
+    .from(projectDocs)
+    .where(and(inArray(projectDocs.id, ids), eq(projectDocs.projectId, projectId)));
+  return new Set(rows.map((r) => r.id));
 }
 
 export async function create(values: CommentInsert, exec: Executor = db): Promise<CommentRow> {

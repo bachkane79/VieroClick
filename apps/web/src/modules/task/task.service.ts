@@ -6,7 +6,7 @@ import { requireActor, type ActorContext } from "@/server/lib/context";
 import { isProjectManager, isReviewer, meetsLevel } from "@/server/lib/permissions";
 import { resolveGrantLevel } from "@/modules/permission/permission.access";
 import { ConflictError, NotFoundError, ValidationError } from "@/server/lib/errors";
-import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
+import { getOrSetCache, invalidateCache, invalidateProjectCaches } from "@/server/lib/cache";
 import { enqueueNotifications } from "@/server/lib/notifications";
 import { createTaskDependencySchema } from "@/modules/task-dependency/task-dependency.schema";
 import * as dependencyEvents from "@/modules/task-dependency/task-dependency.events";
@@ -251,6 +251,7 @@ export async function createTask(p: { workspaceId: string; projectId: string; in
     }
 
     await invalidateCache(`board:${p.projectId}`);
+    await invalidateProjectCaches(p.projectId); // WP-I2: dashboard/team-metrics aggregate over tasks too
     return task;
   });
 }
@@ -434,6 +435,7 @@ export async function updateTask(p: {
     }
 
     await invalidateCache(`board:${p.projectId}`);
+    await invalidateProjectCaches(p.projectId); // WP-I2: dashboard/team-metrics aggregate over tasks too
     return updated;
   });
 }
@@ -495,6 +497,7 @@ export async function reviewTask(p: {
       // 4.1: closing a task feeds the assignee's operational scores.
       await safeRecomputeScore(ctx.workspaceId, updated.assigneeMemberId, tx);
       await invalidateCache(`board:${p.projectId}`);
+    await invalidateProjectCaches(p.projectId); // WP-I2: dashboard/team-metrics aggregate over tasks too
       return updated;
     }
 
@@ -528,6 +531,7 @@ export async function reviewTask(p: {
       ]);
     }
     await invalidateCache(`board:${p.projectId}`);
+    await invalidateProjectCaches(p.projectId); // WP-I2: dashboard/team-metrics aggregate over tasks too
     return updated;
   });
 }
@@ -589,6 +593,7 @@ export async function setTaskAssignees(p: {
     }
 
     await invalidateCache(`board:${p.projectId}`);
+    await invalidateProjectCaches(p.projectId); // WP-I2: dashboard/team-metrics aggregate over tasks too
     return { ...updated, assigneeMemberIds: memberIds };
   });
 }
@@ -691,6 +696,7 @@ export async function addTaskDependency(p: {
 
     await dependencyEvents.dependencyAdded(tx, ctx, blocked.id, blocker.id);
     await invalidateCache(`board:${p.projectId}`);
+    await invalidateProjectCaches(p.projectId); // WP-I2: dashboard/team-metrics aggregate over tasks too
     return dependency;
   });
 }
@@ -710,6 +716,7 @@ export async function removeTaskDependency(p: {
     await dependencyEvents.dependencyRemoved(tx, ctx, existing.blockedTaskId, existing.blockerTaskId);
     await repo.removeDependency(p.dependencyId, tx);
     await invalidateCache(`board:${p.projectId}`);
+    await invalidateProjectCaches(p.projectId); // WP-I2: dashboard/team-metrics aggregate over tasks too
     return { id: p.dependencyId };
   });
 }
@@ -724,6 +731,7 @@ export async function deleteTask(p: { workspaceId: string; projectId: string; ta
     await events.taskDeleted(tx, ctx, existing);
     await repo.softDelete(p.taskId, tx);
     await invalidateCache(`board:${p.projectId}`);
+    await invalidateProjectCaches(p.projectId); // WP-I2: dashboard/team-metrics aggregate over tasks too
     return { id: p.taskId };
   });
 }
@@ -741,6 +749,7 @@ export async function restoreTask(p: { workspaceId: string; projectId: string; t
     if (!restored) throw new NotFoundError("Task");
     await events.taskRestored(tx, ctx, restored);
     await invalidateCache(`board:${p.projectId}`);
+    await invalidateProjectCaches(p.projectId); // WP-I2: dashboard/team-metrics aggregate over tasks too
     return restored;
   });
 }

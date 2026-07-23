@@ -4,7 +4,7 @@ import { db } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
 import { NotFoundError } from "@/server/lib/errors";
 import { enqueueNotifications } from "@/server/lib/notifications";
-import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
+import { getOrSetCache, invalidateCache, invalidateProjectCaches } from "@/server/lib/cache";
 import { createBlockerSchema, updateBlockerSchema } from "./blocker.schema";
 import { assertCanReport, assertCanResolve } from "./blocker.policy";
 import * as repo from "./blocker.repo";
@@ -56,6 +56,7 @@ export async function reportBlocker(p: {
     }
 
     await invalidateCache(`blockers:${p.projectId}`);
+    await invalidateProjectCaches(p.projectId); // WP-I2: dashboard health score counts open blockers
 
     return blocker;
   });
@@ -100,6 +101,7 @@ export async function updateBlocker(p: {
     }
 
     await invalidateCache(`blockers:${p.projectId}`);
+    await invalidateProjectCaches(p.projectId); // WP-I2: dashboard health score counts open blockers
 
     return updated;
   });

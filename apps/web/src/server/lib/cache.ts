@@ -71,6 +71,21 @@ export async function invalidateCachePattern(pattern: string): Promise<void> {
   }
 }
 
+/**
+ * WP-I2 — `dashboard:${projectId}` (health/KPIs) and `team-metrics:${projectId}`
+ * (workload) both aggregate across tasks/blockers/risks, so no single module's
+ * own cache key (`board:`, `blockers:`, `risks:`) covers their invalidation.
+ * Call this alongside the existing per-module invalidateCache at every
+ * task/blocker/risk mutation site instead of teaching each module about the
+ * other two's cache keys.
+ */
+export async function invalidateProjectCaches(projectId: string): Promise<void> {
+  await Promise.all([
+    invalidateCache(`dashboard:${projectId}`),
+    invalidateCache(`team-metrics:${projectId}`),
+  ]);
+}
+
 export async function getOrSetCache<T>(
   key: string,
   fn: () => Promise<T>,

@@ -18,7 +18,7 @@ import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
 import { enqueueNotifications } from "@/server/lib/notifications";
 import { dispatchAgent } from "@/server/lib/agent-dispatch";
 import { isWorkspaceAdmin, meetsLevel, requirePermission } from "@/server/lib/permissions";
-import { resolveGrantLevel } from "@/modules/permission/permission.access";
+import { resolveGrantLevel, resolveViewableSetBatch } from "@/modules/permission/permission.access";
 import { createProjectSchema, updateProjectSchema } from "./project.schema";
 import { assertCanCreateProject, assertCanManageProject } from "./project.policy";
 import * as repo from "./project.repo";
@@ -51,10 +51,12 @@ async function canAccessPrivateProject(
 //
 // WP-C6 reference migration: reads go through requireScopedActor so the
 // underlying queries run under RLS (app_runtime role), not just the app-layer
-// ACL check below. `canAccessPrivateProject` → `resolveGrantLevel` still reads
-// through the default (owner) `db` for now — see docs_local/wp-c6-rls-report.md,
-// "còn lại" section — that one call is an accepted gap in this pass, not
-// silently assumed covered.
+// ACL check below. WP-I1 batched the private-project grant check
+// (resolveViewableSetBatch) and threads `exec` through, so this path is
+// RLS-scoped too now. The remaining gap is `getProject`'s single-resource
+// `canAccessPrivateProject` → `resolveGrantLevel` below, which still reads
+// through the default (owner) `db` — see docs_local/wp-c6-rls-report.md,
+// "còn lại" section.
 export const listProjects = cache(async function listProjects(workspaceId: string) {
   return requireScopedActor(workspaceId, undefined, async (ctx, exec) => {
     // Shared cache holds the full list; per-user private-project filtering happens
@@ -68,15 +70,12 @@ export const listProjects = cache(async function listProjects(workspaceId: strin
     const myProjectIds = new Set(
       await repo.listProjectIdsForMember(workspaceId, ctx.workspaceMemberId, exec)
     );
-    const visible = [];
-    for (const p of all) {
-      if (!p.isPrivate || myProjectIds.has(p.id)) {
-        visible.push(p);
-        continue;
-      }
-      if (await canAccessPrivateProject(ctx, p, false)) visible.push(p);
-    }
-    return visible;
+    // WP-I1: was 1 grant-check query per private project not already owned by
+    // the caller (N+1) — batched into 2 queries total regardless of list size.
+    const candidates = all.filter((p) => p.isPrivate && !myProjectIds.has(p.id));
+    const viewableExtra =
+      candidates.length > 0 ? await resolveViewableSetBatch(ctx, candidates, exec) : new Set<string>();
+    return all.filter((p) => !p.isPrivate || myProjectIds.has(p.id) || viewableExtra.has(p.id));
   });
 });
 
@@ -565,70 +564,6 @@ export async function triggerObserver(workspaceId: string, projectId: string) {
   });
 }
 
-/**
- * Compute a project health score (0–100) from real DB signals.
- *
- * Scoring:
- *   -5 per overdue task (max -30)
- *   -8 per open/in-review blocker (max -24)
- *   -5 per high-risk (probability*impact >= 12, max -20)
- *   +26 * completionPct/100 (bonus for task completion)
- */
-export async function computeHealthScore(projectId: string): Promise<number> {
-  const todayStr = new Date().toISOString().split("T")[0]!;
-
-  const [allTasks, openBlockers, highRisks] = await Promise.all([
-    db
-      .select({ statusType: taskStatuses.type })
-      .from(tasks)
-      .innerJoin(taskStatuses, eq(taskStatuses.id, tasks.statusId))
-      .where(and(eq(tasks.projectId, projectId), ne(taskStatuses.type, "cancelled"))),
-    db
-      .select({ id: blockers.id })
-      .from(blockers)
-      .where(
-        and(
-          eq(blockers.projectId, projectId),
-          sql`${blockers.status} in ('open','in_review')`
-        )
-      ),
-    db
-      .select({ id: projectRisks.id })
-      .from(projectRisks)
-      .where(
-        and(
-          eq(projectRisks.projectId, projectId),
-          eq(projectRisks.status, "open"),
-          sql`coalesce(${projectRisks.probability}, 1) * coalesce(${projectRisks.impact}, 1) >= 12`
-        )
-      ),
-  ]);
-
-  const overdueTasks = await db
-    .select({ id: tasks.id })
-    .from(tasks)
-    .innerJoin(taskStatuses, eq(taskStatuses.id, tasks.statusId))
-    .where(
-      and(
-        eq(tasks.projectId, projectId),
-        lt(tasks.dueDate, todayStr),
-        sql`${taskStatuses.type} not in ('done','cancelled')`
-      )
-    );
-
-  const totalTasks = allTasks.length;
-  const doneTasks = allTasks.filter((t) => t.statusType === "done").length;
-  const completionPct = totalTasks > 0 ? doneTasks / totalTasks : 0;
-
-  let score = 100;
-  score -= Math.min(overdueTasks.length * 5, 30);
-  score -= Math.min(openBlockers.length * 8, 24);
-  score -= Math.min(highRisks.length * 5, 20);
-  score += completionPct * 26;
-
-  return Math.round(Math.max(0, Math.min(100, score)));
-}
-
 export interface HealthDetails {
   score: number;
   overdueTaskCount: number;
@@ -639,10 +574,22 @@ export interface HealthDetails {
   doneTasks: number;
 }
 
+/**
+ * Compute a project health score (0–100) + its breakdown from real DB signals.
+ *
+ * Scoring:
+ *   -5 per overdue task (max -30)
+ *   -8 per open/in-review blocker (max -24)
+ *   -5 per high-risk (probability*impact >= 12, max -20)
+ *   +26 * completionPct/100 (bonus for task completion)
+ */
 export async function computeHealthDetails(projectId: string): Promise<HealthDetails> {
   const todayStr = new Date().toISOString().split("T")[0]!;
 
-  const [allTasks, openBlockers, highRisks] = await Promise.all([
+  // WP-I1: overdueTasks used to be a 4th query awaited *after* this Promise.all
+  // resolved, despite having no dependency on the other three — a free extra
+  // round-trip on every health/dashboard load. Folded in as a 4th parallel branch.
+  const [allTasks, openBlockers, highRisks, overdueTasks] = await Promise.all([
     db
       .select({ statusType: taskStatuses.type })
       .from(tasks)
@@ -667,19 +614,18 @@ export async function computeHealthDetails(projectId: string): Promise<HealthDet
           sql`coalesce(${projectRisks.probability}, 1) * coalesce(${projectRisks.impact}, 1) >= 12`
         )
       ),
+    db
+      .select({ id: tasks.id })
+      .from(tasks)
+      .innerJoin(taskStatuses, eq(taskStatuses.id, tasks.statusId))
+      .where(
+        and(
+          eq(tasks.projectId, projectId),
+          lt(tasks.dueDate, todayStr),
+          sql`${taskStatuses.type} not in ('done','cancelled')`
+        )
+      ),
   ]);
-
-  const overdueTasks = await db
-    .select({ id: tasks.id })
-    .from(tasks)
-    .innerJoin(taskStatuses, eq(taskStatuses.id, tasks.statusId))
-    .where(
-      and(
-        eq(tasks.projectId, projectId),
-        lt(tasks.dueDate, todayStr),
-        sql`${taskStatuses.type} not in ('done','cancelled')`
-      )
-    );
 
   const totalTasks = allTasks.length;
   const doneTasks = allTasks.filter((t) => t.statusType === "done").length;
