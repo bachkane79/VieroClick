@@ -47,4 +47,9 @@ celery_app.conf.beat_schedule = {
         "task": "app.workers.tasks.run_scheduled_daily_update_reminder",
         "schedule": crontab(hour=10, minute=0),
     },
+    # WP-E2: 03:00 UTC+7 = 20:00 UTC (previous day) — low-traffic hour
+    "message-retention": {
+        "task": "app.workers.tasks.run_scheduled_message_retention",
+        "schedule": crontab(hour=20, minute=0),
+    },
 }

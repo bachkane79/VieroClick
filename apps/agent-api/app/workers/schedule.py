@@ -1,15 +1,18 @@
 """
 schedule.py
-Async functions backing the five Celery Beat rhythms:
+Async functions backing the Celery Beat rhythms:
   - morning_briefing       (07:30 UTC+7 = 00:30 UTC)
   - midday_health_scan     (12:00 UTC+7 = 05:00 UTC)
   - eod_report             (17:30 UTC+7 = 10:30 UTC)
   - escalation_scan        (09:00 UTC+7 = 02:00 UTC)
   - daily_update_reminder  (17:00 UTC+7 = 10:00 UTC)
+  - message_retention      (03:00 UTC+7 = 20:00 UTC, previous day)
 
-Each function processes a single project. The beat Celery tasks iterate
+The first five process a single project each; the beat Celery tasks iterate
 over all active projects and call these functions per project, isolating
-failures so one bad project doesn't block the rest.
+failures so one bad project doesn't block the rest. `run_message_retention`
+is global (chat messages aren't scoped per-project the way the others are),
+so it makes one call, not a per-project loop.
 """
 import logging
 
@@ -144,3 +147,24 @@ async def run_daily_update_reminder(project_id: str, workspace_id: str) -> dict:
     reminded = data.get("reminded", 0)
     logger.info("daily_update_reminder: project=%s reminded=%d", project_id, reminded)
     return {"ok": True, "reminded": reminded}
+
+
+async def run_message_retention() -> dict:
+    """03:00 UTC+7 — WP-E2: prune chat messages past the retention window.
+    Global (not per-project) — chat.channels are workspace-scoped, not project-scoped."""
+    logger.info("message_retention: starting prune")
+    headers = {"Authorization": f"Bearer {settings.vieroc_api_key}"}
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.post(
+            f"{settings.vieroc_api_url}/api/cron/prune-messages",
+            headers=headers,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+    logger.info(
+        "message_retention: deleted=%d retentionDays=%s",
+        data.get("deleted", 0), data.get("retentionDays"),
+    )
+    return {"ok": True, "deleted": data.get("deleted", 0)}

@@ -50,6 +50,14 @@ export async function listChannelMessagesAction(args: {
   });
 }
 
+export async function chatUnreadCountsAction(args: { workspaceId: string }) {
+  return runAction(() => service.getChatUnreadCounts(args.workspaceId));
+}
+
+export async function markChannelReadAction(args: { workspaceId: string; channelId: string }) {
+  return runAction(() => service.markChannelRead(args));
+}
+
 export async function sendChannelMessageAction(args: {
   workspaceId: string;
   channelId: string;

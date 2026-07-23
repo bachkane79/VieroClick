@@ -37,11 +37,12 @@ export default async function ChannelPage({ params }: Props) {
         displayName: channel.displayName,
         topic: channel.topic,
       }}
-      channels={directory.channels.map((c) => ({ id: c.id, name: c.name }))}
+      channels={directory.channels.map((c) => ({ id: c.id, name: c.name, unreadCount: c.unreadCount }))}
       dms={directory.dms.map((d) => ({
         id: d.id,
         otherName: d.otherName,
         otherAvatarUrl: d.otherAvatarUrl,
+        unreadCount: d.unreadCount,
       }))}
       members={directory.members.map((m) => ({
         memberId: m.memberId,

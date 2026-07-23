@@ -11,9 +11,11 @@ import { Hash, MessagesSquare, Plus, SendHorizonal, Trash2, UserCircle } from "l
 import { Button } from "@vieroc/ui";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import {
+  chatUnreadCountsAction,
   createChannelAction,
   deleteChannelAction,
   listChannelMessagesAction,
+  markChannelReadAction,
   openDmAction,
   sendChannelMessageAction,
 } from "../channel.actions";
@@ -31,15 +33,21 @@ interface Props {
   workspaceId: string;
   slug: string;
   channel: { id: string; type: string; displayName: string; topic: string | null };
-  channels: Array<{ id: string; name: string }>;
-  dms: Array<{ id: string; otherName: string; otherAvatarUrl: string | null }>;
+  channels: Array<{ id: string; name: string; unreadCount?: number }>;
+  dms: Array<{ id: string; otherName: string; otherAvatarUrl: string | null; unreadCount?: number }>;
   members: Array<{ memberId: string; name: string; avatarUrl: string | null }>;
   myMemberId: string;
   canPost: boolean;
   initialMessages: ChatMessage[];
 }
 
-const POLL_MS = 4000;
+// WP-E2: refresh interval for sidebar-style unread badges in this in-page
+// directory. Not SSE-driven — a periodic refresh is enough for a badge count.
+const UNREAD_REFRESH_MS = 20_000;
+
+// WP-E1: SSE delivers new messages in real time; this is only the fallback
+// cadence used while the stream is down (Redis outage, network blip, etc).
+const FALLBACK_POLL_MS = 30_000;
 
 function dayKey(iso: string) {
   return new Date(iso).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -52,7 +60,8 @@ function timeLabel(iso: string) {
 /**
  * Discord-style chat surface (full-system spec §5.13): channel/DM directory on
  * the left, virtual-enough timeline + composer on the right. New messages
- * arrive via incremental polling (`after` cursor) — no websocket in the stack.
+ * arrive over SSE (`/api/channels/[id]/stream`, Redis Pub/Sub-backed); falls
+ * back to incremental polling (`after` cursor) whenever the stream errors.
  */
 export function ChatClient({
   workspaceId,
@@ -73,6 +82,12 @@ export function ChatClient({
   const [creatingChannel, setCreatingChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
   const [confirmDeleteChannel, setConfirmDeleteChannel] = useState(false);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>(() => {
+    const initial: Record<string, number> = {};
+    for (const c of channels) initial[c.id] = c.unreadCount ?? 0;
+    for (const d of dms) initial[d.id] = d.unreadCount ?? 0;
+    return initial;
+  });
 
   async function handleDeleteChannel() {
     const result = await deleteChannelAction({ workspaceId, channelId: channel.id, slug });
@@ -118,12 +133,89 @@ export function ChatClient({
     if (res.ok) appendNew(res.data);
   }
 
-  // Incremental polling keeps the room live for everyone in it.
+  // Real-time delivery over SSE, with a 30s poll as a fallback while the
+  // stream is down (Redis outage, network blip, mid-reconnect). EventSource
+  // auto-reconnects on its own; we just track whether the poll needs to fill
+  // the gap in the meantime.
   useEffect(() => {
-    const timer = setInterval(fetchNew, POLL_MS);
-    return () => clearInterval(timer);
+    let fallbackTimer: ReturnType<typeof setInterval> | null = null;
+    const startFallback = () => {
+      if (fallbackTimer) return;
+      fallbackTimer = setInterval(fetchNew, FALLBACK_POLL_MS);
+    };
+    const stopFallback = () => {
+      if (fallbackTimer) {
+        clearInterval(fallbackTimer);
+        fallbackTimer = null;
+      }
+    };
+
+    const url = `/api/channels/${channel.id}/stream?workspaceId=${encodeURIComponent(workspaceId)}`;
+    const es = new EventSource(url);
+    es.addEventListener("message", (evt) => {
+      try {
+        const row = JSON.parse((evt as MessageEvent<string>).data) as ChatMessage;
+        appendNew([row]);
+        // WP-E2: a message arriving while this channel is the visible tab
+        // counts as read immediately — don't wait for the next unread poll.
+        if (document.visibilityState === "visible") {
+          setUnreadCounts((cur) => ({ ...cur, [channel.id]: 0 }));
+          void markChannelReadAction({ workspaceId, channelId: channel.id });
+        }
+      } catch {
+        // malformed payload — ignore, next message/poll will catch up
+      }
+    });
+    es.onopen = stopFallback;
+    es.onerror = startFallback;
+
+    // Catch up on anything sent while the client was mounting/switching channels.
+    void fetchNew();
+
+    return () => {
+      es.close();
+      stopFallback();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id]);
+
+  // WP-E2: mark the open channel read now, and again whenever the tab regains
+  // focus while it's still open (switching back from another app/tab counts
+  // as reading whatever arrived while backgrounded).
+  useEffect(() => {
+    const markRead = () => {
+      setUnreadCounts((cur) => ({ ...cur, [channel.id]: 0 }));
+      void markChannelReadAction({ workspaceId, channelId: channel.id });
+    };
+    markRead();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") markRead();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [channel.id, workspaceId]);
+
+  // WP-E2: periodic refresh of unread badges for the *other* channels/DMs in
+  // the directory (the open one is kept at 0 by the effect above).
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      const res = await chatUnreadCountsAction({ workspaceId });
+      if (!cancelled && res.ok) {
+        setUnreadCounts((cur) => ({ ...cur, ...res.data, [channel.id]: 0 }));
+      }
+    };
+    void poll();
+    const timer = setInterval(poll, UNREAD_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [workspaceId, channel.id]);
 
   // Stick to the bottom when messages arrive and the user is already there.
   useEffect(() => {
@@ -253,7 +345,8 @@ export function ChatClient({
                 )}
               >
                 <Hash className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <span className="truncate">{c.name}</span>
+                <span className="flex-1 truncate">{c.name}</span>
+                <UnreadBadge count={unreadCounts[c.id]} />
               </Link>
             ))}
           </div>
@@ -274,7 +367,8 @@ export function ChatClient({
                 )}
               >
                 <Avatar name={d.otherName} url={d.otherAvatarUrl} />
-                <span className="truncate">{d.otherName}</span>
+                <span className="flex-1 truncate">{d.otherName}</span>
+                <UnreadBadge count={unreadCounts[d.id]} />
               </Link>
             ))}
             {newDmTargets.map((m) => (
@@ -419,6 +513,15 @@ export function ChatClient({
         </footer>
       </section>
     </div>
+  );
+}
+
+function UnreadBadge({ count }: { count?: number }) {
+  if (!count || count <= 0) return null;
+  return (
+    <span className="grid h-4 min-w-4 shrink-0 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold leading-none text-primary-foreground">
+      {count > 9 ? "9+" : count}
+    </span>
   );
 }
 

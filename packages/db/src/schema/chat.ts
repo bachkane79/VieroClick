@@ -68,3 +68,24 @@ export const channelMessages = pgTable(
   },
   (t) => [index("channel_messages_channel_created_idx").on(t.channelId, t.createdAt)]
 );
+
+/**
+ * WP-E2: per-member read cursor. A separate table (not a column on
+ * `channelMembers`) because open "channel" type rows have no membership row
+ * to hang a cursor off — this table is upserted for any channel type the
+ * moment a member reads it, regardless of membership semantics.
+ */
+export const channelReads = pgTable(
+  "channel_reads",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    channelId: uuid("channel_id")
+      .notNull()
+      .references(() => channels.id, { onDelete: "cascade" }),
+    workspaceMemberId: uuid("workspace_member_id")
+      .notNull()
+      .references(() => workspaceMembers.id, { onDelete: "cascade" }),
+    lastReadAt: timestamptz("last_read_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("channel_reads_channel_member_idx").on(t.channelId, t.workspaceMemberId)]
+);

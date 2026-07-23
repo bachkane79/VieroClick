@@ -3,6 +3,7 @@ import { db } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
 import { NotFoundError, ForbiddenError } from "@/server/lib/errors";
 import { assertRateLimit } from "@/server/lib/rate-limit";
+import { publishChannelMessage } from "@/server/lib/chat-pubsub";
 import * as repo from "./channel.repo";
 import * as events from "./channel.events";
 import { createChannelSchema, sendMessageSchema, openDmSchema } from "./channel.schema";
@@ -58,13 +59,40 @@ export async function listChatDirectory(workspaceId: string) {
     repo.listWorkspaceMembersWithNames(workspaceId),
   ]);
 
+  // WP-E2: unread counts for the sidebar badge, batched over every channel/DM
+  // this member can see.
+  const unread = await repo.getUnreadCounts(
+    [...channels.map((c) => c.id), ...dms.map((d) => d.id)],
+    ctx.workspaceMemberId
+  );
+
   return {
-    channels,
-    dms,
+    channels: channels.map((c) => ({ ...c, unreadCount: unread[c.id] ?? 0 })),
+    dms: dms.map((d) => ({ ...d, unreadCount: unread[d.id] ?? 0 })),
     members: members.filter((m) => m.memberId !== ctx.workspaceMemberId),
     myMemberId: ctx.workspaceMemberId,
     canPost: ctx.workspaceRole !== "viewer" && ctx.workspaceRole !== "guest",
   };
+}
+
+/** WP-E2: lightweight refresh of just the unread counts (sidebar badge polling). */
+export async function getChatUnreadCounts(workspaceId: string): Promise<Record<string, number>> {
+  const ctx = await requireActor(workspaceId);
+  assertCanAccessChat(ctx);
+
+  const [channels, dms] = await Promise.all([
+    repo.listChannels(workspaceId),
+    repo.listDmsForMember(workspaceId, ctx.workspaceMemberId),
+  ]);
+  return repo.getUnreadCounts([...channels.map((c) => c.id), ...dms.map((d) => d.id)], ctx.workspaceMemberId);
+}
+
+/** WP-E2: marks a channel/DM as read up to now for the caller. */
+export async function markChannelRead(p: { workspaceId: string; channelId: string }): Promise<void> {
+  const ctx = await requireActor(p.workspaceId);
+  assertCanAccessChat(ctx);
+  await requireChannelAccess(ctx, p.channelId, p.workspaceId);
+  await repo.markRead(p.channelId, ctx.workspaceMemberId);
 }
 
 export async function createChannel(p: { workspaceId: string; input: unknown }) {
@@ -164,7 +192,7 @@ export async function sendMessage(p: { workspaceId: string; channelId: string; i
   await assertRateLimit(ctx.userId, "chat-send", { limit: 30, windowSec: 10 });
   await requireChannelAccess(ctx, p.channelId, p.workspaceId);
 
-  return db.transaction(async (tx) => {
+  const message = await db.transaction(async (tx) => {
     return repo.createMessage(
       {
         channelId: p.channelId,
@@ -174,4 +202,13 @@ export async function sendMessage(p: { workspaceId: string; channelId: string; i
       tx
     );
   });
+
+  // WP-E1: fan out to SSE subscribers. Fetched separately (not returned from the
+  // insert) because the stream payload needs author identity, same shape as
+  // listMessages. Not awaited — a slow/down Redis must never delay the send.
+  void repo.getMessageWithAuthor(message.id).then((full) => {
+    if (full) void publishChannelMessage(p.channelId, { ...full, createdAt: full.createdAt.toISOString() });
+  });
+
+  return message;
 }

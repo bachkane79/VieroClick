@@ -147,9 +147,6 @@ importers:
       autoprefixer:
         specifier: ^10.4.20
         version: 10.5.0(postcss@8.5.15)
-      dotenv:
-        specifier: ^17.4.2
-        version: 17.4.2
       eslint:
         specifier: ^8.57.1
         version: 8.57.1
@@ -165,9 +162,6 @@ importers:
       tailwindcss:
         specifier: ^3.4.17
         version: 3.4.19(tsx@4.22.4)
-      tsx:
-        specifier: ^4.19.2
-        version: 4.22.4
       typescript:
         specifier: '*'
         version: 5.9.3

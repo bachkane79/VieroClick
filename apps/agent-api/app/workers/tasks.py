@@ -146,3 +146,11 @@ def run_scheduled_daily_update_reminder(self: Any) -> dict[str, Any]:
         except Exception as e:
             results.append({"project": proj["id"], "ok": False, "error": str(e)})
     return {"total": len(projects), "results": results}
+
+
+@celery_app.task(name="app.workers.tasks.run_scheduled_message_retention", bind=True,
+                 max_retries=2, default_retry_delay=300)
+def run_scheduled_message_retention(self: Any) -> dict[str, Any]:
+    """03:00 UTC+7 — WP-E2: prune old chat messages (global, not per-project)."""
+    from app.workers import schedule
+    return run_async(schedule.run_message_retention())

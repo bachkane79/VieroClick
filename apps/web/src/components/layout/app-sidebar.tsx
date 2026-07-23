@@ -13,7 +13,7 @@ import { listProjectPhasesAction } from "@/modules/wbs/wbs.actions";
 import { unreadCountAction } from "@/modules/notification/notification.actions";
 import { listTeamsWithMembersAction } from "@/modules/permission/permission.actions";
 import { listWorkspaceDocsAction } from "@/modules/workspace-doc/workspace-doc.actions";
-import { listChatDirectoryAction } from "@/modules/channel/channel.actions";
+import { chatUnreadCountsAction, listChatDirectoryAction } from "@/modules/channel/channel.actions";
 import { useLocale } from "@/lib/i18n/client";
 import { t } from "@/lib/i18n/dict";
 import { setLocaleAction } from "@/lib/i18n/actions";
@@ -70,8 +70,8 @@ type TeamItem = { id: string; name: string; memberIds: string[] };
 type DocItem = { id: string; parentId: string | null; title: string };
 type ChatDir = {
   ok: boolean;
-  channels: Array<{ id: string; name: string }>;
-  dms: Array<{ id: string; otherName: string }>;
+  channels: Array<{ id: string; name: string; unreadCount: number }>;
+  dms: Array<{ id: string; otherName: string; unreadCount: number }>;
 };
 
 /** Rail tab = the contextual panel currently shown (ClickUp model). */
@@ -195,8 +195,8 @@ export function AppSidebar({ user, workspaces }: Props) {
           res.ok
             ? {
                 ok: true,
-                channels: res.data.channels.map((c) => ({ id: c.id, name: c.name })),
-                dms: res.data.dms.map((d) => ({ id: d.id, otherName: d.otherName })),
+                channels: res.data.channels.map((c) => ({ id: c.id, name: c.name, unreadCount: c.unreadCount })),
+                dms: res.data.dms.map((d) => ({ id: d.id, otherName: d.otherName, unreadCount: d.unreadCount })),
               }
             : { ok: false, channels: [], dms: [] }
         );
@@ -206,6 +206,30 @@ export function AppSidebar({ user, workspaces }: Props) {
       cancelled = true;
     };
   }, [tab, wsId, collapsed, teams, docs, chatDir]);
+
+  // WP-E2: refresh just the unread badges whenever the user navigates (same
+  // cadence as the notifications badge above) — cheap enough not to need its
+  // own poll timer, and catches up the moment the user switches channels.
+  useEffect(() => {
+    if (!wsId || chatDir === null || !chatDir.ok) return;
+    let cancelled = false;
+    chatUnreadCountsAction({ workspaceId: wsId }).then((res) => {
+      if (cancelled || !res.ok) return;
+      setChatDir((cur) =>
+        cur && cur.ok
+          ? {
+              ok: true,
+              channels: cur.channels.map((c) => ({ ...c, unreadCount: res.data[c.id] ?? 0 })),
+              dms: cur.dms.map((d) => ({ ...d, unreadCount: res.data[d.id] ?? 0 })),
+            }
+          : cur
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wsId, pathname]);
 
   useEffect(() => {
     if (currentProjectId) {
@@ -813,7 +837,14 @@ function HomePanel({
           ) : (
             <div className="space-y-px">
               {chatDir.channels.map((c) => (
-                <PanelLink key={c.id} href={`${wsBase}/chat/${c.id}`} icon={Hash} label={c.name} active={pathname.endsWith(`/chat/${c.id}`)} />
+                <PanelLink
+                  key={c.id}
+                  href={`${wsBase}/chat/${c.id}`}
+                  icon={Hash}
+                  label={c.name}
+                  active={pathname.endsWith(`/chat/${c.id}`)}
+                  badge={c.unreadCount}
+                />
               ))}
               {chatDir.dms.length > 0 && (
                 <p className="px-2 pb-0.5 pt-2 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
@@ -821,7 +852,14 @@ function HomePanel({
                 </p>
               )}
               {chatDir.dms.map((d) => (
-                <PanelLink key={d.id} href={`${wsBase}/chat/${d.id}`} icon={UserCircle} label={d.otherName} active={pathname.endsWith(`/chat/${d.id}`)} />
+                <PanelLink
+                  key={d.id}
+                  href={`${wsBase}/chat/${d.id}`}
+                  icon={UserCircle}
+                  label={d.otherName}
+                  active={pathname.endsWith(`/chat/${d.id}`)}
+                  badge={d.unreadCount}
+                />
               ))}
             </div>
           )}

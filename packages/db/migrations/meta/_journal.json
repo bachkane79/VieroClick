@@ -71,6 +71,13 @@
       "when": 1784744238234,
       "tag": "0009_unusual_eternals",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784776446151,
+      "tag": "0010_daily_yellow_claw",
+      "breakpoints": true
     }
   ]
 }
