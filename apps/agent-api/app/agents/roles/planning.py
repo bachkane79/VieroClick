@@ -14,11 +14,28 @@ import json
 import logging
 
 from app.agents.gemini_client import generate
+from app.agents.intake_context import build_intake_context
 from app.agents.message_parser import extract_json_payload
 from app.agents.vieroc_client import VieroClickClient
 from app.settings import settings
 
 logger = logging.getLogger(__name__)
+
+# Phase-template scaffold seeded by the project's "Lĩnh vực" (projectType). The
+# planner is told to START from these phases and adapt — it keeps plans for the
+# same kind of project structurally consistent without hard-coding the WBS.
+PHASE_TEMPLATES: dict[str, list[str]] = {
+    "software": ["Discovery", "Design", "Build", "Test", "Launch"],
+    "marketing_campaign": ["Research", "Strategy", "Content", "Launch", "Measure"],
+    "event": ["Planning", "Logistics", "Promotion", "Execution", "Wrap-up"],
+    "research": ["Scoping", "Data Collection", "Analysis", "Report"],
+    "product_launch": ["Concept", "Build", "Go-To-Market", "Launch", "Post-launch"],
+    "general": ["Planning", "Execution", "Review"],
+}
+
+
+def _phase_template_for(project_type: str) -> list[str]:
+    return PHASE_TEMPLATES.get(project_type, PHASE_TEMPLATES["general"])
 
 PLANNING_SYSTEM_PROMPT = """You are an expert AI Planning Agent.
 Analyze the project intake details, constraints, deliverables, docs, and members to generate a structured project plan.
@@ -29,7 +46,7 @@ so grouping must be complete:
 - Always output at least one WBS phase.
 - EVERY task MUST include a "wbsTitle" that EXACTLY matches (case-insensitive) the title of one of the
   WBS phases you return. Never emit a task without a wbsTitle.
-- If a task does not fit a specific phase, put it under a phase titled "General" (add that phase to the WBS list).
+- If a task does not fit a specific phase , put it under a phase titled "General" (add that phase to the WBS list).
 
 Tasks should include ISO date-only startDate and dueDate values when a reasonable timeline can be inferred.
 Do not assign tasks to members yet.
@@ -112,6 +129,30 @@ PLANNING_USER_TEMPLATE = """Project state:
 Build a practical implementation plan for this project. Return only structured JSON.
 """
 
+# Used when the plan is generated from the structured "Tạo kế hoạch" intake. The
+# context is the zone-labeled intake (meta + 5 zones + uploaded docs), and the
+# planner is seeded with a phase template chosen by the project's Lĩnh vực.
+PLANNING_INTAKE_USER_TEMPLATE = """You are planning from a STRUCTURED INTAKE. The
+context below is split into clearly-labeled ZONES — read each one carefully and
+map it into the plan deliberately (it is long on purpose):
+- ZONE 1 SCOPE → what the plan must (and must not) cover.
+- ZONE 2 GOALS → measurable objectives; each goal should trace to tasks/milestones.
+- ZONE 3 CONSTRAINTS → hard limits (budget/stack/compliance/timeline/resource) the
+  plan must respect; reflect timeline constraints in task/milestone dates.
+- ZONE 4 DELIVERABLES → each deliverable must be covered by tasks and its
+  acceptance note should inform acceptanceCriteria.
+- ZONE 5 INITIAL CONTEXT + ZONE 6 DOCUMENTS → background; extract real requirements
+  and assumptions from the uploaded documents.
+
+Seed the WBS from this phase template for the project's Lĩnh vực (adapt/rename as
+the intake demands — do not follow it blindly): {phase_template}
+
+{context}
+
+Anchor task/milestone dates inside the project's start date → deadline window when
+set. Return only structured JSON in the required format.
+"""
+
 REPLAN_USER_TEMPLATE = """Current project state (tasks with their current statuses and assignees, milestones, risks):
 {current_plan_state}
 
@@ -126,13 +167,18 @@ async def run(project_id: str | None = None, payload: dict | None = None) -> dic
     mode = (payload or {}).get("mode", "initial")
     reason = (payload or {}).get("reason", "")
     dispatch_id = (payload or {}).get("dispatch_id")
+    # Set by the plan-intake flow (savePlanIntake → generatePlan). When true the
+    # plan is generated from the structured intake and always lands as a draft.
+    intake_generated = bool((payload or {}).get("intakeGenerated"))
 
     vieroc = VieroClickClient()
     project_id = project_id or vieroc.default_project_id
     if not project_id:
         return {"ok": False, "error": "No projectId provided for planning."}
 
-    logger.info("Planning agent: mode=%s project=%s", mode, project_id)
+    logger.info(
+        "Planning agent: mode=%s intake=%s project=%s", mode, intake_generated, project_id
+    )
 
     project_data = await vieroc.fetch_project_data(project_id)
     if not project_data:
@@ -144,6 +190,15 @@ async def run(project_id: str | None = None, payload: dict | None = None) -> dic
             current_plan_state=json.dumps(project_data, ensure_ascii=False, default=str),
             reason=reason or "General replan requested.",
         )
+    elif intake_generated:
+        # Structured plan-intake path: zone-labeled context + phase template.
+        project_type = (project_data.get("project", {}) or {}).get("projectType", "general")
+        context = await build_intake_context(vieroc, project_id, project_data)
+        system_prompt = PLANNING_SYSTEM_PROMPT
+        user_prompt = PLANNING_INTAKE_USER_TEMPLATE.format(
+            phase_template=", ".join(_phase_template_for(project_type)),
+            context=context,
+        )
     else:
         system_prompt = PLANNING_SYSTEM_PROMPT
         user_prompt = PLANNING_USER_TEMPLATE.format(
@@ -154,8 +209,9 @@ async def run(project_id: str | None = None, payload: dict | None = None) -> dic
         llm_response = await generate(
             system_prompt,
             user_prompt,
-            model=settings.gemini_planner_model,
+            model=settings.llm_planner_model,
             as_json=True,
+            thinking=True,
         )
         plan = extract_json_payload(llm_response)
     except Exception as e:
@@ -165,7 +221,9 @@ async def run(project_id: str | None = None, payload: dict | None = None) -> dic
     if not plan:
         return {"ok": False, "error": "LLM response was not valid JSON."}
 
-    resp = await vieroc.apply_plan(project_id, plan, mode=mode, dispatch_id=dispatch_id)
+    resp = await vieroc.apply_plan(
+        project_id, plan, mode=mode, dispatch_id=dispatch_id, force_draft=intake_generated
+    )
     if resp and resp.get("ok"):
         if resp.get("gated"):
             # Project requires review — the plan was stored as a pending

@@ -99,6 +99,22 @@ class VieroClickClient:
             logger.error("Failed to fetch project data from VieroClick: %s", e)
             return {}
 
+    async def download_project_file(self, project_id: str, file_id: str) -> bytes | None:
+        """Download a plan-intake file's raw bytes (for markitdown preprocessing).
+
+        Best-effort: returns None on any failure so one unreadable file never
+        crashes an intake run.
+        """
+        url = f"{self.base_url}/api/project-files/{file_id}"
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.get(url, headers=self._headers, params={"projectId": project_id})
+            resp.raise_for_status()
+            return resp.content
+        except Exception as e:
+            logger.error("Failed to download project file %s: %s", file_id, e)
+            return None
+
     async def fetch_project_summary(self, project_id: str) -> dict:
         """Fetch the resolved read model used by Telegram query commands (§2.8).
 
@@ -185,9 +201,18 @@ class VieroClickClient:
             return {"ok": False, "error": str(e)}
 
     async def apply_plan(
-        self, project_id: str, plan: dict, mode: str = "initial", dispatch_id: Optional[str] = None
+        self,
+        project_id: str,
+        plan: dict,
+        mode: str = "initial",
+        dispatch_id: Optional[str] = None,
+        force_draft: bool = False,
     ) -> dict:
-        """Apply an agent-generated plan to VieroClick DB-backed objects."""
+        """Apply an agent-generated plan to VieroClick DB-backed objects.
+
+        `force_draft=True` (the plan-intake flow) makes the web side always store
+        the plan as a reviewable draft instead of auto-applying it.
+        """
         try:
             return await _request_json(
                 "POST",
@@ -198,6 +223,7 @@ class VieroClickClient:
                     "plan": plan,
                     "mode": mode,
                     "dispatchId": dispatch_id,
+                    "forceDraft": force_draft,
                 },
                 timeout=60.0,
             )
