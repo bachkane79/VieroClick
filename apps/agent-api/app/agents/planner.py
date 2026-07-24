@@ -22,7 +22,7 @@ async def plan_project(project_context: dict[str, Any]) -> dict[str, Any]:
     content = await generate(
         SYSTEM_PROMPT,
         f"Project context:\n{project_context}",
-        model=settings.gemini_planner_model,
+        model=settings.llm_planner_model,
         as_json=True,
     )
     return json.loads(content or "{}")
