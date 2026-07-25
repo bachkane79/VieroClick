@@ -244,6 +244,7 @@ async function runActionsForRun(
     projectId: event.projectId,
     entityType: event.entityType,
     entityId: event.entityId,
+    automationCreatedBy: automation.createdBy,
   };
   const meta: AutomationRunMeta = {
     runId,
@@ -355,6 +356,7 @@ export async function retryAutomationRun(automationRunId: string): Promise<RunOu
     projectId: event.projectId,
     entityType: event.entityType,
     entityId: event.entityId,
+    automationCreatedBy: automation.createdBy,
   };
   const meta: AutomationRunMeta = {
     runId: run.id,

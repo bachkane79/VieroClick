@@ -8,6 +8,7 @@ interface RiskLike {
   probability: number | null;
   impact: number | null;
   status: string;
+  ownerMemberId: string | null;
 }
 
 export function riskCreated(exec: Executor, ctx: ActorContext, risk: RiskLike) {
@@ -16,12 +17,7 @@ export function riskCreated(exec: Executor, ctx: ActorContext, risk: RiskLike) {
     entityType: "project_risk",
     entityId: risk.id,
     eventType: "risk.created",
-    after: {
-      title: risk.title,
-      probability: risk.probability,
-      impact: risk.impact,
-      status: risk.status,
-    },
+    after: { ...risk },
   });
 }
 
@@ -31,17 +27,7 @@ export function riskUpdated(exec: Executor, ctx: ActorContext, before: RiskLike,
     entityType: "project_risk",
     entityId: after.id,
     eventType: "risk.updated",
-    before: {
-      title: before.title,
-      probability: before.probability,
-      impact: before.impact,
-      status: before.status,
-    },
-    after: {
-      title: after.title,
-      probability: after.probability,
-      impact: after.impact,
-      status: after.status,
-    },
+    before: { ...before },
+    after: { ...after },
   });
 }

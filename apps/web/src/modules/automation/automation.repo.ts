@@ -1,45 +1,159 @@
 import "server-only";
-import { and, desc, eq, gte, inArray, isNull, or } from "drizzle-orm";
-import { db, automations, automationRuns, projects, type Executor } from "@vieroc/db";
+import { and, asc, desc, eq, gte, inArray, isNull, or } from "drizzle-orm";
+import {
+  db,
+  automations,
+  automationConditions,
+  automationActions,
+  automationRuns,
+  projects,
+  type Executor,
+  type AutomationCondition,
+  type AutomationAction,
+} from "@vieroc/db";
 
 export type AutomationInsert = typeof automations.$inferInsert;
-export type AutomationRow = typeof automations.$inferSelect;
+export type AutomationBaseRow = typeof automations.$inferSelect;
+export type AutomationRow = AutomationBaseRow & {
+  conditions: AutomationCondition[];
+  actions: AutomationAction[];
+};
 export type AutomationRunInsert = typeof automationRuns.$inferInsert;
 export type AutomationRunRow = typeof automationRuns.$inferSelect;
 export type AutomationWithScope = AutomationRow & { projectName: string | null };
 
+/** Conditions are AND-only (no groups) so a flat per-automationId table is
+ * enough; fetched once per batch of base rows and grouped in JS rather than
+ * joined, since the number of automations matched per event is always small. */
+async function attachChildren(
+  rows: AutomationBaseRow[],
+  exec: Executor
+): Promise<AutomationRow[]> {
+  if (rows.length === 0) return [];
+  const ids = rows.map((r) => r.id);
+
+  const [condRows, actRows] = await Promise.all([
+    exec
+      .select()
+      .from(automationConditions)
+      .where(inArray(automationConditions.automationId, ids))
+      .orderBy(asc(automationConditions.orderIndex)),
+    exec
+      .select()
+      .from(automationActions)
+      .where(inArray(automationActions.automationId, ids))
+      .orderBy(asc(automationActions.orderIndex)),
+  ]);
+
+  const conditionsByAutomation = new Map<string, AutomationCondition[]>();
+  for (const c of condRows) {
+    const list = conditionsByAutomation.get(c.automationId) ?? [];
+    list.push({ field: c.field, op: c.op as AutomationCondition["op"], value: c.value });
+    conditionsByAutomation.set(c.automationId, list);
+  }
+
+  const actionsByAutomation = new Map<string, AutomationAction[]>();
+  for (const a of actRows) {
+    const list = actionsByAutomation.get(a.automationId) ?? [];
+    list.push({ type: a.type, params: a.params });
+    actionsByAutomation.set(a.automationId, list);
+  }
+
+  return rows.map((r) => ({
+    ...r,
+    conditions: conditionsByAutomation.get(r.id) ?? [],
+    actions: actionsByAutomation.get(r.id) ?? [],
+  }));
+}
+
 export async function findById(id: string, exec: Executor = db): Promise<AutomationRow | null> {
   const [row] = await exec.select().from(automations).where(eq(automations.id, id)).limit(1);
-  return row ?? null;
+  if (!row) return null;
+  const [attached] = await attachChildren([row], exec);
+  return attached ?? null;
 }
 
 export async function listByProject(
   projectId: string,
   exec: Executor = db
 ): Promise<AutomationRow[]> {
-  return exec
+  const rows = await exec
     .select()
     .from(automations)
     .where(eq(automations.projectId, projectId))
     .orderBy(desc(automations.createdAt));
+  return attachChildren(rows, exec);
 }
 
-export async function create(values: AutomationInsert, exec: Executor = db): Promise<AutomationRow> {
-  const [row] = await exec.insert(automations).values(values).returning();
-  return row!;
+/** Replace the full condition set for an automation (delete + re-insert in
+ * order) — simplest correct approach for edits, no diffing needed. */
+export async function replaceConditions(
+  automationId: string,
+  conditions: AutomationCondition[],
+  exec: Executor = db
+): Promise<void> {
+  await exec.delete(automationConditions).where(eq(automationConditions.automationId, automationId));
+  if (conditions.length === 0) return;
+  await exec.insert(automationConditions).values(
+    conditions.map((c, i) => ({
+      automationId,
+      field: c.field,
+      op: c.op,
+      value: c.value ?? null,
+      orderIndex: i,
+    }))
+  );
+}
+
+/** Same as replaceConditions but order is load-bearing here (actions run
+ * sequentially — Group A in one transaction, then Group B). */
+export async function replaceActions(
+  automationId: string,
+  actions: AutomationAction[],
+  exec: Executor = db
+): Promise<void> {
+  await exec.delete(automationActions).where(eq(automationActions.automationId, automationId));
+  if (actions.length === 0) return;
+  await exec.insert(automationActions).values(
+    actions.map((a, i) => ({
+      automationId,
+      type: a.type,
+      params: a.params,
+      orderIndex: i,
+    }))
+  );
+}
+
+export async function create(
+  values: AutomationInsert & { conditions: AutomationCondition[]; actions: AutomationAction[] },
+  exec: Executor = db
+): Promise<AutomationRow> {
+  const { conditions, actions, ...base } = values;
+  const [row] = await exec.insert(automations).values(base).returning();
+  if (!row) throw new Error("automation insert failed");
+  await replaceConditions(row.id, conditions, exec);
+  await replaceActions(row.id, actions, exec);
+  return { ...row, conditions, actions };
 }
 
 export async function update(
   id: string,
-  patch: Partial<AutomationInsert>,
+  patch: Partial<AutomationInsert> & { conditions?: AutomationCondition[]; actions?: AutomationAction[] },
   exec: Executor = db
 ): Promise<AutomationRow | null> {
+  const { conditions, actions, ...base } = patch;
   const [row] = await exec
     .update(automations)
-    .set({ ...patch, updatedAt: new Date() })
+    .set({ ...base, updatedAt: new Date() })
     .where(eq(automations.id, id))
     .returning();
-  return row ?? null;
+  if (!row) return null;
+
+  if (conditions !== undefined) await replaceConditions(id, conditions, exec);
+  if (actions !== undefined) await replaceActions(id, actions, exec);
+
+  const [attached] = await attachChildren([row], exec);
+  return attached ?? null;
 }
 
 export async function remove(id: string, exec: Executor = db): Promise<void> {
@@ -56,7 +170,7 @@ export async function findMatchingActive(
   entityId: string,
   exec: Executor = db
 ): Promise<AutomationRow[]> {
-  return exec
+  const rows = await exec
     .select()
     .from(automations)
     .where(
@@ -67,6 +181,7 @@ export async function findMatchingActive(
         or(isNull(automations.targetEntityId), eq(automations.targetEntityId, entityId))
       )
     );
+  return attachChildren(rows, exec);
 }
 
 /** Workspace-wide rules only (projectId IS NULL) — feeds the dedicated
@@ -75,11 +190,12 @@ export async function listWorkspaceWide(
   workspaceId: string,
   exec: Executor = db
 ): Promise<AutomationRow[]> {
-  return exec
+  const rows = await exec
     .select()
     .from(automations)
     .where(and(eq(automations.workspaceId, workspaceId), isNull(automations.projectId)))
     .orderBy(desc(automations.createdAt));
+  return attachChildren(rows, exec);
 }
 
 /** Every automation in the workspace — both workspace-wide and per-project —
@@ -94,7 +210,9 @@ export async function listAllInWorkspace(
     .leftJoin(projects, eq(projects.id, automations.projectId))
     .where(eq(automations.workspaceId, workspaceId))
     .orderBy(desc(automations.createdAt));
-  return rows.map((r) => ({ ...r.automation, projectName: r.projectName ?? null }));
+  const attached = await attachChildren(rows.map((r) => r.automation), exec);
+  const byId = new Map(attached.map((a) => [a.id, a]));
+  return rows.map((r) => ({ ...(byId.get(r.automation.id) ?? { ...r.automation, conditions: [], actions: [] }), projectName: r.projectName ?? null }));
 }
 
 // ─── automation_runs (audit) ─────────────────────────────────────────────────

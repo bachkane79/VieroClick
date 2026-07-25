@@ -1,42 +1,42 @@
 import { recordEvent, actorFields } from "@/server/lib/events";
 import type { ActorContext } from "@/server/lib/context";
 import type { Executor } from "@vieroc/db";
+import type { TaskRow } from "./task.repo";
 
-interface TaskLike {
-  id: string;
-  title: string;
-  statusId: string;
-  priority: string;
-  assigneeMemberId: string | null;
-  dueDate?: string | null;
-}
+/**
+ * Automation conditions (see docs_local/automation-trigger-condition-action-catalog.md)
+ * read arbitrary fields off before/after — so every event here spreads the
+ * full task row rather than cherry-picking a few fields. Cheap (small row,
+ * already in memory) and means a new condition field never requires touching
+ * this file again.
+ */
 
-export function taskCreated(exec: Executor, ctx: ActorContext, task: TaskLike) {
+export function taskCreated(exec: Executor, ctx: ActorContext, task: TaskRow) {
   return recordEvent(exec, {
     ...actorFields(ctx),
     entityType: "task",
     entityId: task.id,
     eventType: "task.created",
-    after: { title: task.title, statusId: task.statusId, priority: task.priority },
+    after: { ...task },
   });
 }
 
-export function taskUpdated(exec: Executor, ctx: ActorContext, before: TaskLike, after: TaskLike) {
+export function taskUpdated(exec: Executor, ctx: ActorContext, before: TaskRow, after: TaskRow) {
   return recordEvent(exec, {
     ...actorFields(ctx),
     entityType: "task",
     entityId: after.id,
     eventType: "task.updated",
-    before: { title: before.title, priority: before.priority },
-    after: { title: after.title, priority: after.priority },
+    before: { ...before },
+    after: { ...after },
   });
 }
 
 export function taskStatusChanged(
   exec: Executor,
   ctx: ActorContext,
-  before: TaskLike,
-  after: TaskLike,
+  before: TaskRow,
+  after: TaskRow,
   statusType?: { from?: string | null; to: string }
 ) {
   return recordEvent(exec, {
@@ -47,22 +47,27 @@ export function taskStatusChanged(
     // statusType (todo/in_progress/.../done) is included alongside the opaque
     // statusId so automation conditions can filter on the human-meaningful
     // type without a join back to task_statuses at evaluation time.
-    before: { statusId: before.statusId, statusType: statusType?.from ?? null },
-    after: { statusId: after.statusId, statusType: statusType?.to ?? null },
+    before: { ...before, statusType: statusType?.from ?? null },
+    after: { ...after, statusType: statusType?.to ?? null },
   });
 }
 
-export function taskAssigned(exec: Executor, ctx: ActorContext, task: TaskLike) {
+export function taskAssigned(
+  exec: Executor,
+  ctx: ActorContext,
+  task: TaskRow,
+  opts?: { assigneeProjectRole?: string | null }
+) {
   return recordEvent(exec, {
     ...actorFields(ctx),
     entityType: "task",
     entityId: task.id,
     eventType: "task.assigned",
-    after: { assigneeMemberId: task.assigneeMemberId },
+    after: { ...task, assigneeProjectRole: opts?.assigneeProjectRole ?? null },
   });
 }
 
-export function taskDeleted(exec: Executor, ctx: ActorContext, task: TaskLike) {
+export function taskDeleted(exec: Executor, ctx: ActorContext, task: TaskRow) {
   return recordEvent(exec, {
     ...actorFields(ctx),
     entityType: "task",
@@ -74,40 +79,40 @@ export function taskDeleted(exec: Executor, ctx: ActorContext, task: TaskLike) {
   });
 }
 
-export function taskRestored(exec: Executor, ctx: ActorContext, task: TaskLike) {
+export function taskRestored(exec: Executor, ctx: ActorContext, task: TaskRow) {
   return recordEvent(exec, {
     ...actorFields(ctx),
     entityType: "task",
     entityId: task.id,
     eventType: "task.restored",
-    after: { title: task.title },
+    after: { ...task },
   });
 }
 
-export function taskSubmittedForReview(exec: Executor, ctx: ActorContext, task: TaskLike) {
+export function taskSubmittedForReview(exec: Executor, ctx: ActorContext, task: TaskRow) {
   return recordEvent(exec, {
     ...actorFields(ctx),
     entityType: "task",
     entityId: task.id,
     eventType: "task.submitted_for_review",
-    after: { statusId: task.statusId },
+    after: { ...task },
   });
 }
 
-export function taskApproved(exec: Executor, ctx: ActorContext, task: TaskLike) {
+export function taskApproved(exec: Executor, ctx: ActorContext, task: TaskRow) {
   return recordEvent(exec, {
     ...actorFields(ctx),
     entityType: "task",
     entityId: task.id,
     eventType: "task.approved",
-    after: { statusId: task.statusId },
+    after: { ...task },
   });
 }
 
 export function taskReworkRequested(
   exec: Executor,
   ctx: ActorContext,
-  task: TaskLike,
+  task: TaskRow,
   feedback?: string
 ) {
   return recordEvent(exec, {
@@ -115,7 +120,7 @@ export function taskReworkRequested(
     entityType: "task",
     entityId: task.id,
     eventType: "task.rework_requested",
-    after: { statusId: task.statusId },
+    after: { ...task },
     metadata: feedback ? { feedback } : undefined,
   });
 }
@@ -123,8 +128,8 @@ export function taskReworkRequested(
 export function taskPlanDeviation(
   exec: Executor,
   ctx: ActorContext,
-  before: TaskLike,
-  after: TaskLike
+  before: TaskRow,
+  after: TaskRow
 ) {
   return recordEvent(exec, {
     ...actorFields(ctx),

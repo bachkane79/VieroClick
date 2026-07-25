@@ -8,6 +8,8 @@ interface BlockerLike {
   status: string;
   severity: string;
   ownerMemberId: string | null;
+  resolvedByMemberId: string | null;
+  escalatedAt: Date | null;
 }
 
 export function blockerCreated(exec: Executor, ctx: ActorContext, blocker: BlockerLike) {
@@ -16,7 +18,7 @@ export function blockerCreated(exec: Executor, ctx: ActorContext, blocker: Block
     entityType: "blocker",
     entityId: blocker.id,
     eventType: "blocker.created",
-    after: { title: blocker.title, status: blocker.status, severity: blocker.severity },
+    after: { ...blocker },
   });
 }
 
@@ -31,8 +33,8 @@ export function blockerUpdated(
     entityType: "blocker",
     entityId: after.id,
     eventType: "blocker.updated",
-    before: { status: before.status, severity: before.severity, ownerMemberId: before.ownerMemberId },
-    after: { status: after.status, severity: after.severity, ownerMemberId: after.ownerMemberId },
+    before: { ...before },
+    after: { ...after },
   });
 }
 
@@ -47,7 +49,7 @@ export function blockerResolved(
     entityType: "blocker",
     entityId: after.id,
     eventType: "blocker.resolved",
-    before: { status: before.status },
-    after: { status: after.status },
+    before: { ...before },
+    after: { ...after },
   });
 }

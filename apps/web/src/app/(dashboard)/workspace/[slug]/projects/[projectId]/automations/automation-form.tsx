@@ -7,19 +7,21 @@ import { Plus, Trash2 } from "lucide-react";
 import { createAutomationAction } from "@/modules/automation/automation.actions";
 import {
   AUTOMATION_TRIGGER_TYPES,
-  AUTOMATION_ACTION_TYPES,
   AUTOMATION_TRIGGER_LABELS,
   AUTOMATION_ACTION_LABELS,
   ACTION_FIELD_SPECS,
+  ACTION_TYPES_BY_TRIGGER,
   CONDITION_FIELDS_BY_TRIGGER,
   PROJECT_ONLY_ACTION_TYPES,
   TASK_STATUS_TYPES,
   BLOCKER_STATUS_TYPES,
+  PROJECT_ROLE_TYPES,
+  AUTOMATION_CONDITION_OPS,
   type ActionFieldType,
 } from "@/modules/automation/automation.schema";
 
 const PRIORITY_OPTIONS = ["low", "medium", "high", "urgent"];
-const CONDITION_OPS = ["eq", "neq", "in", "gt", "lt", "contains"];
+const CONDITION_OPS = AUTOMATION_CONDITION_OPS;
 const MAX_CONDITIONS = 15;
 const MAX_ACTIONS = 6;
 
@@ -57,10 +59,6 @@ export function AutomationForm({
   onCreated,
   onCancel,
 }: Props) {
-  const allowedActionTypes = projectId
-    ? AUTOMATION_ACTION_TYPES
-    : AUTOMATION_ACTION_TYPES.filter((t) => !PROJECT_ONLY_ACTION_TYPES.has(t));
-
   const [submitting, setSubmitting] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -69,7 +67,13 @@ export function AutomationForm({
   const [taskFilter, setTaskFilter] = useState("");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(initialTaskId ?? null);
   const [conditions, setConditions] = useState<ConditionDraft[]>([]);
-  const [actions, setActions] = useState<ActionDraft[]>([{ type: allowedActionTypes[0], params: {} }]);
+
+  // Two filters compose: which actions make sense for this trigger (always),
+  // further narrowed to non-project-scoped ones on the workspace-wide page.
+  const allowedActionTypes = (ACTION_TYPES_BY_TRIGGER[triggerType] ?? []).filter(
+    (t) => projectId !== null || !PROJECT_ONLY_ACTION_TYPES.has(t)
+  );
+  const [actions, setActions] = useState<ActionDraft[]>([{ type: allowedActionTypes[0] ?? "", params: {} }]);
 
   const canScopeToTask = projectId !== null && triggerType.startsWith("task.");
   const filteredTasks = tasks.filter((t) =>
@@ -143,9 +147,14 @@ export function AutomationForm({
           className="w-full rounded-lg border border-border px-3 py-2"
           value={triggerType}
           onChange={(e) => {
-            setTriggerType(e.target.value);
+            const nextTrigger = e.target.value;
+            setTriggerType(nextTrigger);
             setConditions([]);
-            if (!e.target.value.startsWith("task.")) setScope("all");
+            const nextAllowedActions = (ACTION_TYPES_BY_TRIGGER[nextTrigger] ?? []).filter(
+              (t) => projectId !== null || !PROJECT_ONLY_ACTION_TYPES.has(t)
+            );
+            setActions([{ type: nextAllowedActions[0] ?? "", params: {} }]);
+            if (!nextTrigger.startsWith("task.")) setScope("all");
           }}
         >
           {AUTOMATION_TRIGGER_TYPES.map((t) => (
@@ -243,7 +252,7 @@ export function AutomationForm({
             type="button"
             variant="outline"
             disabled={actions.length >= MAX_ACTIONS}
-            onClick={() => setActions((a) => [...a, { type: allowedActionTypes[0], params: {} }])}
+            onClick={() => setActions((a) => [...a, { type: allowedActionTypes[0] ?? "", params: {} }])}
           >
             <Plus className="h-4 w-4" />
           </Button>
@@ -256,6 +265,7 @@ export function AutomationForm({
             statuses={statuses}
             members={members}
             blockers={blockers}
+            tasks={tasks}
             onTypeChange={(newType) => resetActionParams(i, newType)}
             onParamChange={(key, value) => updateActionParam(i, key, value)}
             onRemove={() => setActions((a) => a.filter((_, j) => j !== i))}
@@ -367,11 +377,71 @@ function ConditionRow({
 }
 
 function renderConditionValueInput(
-  valueKind: "status-type" | "priority" | "member" | "blocker-status" | undefined,
+  valueKind:
+    | "status-type"
+    | "priority"
+    | "member"
+    | "blocker-status"
+    | "project-role"
+    | "date"
+    | "number"
+    | "boolean"
+    | undefined,
   value: string,
   members: MemberOption[],
   onChange: (v: string) => void
 ) {
+  if (valueKind === "date") {
+    return (
+      <div className="flex items-center gap-1">
+        <Input
+          type="date"
+          value={value === "$now" ? "" : value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={value === "$now"}
+        />
+        <label className="flex items-center gap-1 whitespace-nowrap text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={value === "$now"}
+            onChange={(e) => onChange(e.target.checked ? "$now" : "")}
+          />
+          hiện tại
+        </label>
+      </div>
+    );
+  }
+  if (valueKind === "number") {
+    return (
+      <Input
+        type="number"
+        placeholder="value"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    );
+  }
+  if (valueKind === "boolean") {
+    return (
+      <select className="rounded-lg border border-border px-2" value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">— chọn —</option>
+        <option value="true">true</option>
+        <option value="false">false</option>
+      </select>
+    );
+  }
+  if (valueKind === "project-role") {
+    return (
+      <select className="rounded-lg border border-border px-2" value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">— chọn —</option>
+        {PROJECT_ROLE_TYPES.map((r) => (
+          <option key={r} value={r}>
+            {r}
+          </option>
+        ))}
+      </select>
+    );
+  }
   if (valueKind === "status-type") {
     return (
       <select className="rounded-lg border border-border px-2" value={value} onChange={(e) => onChange(e.target.value)}>
@@ -433,6 +503,7 @@ function ActionRow({
   statuses,
   members,
   blockers,
+  tasks,
   onTypeChange,
   onParamChange,
   onRemove,
@@ -442,6 +513,7 @@ function ActionRow({
   statuses: StatusOption[];
   members: MemberOption[];
   blockers: BlockerOption[];
+  tasks: TaskOption[];
   onTypeChange: (type: string) => void;
   onParamChange: (key: string, value: unknown) => void;
   onRemove: () => void;
@@ -474,6 +546,7 @@ function ActionRow({
           statuses={statuses}
           members={members}
           blockers={blockers}
+          tasks={tasks}
           onChange={(v) => onParamChange(spec.key, v)}
         />
       ))}
@@ -487,6 +560,7 @@ function ActionFieldControl({
   statuses,
   members,
   blockers,
+  tasks,
   onChange,
 }: {
   spec: { key: string; label: string; type: ActionFieldType };
@@ -494,6 +568,7 @@ function ActionFieldControl({
   statuses: StatusOption[];
   members: MemberOption[];
   blockers: BlockerOption[];
+  tasks: TaskOption[];
   onChange: (v: unknown) => void;
 }) {
   const strValue = typeof value === "string" ? value : value != null ? String(value) : "";
@@ -560,6 +635,32 @@ function ActionFieldControl({
           </option>
         ))}
       </select>
+    );
+  }
+  if (spec.type === "select-task") {
+    return (
+      <select
+        className="w-full rounded-lg border border-border px-3 py-2 text-sm"
+        value={strValue}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="">{spec.label}</option>
+        {tasks.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.title}
+          </option>
+        ))}
+      </select>
+    );
+  }
+  if (spec.type === "date") {
+    return (
+      <Input
+        type="date"
+        placeholder={spec.label}
+        value={strValue}
+        onChange={(e) => onChange(e.target.value || undefined)}
+      />
     );
   }
   if (spec.type === "number") {

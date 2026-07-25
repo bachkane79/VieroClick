@@ -1,5 +1,6 @@
 import "server-only";
-import { db } from "@vieroc/db";
+import { eq } from "drizzle-orm";
+import { db, tasks, taskStatuses } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
 import { NotFoundError, ValidationError } from "@/server/lib/errors";
 import { createTaskDependencySchema } from "./task-dependency.schema";
@@ -7,6 +8,18 @@ import { assertCanManageTasks } from "./task-dependency.policy";
 import * as repo from "./task-dependency.repo";
 import * as events from "./task-dependency.events";
 import { wouldCreateCycle } from "./task-dependency.pure";
+
+/** Current status type of the blocker task — attached to dependency_added/
+ * removed events so automation conditions can filter on it without a join. */
+async function findBlockerStatusType(blockerTaskId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ type: taskStatuses.type })
+    .from(tasks)
+    .innerJoin(taskStatuses, eq(taskStatuses.id, tasks.statusId))
+    .where(eq(tasks.id, blockerTaskId))
+    .limit(1);
+  return row?.type ?? null;
+}
 
 /** Read: all dependencies for a project. Requires workspace membership. */
 export async function listDependencies(workspaceId: string, projectId: string) {
@@ -49,7 +62,10 @@ export async function addDependency(p: {
       tx
     );
 
-    await events.dependencyAdded(tx, ctx, dependency.blockedTaskId, dependency.blockerTaskId);
+    await events.dependencyAdded(tx, ctx, dependency.blockedTaskId, dependency.blockerTaskId, {
+      dependencyType: dependency.dependencyType,
+      blockerStatusType: await findBlockerStatusType(dependency.blockerTaskId),
+    });
 
     return dependency;
   });
@@ -68,7 +84,10 @@ export async function removeDependency(p: {
   if (!existing) throw new NotFoundError("Task dependency");
 
   return db.transaction(async (tx) => {
-    await events.dependencyRemoved(tx, ctx, existing.blockedTaskId, existing.blockerTaskId);
+    await events.dependencyRemoved(tx, ctx, existing.blockedTaskId, existing.blockerTaskId, {
+      dependencyType: existing.dependencyType,
+      blockerStatusType: await findBlockerStatusType(existing.blockerTaskId),
+    });
     await repo.remove(p.dependencyId, tx);
     return { id: p.dependencyId };
   });

@@ -5,9 +5,20 @@ import { workspaces } from "./workspaces";
 import { projects } from "./projects";
 import { activityEvents } from "./events";
 
+export type AutomationConditionOp =
+  | "eq"
+  | "neq"
+  | "in"
+  | "gt"
+  | "lt"
+  | "contains"
+  | "before_date"
+  | "after_date"
+  | "within_days";
+
 export type AutomationCondition = {
   field: string;
-  op: "eq" | "neq" | "in" | "gt" | "lt" | "contains";
+  op: AutomationConditionOp;
   value: unknown;
 };
 
@@ -35,8 +46,6 @@ export const automations = pgTable(
     isActive: boolean("is_active").notNull().default(true),
 
     triggerType: text("trigger_type").notNull(),
-    conditions: jsonb("conditions").$type<AutomationCondition[]>().notNull().default([]),
-    actions: jsonb("actions").$type<AutomationAction[]>().notNull().default([]),
 
     createdBy: uuid("created_by")
       .notNull()
@@ -47,6 +56,42 @@ export const automations = pgTable(
   (t) => [
     index("automations_trigger_idx").on(t.triggerType, t.projectId),
   ]
+);
+
+// Conditions are always AND'ed together (no OR/nesting — see
+// docs_local/automation-trigger-condition-action-catalog.md), so a flat table
+// keyed by automationId is enough; orderIndex is cosmetic (display order only).
+export const automationConditions = pgTable(
+  "automation_conditions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    automationId: uuid("automation_id")
+      .notNull()
+      .references(() => automations.id, { onDelete: "cascade" }),
+    field: text("field").notNull(),
+    op: text("op").$type<AutomationConditionOp>().notNull(),
+    value: jsonb("value"),
+    orderIndex: integer("order_index").notNull().default(0),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("automation_conditions_automation_idx").on(t.automationId)]
+);
+
+// Actions run sequentially (Group A in one transaction, then Group B) —
+// orderIndex here is load-bearing, not cosmetic.
+export const automationActions = pgTable(
+  "automation_actions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    automationId: uuid("automation_id")
+      .notNull()
+      .references(() => automations.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    params: jsonb("params").$type<Record<string, unknown>>().notNull().default({}),
+    orderIndex: integer("order_index").notNull().default(0),
+    createdAt: timestamptz("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("automation_actions_automation_idx").on(t.automationId, t.orderIndex)]
 );
 
 export const automationRuns = pgTable("automation_runs", {

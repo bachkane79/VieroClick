@@ -15,7 +15,7 @@ export function milestoneCreated(exec: Executor, ctx: ActorContext, milestone: M
     entityType: "milestone",
     entityId: milestone.id,
     eventType: "milestone.created",
-    after: { title: milestone.title, status: milestone.status, targetDate: milestone.targetDate },
+    after: { ...milestone },
   });
 }
 
@@ -30,7 +30,7 @@ export function milestoneUpdated(
     entityType: "milestone",
     entityId: after.id,
     eventType: "milestone.updated",
-    before: { title: before.title, status: before.status, targetDate: before.targetDate },
-    after: { title: after.title, status: after.status, targetDate: after.targetDate },
+    before: { ...before },
+    after: { ...after },
   });
 }

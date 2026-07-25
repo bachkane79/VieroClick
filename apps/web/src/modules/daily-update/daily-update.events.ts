@@ -6,6 +6,11 @@ interface DailyUpdateLike {
   id: string;
   workDate: string;
   memberId: string;
+  confidenceLevel: number | null;
+  completedText: string | null;
+  inProgressText: string | null;
+  blockersText: string | null;
+  concerns: string | null;
 }
 
 export function dailyUpdateSubmitted(
@@ -18,6 +23,6 @@ export function dailyUpdateSubmitted(
     entityType: "daily_update",
     entityId: update.id,
     eventType: "daily_update.submitted",
-    after: { workDate: update.workDate, memberId: update.memberId },
+    after: { ...update },
   });
 }

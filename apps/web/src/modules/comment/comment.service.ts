@@ -105,7 +105,7 @@ export async function addComment(p: {
       tx
     );
 
-    await events.commentAdded(tx, ctx, p.taskId, comment.id);
+    await events.commentAdded(tx, ctx, p.taskId, comment);
 
     const allMembers = await workspaceRepo.listMembers(ctx.workspaceId, tx);
 

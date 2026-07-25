@@ -12,6 +12,7 @@ import { createTaskDependencySchema } from "@/modules/task-dependency/task-depen
 import * as dependencyEvents from "@/modules/task-dependency/task-dependency.events";
 import * as blockerRepo from "@/modules/blocker/blocker.repo";
 import * as blockerEvents from "@/modules/blocker/blocker.events";
+import * as projectMemberRepo from "@/modules/project-member/project-member.repo";
 import { recomputeMemberScore } from "@/modules/member-score/member-score.service";
 import { createTaskSchema, updateTaskSchema, moveTaskSchema, reviewTaskSchema } from "./task.schema";
 import { assertCanManageTasks, assertCanReviewTask, assertCanUpdateTask } from "./task.policy";
@@ -426,7 +427,12 @@ export async function updateTask(p: {
       values.assigneeMemberId !== undefined &&
       values.assigneeMemberId !== existing.assigneeMemberId
     ) {
-      await events.taskAssigned(tx, ctx, updated);
+      const assigneeProjectMember = updated.assigneeMemberId
+        ? await projectMemberRepo.findByMember(p.projectId, updated.assigneeMemberId, tx)
+        : null;
+      await events.taskAssigned(tx, ctx, updated, {
+        assigneeProjectRole: assigneeProjectMember?.role ?? null,
+      });
       if (updated.assigneeMemberId) {
         await enqueueNotifications(tx, [
           {
@@ -593,7 +599,12 @@ export async function setTaskAssignees(p: {
     const updated = await repo.update(p.taskId, { assigneeMemberId: primary }, tx);
     if (!updated) throw new NotFoundError("Task");
 
-    await events.taskAssigned(tx, ctx, updated);
+    const assigneeProjectMember = primary
+      ? await projectMemberRepo.findByMember(p.projectId, primary, tx)
+      : null;
+    await events.taskAssigned(tx, ctx, updated, {
+      assigneeProjectRole: assigneeProjectMember?.role ?? null,
+    });
 
     const added = memberIds.filter((id) => !previous.has(id) && id !== ctx.workspaceMemberId);
     if (added.length > 0) {
@@ -713,7 +724,11 @@ export async function addTaskDependency(p: {
       tx
     );
 
-    await dependencyEvents.dependencyAdded(tx, ctx, blocked.id, blocker.id);
+    const blockerStatus = await repo.findStatusById(blocker.statusId, tx);
+    await dependencyEvents.dependencyAdded(tx, ctx, blocked.id, blocker.id, {
+      dependencyType: data.dependencyType,
+      blockerStatusType: blockerStatus?.type ?? null,
+    });
     await invalidateCache(`board:${p.projectId}`);
     await invalidateProjectCaches(p.projectId); // WP-I2: dashboard/team-metrics aggregate over tasks too
     return dependency;
@@ -732,7 +747,12 @@ export async function removeTaskDependency(p: {
   if (!existing || existing.projectId !== p.projectId) throw new NotFoundError("Task dependency");
 
   return db.transaction(async (tx) => {
-    await dependencyEvents.dependencyRemoved(tx, ctx, existing.blockedTaskId, existing.blockerTaskId);
+    const blockerTask = await repo.findById(existing.blockerTaskId, tx);
+    const blockerStatus = blockerTask ? await repo.findStatusById(blockerTask.statusId, tx) : null;
+    await dependencyEvents.dependencyRemoved(tx, ctx, existing.blockedTaskId, existing.blockerTaskId, {
+      dependencyType: existing.dependencyType,
+      blockerStatusType: blockerStatus?.type ?? null,
+    });
     await repo.removeDependency(p.dependencyId, tx);
     await invalidateCache(`board:${p.projectId}`);
     await invalidateProjectCaches(p.projectId); // WP-I2: dashboard/team-metrics aggregate over tasks too

@@ -3,7 +3,7 @@ import { cache } from "react";
 import { db } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
 import { NotFoundError } from "@/server/lib/errors";
-import { createAutomationSchema, updateAutomationSchema } from "./automation.schema";
+import { createAutomationSchema, updateAutomationSchema, assertTriggerScoping } from "./automation.schema";
 import type { AutomationCondition } from "@vieroc/db";
 
 /** zod infers `value?: unknown` for z.unknown() fields (an optional-key
@@ -98,10 +98,10 @@ export async function createAutomation(p: {
         name: data.name,
         description: data.description ?? null,
         triggerType: data.triggerType,
-        conditions: normalizeConditions(data.conditions),
-        actions: data.actions,
         isActive: data.isActive,
         createdBy: ctx.userId,
+        conditions: normalizeConditions(data.conditions),
+        actions: data.actions,
       },
       tx
     );
@@ -125,6 +125,14 @@ export async function updateAutomation(p: {
   if (!existing || existing.workspaceId !== p.workspaceId || existing.projectId !== p.projectId) {
     throw new NotFoundError("Automation");
   }
+
+  // triggerType is immutable — validate the (possibly new) conditions/actions
+  // against the automation's existing trigger.
+  assertTriggerScoping(
+    existing.triggerType,
+    data.conditions ?? existing.conditions,
+    data.actions ?? existing.actions
+  );
 
   return db.transaction(async (tx) => {
     const updated = await repo.update(
