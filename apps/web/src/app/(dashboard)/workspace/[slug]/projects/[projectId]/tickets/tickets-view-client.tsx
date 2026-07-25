@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useFormatter, useTranslations } from "next-intl";
 import { Button, Input, Textarea } from "@vieroc/ui";
 import { toast } from "sonner";
 import { Inbox, Plus, CheckCircle, XCircle } from "lucide-react";
+import { useActionError } from "@/i18n/use-action-error";
 import { createTicketAction, decideTicketAction } from "@/modules/ticket/ticket.actions";
 import type { TicketView } from "@/modules/ticket/ticket.view";
 
@@ -38,6 +40,9 @@ export function TicketsViewClient({
   canDecide,
 }: Props) {
   const router = useRouter();
+  const t = useTranslations();
+  const format = useFormatter();
+  const actionError = useActionError();
   const [tickets, setTickets] = useState<TicketView[]>(initialTickets);
   const [submitting, setSubmitting] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
@@ -48,8 +53,8 @@ export function TicketsViewClient({
 
   const memberNameMap = new Map(members.map((m) => [m.id, m.fullName]));
 
-  const openTickets = tickets.filter((t) => t.status === "open");
-  const decidedTickets = tickets.filter((t) => t.status !== "open");
+  const openTickets = tickets.filter((ticket) => ticket.status === "open");
+  const decidedTickets = tickets.filter((ticket) => ticket.status !== "open");
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -71,17 +76,17 @@ export function TicketsViewClient({
     setSubmitting(false);
 
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
-    toast.success("Ticket submitted");
+    toast.success(t("tickets.toast.created"));
     setTickets((current) => [res.data, ...current]);
     router.refresh();
   }
 
   async function handleDecide(ticketId: string, status: "approved" | "rejected") {
     if (status === "approved" && !resolutionNote.trim()) {
-      toast.error("Resolution note is required to approve");
+      toast.error(t("tickets.toast.noteRequired"));
       return;
     }
 
@@ -96,12 +101,14 @@ export function TicketsViewClient({
     setSubmitting(false);
 
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
 
-    toast.success(status === "approved" ? "Ticket approved — replan dispatched" : "Ticket rejected");
-    setTickets((current) => current.map((t) => (t.id === ticketId ? res.data : t)));
+    toast.success(
+      status === "approved" ? t("tickets.toast.approved") : t("tickets.toast.rejected")
+    );
+    setTickets((current) => current.map((item) => (item.id === ticketId ? res.data : item)));
     setDecidingId(null);
     setResolutionNote("");
     router.refresh();
@@ -114,11 +121,11 @@ export function TicketsViewClient({
           <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
             <h3 className="text-sm font-bold uppercase tracking-wider text-amber-600 flex items-center gap-1.5">
               <Inbox className="w-4 h-4" />
-              Open Tickets ({openTickets.length})
+              {t("tickets.openTitle", { count: openTickets.length })}
             </h3>
             {!isAdding && (
               <Button size="sm" onClick={() => setIsAdding(true)} className="gap-1.5 text-xs">
-                <Plus className="w-3.5 h-3.5" /> New Ticket
+                <Plus className="w-3.5 h-3.5" /> {t("tickets.new")}
               </Button>
             )}
           </div>
@@ -126,35 +133,38 @@ export function TicketsViewClient({
           {openTickets.length === 0 ? (
             <div className="p-12 text-center text-muted-foreground border border-dashed rounded-xl">
               <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2 opacity-80" />
-              <p className="text-sm font-semibold">No open tickets</p>
-              <p className="text-xs mt-0.5">Nothing awaiting the project leader&apos;s decision.</p>
+              <p className="text-sm font-semibold">{t("tickets.emptyOpen")}</p>
+              <p className="text-xs mt-0.5">{t("tickets.emptyOpenSub")}</p>
             </div>
           ) : (
             <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-              {openTickets.map((t) => {
-                const authorName = memberNameMap.get(t.createdByMemberId) ?? "Workspace member";
-                const isDeciding = decidingId === t.id;
+              {openTickets.map((ticket) => {
+                const authorName =
+                  memberNameMap.get(ticket.createdByMemberId) ?? t("tickets.unknownMember");
+                const isDeciding = decidingId === ticket.id;
                 return (
                   <div
-                    key={t.id}
+                    key={ticket.id}
                     className="p-4 border border-neutral-200/40 dark:border-neutral-800/40 rounded-xl bg-card space-y-3 hover:border-neutral-300 transition-all shadow-sm"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1 min-w-0">
-                        <span className="font-bold text-xs text-foreground block">{t.title}</span>
+                        <span className="font-bold text-xs text-foreground block">
+                          {ticket.title}
+                        </span>
                         <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                          {t.description}
+                          {ticket.description}
                         </p>
                         <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground mt-2">
-                          <span>Submitted by: <strong className="text-foreground">{authorName}</strong></span>
+                          <span>{t("tickets.submittedBy", { name: authorName })}</span>
                           <span>·</span>
-                          <span>{new Date(t.createdAt).toLocaleDateString()}</span>
+                          <span>{format.dateTime(new Date(ticket.createdAt), "short")}</span>
                         </div>
                       </div>
                       <span
                         className={`shrink-0 px-2 py-0.5 rounded text-[9px] font-bold uppercase ${STATUS_STYLE.open}`}
                       >
-                        Open
+                        {t("tickets.status.open")}
                       </span>
                     </div>
 
@@ -163,7 +173,7 @@ export function TicketsViewClient({
                         {isDeciding ? (
                           <div className="space-y-2">
                             <Textarea
-                              placeholder="Resolution / how this will be addressed (required to approve)..."
+                              placeholder={t("tickets.resolutionPlaceholder")}
                               value={resolutionNote}
                               onChange={(e) => setResolutionNote(e.target.value)}
                               className="min-h-16 text-xs"
@@ -174,9 +184,9 @@ export function TicketsViewClient({
                                 size="sm"
                                 disabled={submitting}
                                 className="h-8 gap-1 text-[10px] font-bold"
-                                onClick={() => handleDecide(t.id, "approved")}
+                                onClick={() => handleDecide(ticket.id, "approved")}
                               >
-                                <CheckCircle className="w-3.5 h-3.5" /> Approve & Replan
+                                <CheckCircle className="w-3.5 h-3.5" /> {t("tickets.approve")}
                               </Button>
                               <Button
                                 type="button"
@@ -184,9 +194,9 @@ export function TicketsViewClient({
                                 size="sm"
                                 disabled={submitting}
                                 className="h-8 gap-1 text-[10px] font-bold text-red-600 hover:text-red-700"
-                                onClick={() => handleDecide(t.id, "rejected")}
+                                onClick={() => handleDecide(ticket.id, "rejected")}
                               >
-                                <XCircle className="w-3.5 h-3.5" /> Reject
+                                <XCircle className="w-3.5 h-3.5" /> {t("tickets.reject")}
                               </Button>
                               <Button
                                 type="button"
@@ -198,7 +208,7 @@ export function TicketsViewClient({
                                   setResolutionNote("");
                                 }}
                               >
-                                Cancel
+                                {t("common.cancel")}
                               </Button>
                             </div>
                           </div>
@@ -208,9 +218,9 @@ export function TicketsViewClient({
                             variant="outline"
                             size="sm"
                             className="h-8 text-[10px] font-bold"
-                            onClick={() => setDecidingId(t.id)}
+                            onClick={() => setDecidingId(ticket.id)}
                           >
-                            Decide
+                            {t("tickets.decide")}
                           </Button>
                         )}
                       </div>
@@ -224,32 +234,41 @@ export function TicketsViewClient({
 
         <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
           <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground border-b pb-3 border-neutral-100 dark:border-neutral-800">
-            Decided Tickets ({decidedTickets.length})
+            {t("tickets.decidedTitle", { count: decidedTickets.length })}
           </h3>
 
           {decidedTickets.length === 0 ? (
-            <p className="text-xs text-muted-foreground p-4 text-center">No decided tickets yet.</p>
+            <p className="text-xs text-muted-foreground p-4 text-center">
+              {t("tickets.emptyDecided")}
+            </p>
           ) : (
             <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 divide-y divide-neutral-200/20">
-              {decidedTickets.map((t) => (
-                <div key={t.id} className="py-3 flex items-start justify-between gap-3 text-xs">
+              {decidedTickets.map((ticket) => (
+                <div key={ticket.id} className="py-3 flex items-start justify-between gap-3 text-xs">
                   <div className="min-w-0">
-                    <span className="font-semibold text-foreground truncate block">{t.title}</span>
-                    {t.resolutionNote && (
+                    <span className="font-semibold text-foreground truncate block">
+                      {ticket.title}
+                    </span>
+                    {ticket.resolutionNote && (
                       <span className="text-[10px] text-muted-foreground block mt-0.5 whitespace-pre-wrap">
-                        {t.resolutionNote}
+                        {ticket.resolutionNote}
                       </span>
                     )}
                     <span className="text-[10px] text-muted-foreground block mt-0.5">
-                      Decided by:{" "}
-                      <strong>{memberNameMap.get(t.decidedByMemberId ?? "") ?? "Workspace member"}</strong>{" "}
-                      on {t.decidedAt ? new Date(t.decidedAt).toLocaleDateString() : ""}
+                      {t("tickets.decidedBy", {
+                        name:
+                          memberNameMap.get(ticket.decidedByMemberId ?? "") ??
+                          t("tickets.unknownMember"),
+                        date: ticket.decidedAt
+                          ? format.dateTime(new Date(ticket.decidedAt), "short")
+                          : "—",
+                      })}
                     </span>
                   </div>
                   <span
-                    className={`shrink-0 px-2 py-0.5 rounded text-[9px] font-bold uppercase ${STATUS_STYLE[t.status]}`}
+                    className={`shrink-0 px-2 py-0.5 rounded text-[9px] font-bold uppercase ${STATUS_STYLE[ticket.status]}`}
                   >
-                    {t.status}
+                    {t(`tickets.status.${ticket.status}`)}
                   </span>
                 </div>
               ))}
@@ -262,28 +281,28 @@ export function TicketsViewClient({
         {isAdding && (
           <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4 animate-in fade-in slide-in-from-right-3 duration-250">
             <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
-              <h3 className="text-sm font-semibold text-foreground">New Ticket</h3>
+              <h3 className="text-sm font-semibold text-foreground">{t("tickets.new")}</h3>
               <Button variant="ghost" size="sm" onClick={() => setIsAdding(false)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
             </div>
 
             <form onSubmit={handleCreate} className="space-y-4 text-xs font-semibold">
               <div className="space-y-1.5">
-                <label className="text-muted-foreground">Title</label>
+                <label className="text-muted-foreground">{t("common.title")}</label>
                 <Input
                   required
-                  placeholder="e.g. Need an export-to-CSV option"
+                  placeholder={t("tickets.titlePlaceholder")}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-muted-foreground">Description</label>
+                <label className="text-muted-foreground">{t("common.description")}</label>
                 <Textarea
                   required
-                  placeholder="Describe the request or issue in detail..."
+                  placeholder={t("tickets.descPlaceholder")}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   className="min-h-24"
@@ -291,7 +310,7 @@ export function TicketsViewClient({
               </div>
 
               <Button type="submit" disabled={submitting} className="w-full text-xs">
-                {submitting ? "Submitting..." : "Submit Ticket"}
+                {submitting ? t("tickets.submitting") : t("tickets.submit")}
               </Button>
             </form>
           </div>
@@ -300,12 +319,9 @@ export function TicketsViewClient({
         <div className="p-5 border border-border rounded-2xl bg-card shadow-sm text-xs space-y-3">
           <h4 className="font-semibold text-foreground flex items-center gap-1">
             <Inbox className="w-4 h-4 text-primary" />
-            How tickets work
+            {t("tickets.howTitle")}
           </h4>
-          <p className="text-muted-foreground leading-relaxed">
-            Submit a request or issue for this project. The project leader will approve with a
-            resolution note (which triggers an AI replan of the project plan) or reject it.
-          </p>
+          <p className="text-muted-foreground leading-relaxed">{t("tickets.howBody")}</p>
         </div>
       </div>
     </div>

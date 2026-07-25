@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button, Input, Textarea } from "@vieroc/ui";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
+import { useActionError } from "@/i18n/use-action-error";
+import type { EventTranslator } from "@/i18n/activity-event";
+import { automationLabel } from "@/modules/automation/automation.labels";
 import { createAutomationAction } from "@/modules/automation/automation.actions";
 import {
   AUTOMATION_TRIGGER_TYPES,
   AUTOMATION_ACTION_TYPES,
-  AUTOMATION_TRIGGER_LABELS,
-  AUTOMATION_ACTION_LABELS,
   ACTION_FIELD_SPECS,
   CONDITION_FIELDS_BY_TRIGGER,
   PROJECT_ONLY_ACTION_TYPES,
@@ -19,6 +21,10 @@ import {
 } from "@/modules/automation/automation.schema";
 
 const PRIORITY_OPTIONS = ["low", "medium", "high", "urgent"];
+type Translator = EventTranslator & {
+  (key: string, values?: Record<string, string | number>): string;
+};
+
 const CONDITION_OPS = ["eq", "neq", "in", "gt", "lt", "contains"];
 const MAX_CONDITIONS = 15;
 const MAX_ACTIONS = 6;
@@ -57,9 +63,13 @@ export function AutomationForm({
   onCreated,
   onCancel,
 }: Props) {
+  const t = useTranslations();
+  const actionError = useActionError();
   const allowedActionTypes = projectId
     ? AUTOMATION_ACTION_TYPES
-    : AUTOMATION_ACTION_TYPES.filter((t) => !PROJECT_ONLY_ACTION_TYPES.has(t));
+    : AUTOMATION_ACTION_TYPES.filter((type) => !PROJECT_ONLY_ACTION_TYPES.has(type));
+  const triggerLabel = (code: string) =>
+    automationLabel(t as unknown as EventTranslator, "trigger", code);
 
   const [submitting, setSubmitting] = useState(false);
   const [name, setName] = useState("");
@@ -89,11 +99,11 @@ export function AutomationForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) {
-      toast.error("Vui lòng nhập tên automation");
+      toast.error(t("automations.form.nameRequired"));
       return;
     }
     if (scope === "task" && !selectedTaskId) {
-      toast.error("Vui lòng chọn 1 task cụ thể");
+      toast.error(t("automations.form.taskRequired"));
       return;
     }
 
@@ -121,24 +131,28 @@ export function AutomationForm({
     setSubmitting(false);
 
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
-    toast.success("Đã tạo automation");
+    toast.success(t("automations.form.created"));
     onCreated();
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-border p-4">
-      <Input placeholder="Tên automation" value={name} onChange={(e) => setName(e.target.value)} />
+      <Input
+        placeholder={t("automations.form.namePlaceholder")}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+      />
       <Textarea
-        placeholder="Mô tả (tuỳ chọn)"
+        placeholder={t("automations.form.descPlaceholder")}
         value={description}
         onChange={(e) => setDescription(e.target.value)}
       />
 
       <div>
-        <label className="mb-1 block text-sm font-medium">Khi nào (Trigger)</label>
+        <label className="mb-1 block text-sm font-medium">{t("automations.form.triggerLabel")}</label>
         <select
           className="w-full rounded-lg border border-border px-3 py-2"
           value={triggerType}
@@ -148,9 +162,9 @@ export function AutomationForm({
             if (!e.target.value.startsWith("task.")) setScope("all");
           }}
         >
-          {AUTOMATION_TRIGGER_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {AUTOMATION_TRIGGER_LABELS[t] ?? t}
+          {AUTOMATION_TRIGGER_TYPES.map((triggerCode) => (
+            <option key={triggerCode} value={triggerCode}>
+              {triggerLabel(triggerCode)}
             </option>
           ))}
         </select>
@@ -158,7 +172,7 @@ export function AutomationForm({
 
       {canScopeToTask && tasks.length > 0 && (
         <div>
-          <label className="mb-1 block text-sm font-medium">Phạm vi áp dụng</label>
+          <label className="mb-1 block text-sm font-medium">{t("automations.form.scopeLabel")}</label>
           <div className="flex gap-4 text-sm">
             <label className="flex items-center gap-1.5">
               <input
@@ -166,7 +180,7 @@ export function AutomationForm({
                 checked={scope === "all"}
                 onChange={() => setScope("all")}
               />
-              Tất cả task trong dự án
+              {t("automations.form.allTasks")}
             </label>
             <label className="flex items-center gap-1.5">
               <input
@@ -174,13 +188,13 @@ export function AutomationForm({
                 checked={scope === "task"}
                 onChange={() => setScope("task")}
               />
-              Chỉ 1 task cụ thể
+              {t("automations.form.oneTask")}
             </label>
           </div>
           {scope === "task" && (
             <div className="mt-2 space-y-2">
               <Input
-                placeholder="Tìm task theo tên…"
+                placeholder={t("automations.form.taskSearchPlaceholder")}
                 value={taskFilter}
                 onChange={(e) => setTaskFilter(e.target.value)}
               />
@@ -189,10 +203,10 @@ export function AutomationForm({
                 value={selectedTaskId ?? ""}
                 onChange={(e) => setSelectedTaskId(e.target.value || null)}
               >
-                <option value="">— Chọn task —</option>
-                {filteredTasks.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title}
+                <option value="">{t("automations.form.selectTask")}</option>
+                {filteredTasks.map((task) => (
+                  <option key={task.id} value={task.id}>
+                    {task.title}
                   </option>
                 ))}
               </select>
@@ -204,7 +218,10 @@ export function AutomationForm({
       <div>
         <div className="mb-1 flex items-center justify-between">
           <label className="text-sm font-medium">
-            Điều kiện ({conditions.length}/{MAX_CONDITIONS})
+            {t("automations.form.conditions", {
+              count: conditions.length,
+              max: MAX_CONDITIONS,
+            })}
           </label>
           <Button
             type="button"
@@ -237,7 +254,7 @@ export function AutomationForm({
       <div>
         <div className="mb-1 flex items-center justify-between">
           <label className="text-sm font-medium">
-            Hành động ({actions.length}/{MAX_ACTIONS})
+            {t("automations.form.actions", { count: actions.length, max: MAX_ACTIONS })}
           </label>
           <Button
             type="button"
@@ -264,15 +281,15 @@ export function AutomationForm({
       </div>
 
       <p className="rounded-lg bg-surface-subtle px-3 py-2 text-xs text-muted-foreground">
-        {buildSummary(triggerType, conditions, actions, scope, selectedTaskId, tasks)}
+        {buildSummary(t as unknown as Translator, triggerType, conditions, actions, scope, selectedTaskId, tasks)}
       </p>
 
       <div className="flex gap-2">
         <Button type="submit" variant="dark" disabled={submitting}>
-          Tạo automation
+          {t("automations.form.create")}
         </Button>
         <Button type="button" variant="outline" onClick={onCancel}>
-          Huỷ
+          {t("common.cancel")}
         </Button>
       </div>
     </form>
@@ -287,7 +304,13 @@ function parseConditionValue(raw: string): unknown {
   }
 }
 
+/**
+ * Live preview of the rule being built. Assembled from parts rather than a
+ * single sentence key because the condition and action lists are user-built
+ * and variable-length; each part is itself localized.
+ */
 function buildSummary(
+  t: Translator,
   triggerType: string,
   conditions: ConditionDraft[],
   actions: ActionDraft[],
@@ -295,17 +318,25 @@ function buildSummary(
   selectedTaskId: string | null,
   tasks: TaskOption[]
 ): string {
-  const triggerLabel = AUTOMATION_TRIGGER_LABELS[triggerType] ?? triggerType;
   const scopeLabel =
     scope === "task" && selectedTaskId
-      ? ` (chỉ task "${tasks.find((t) => t.id === selectedTaskId)?.title ?? "?"}")`
+      ? t("automations.form.summaryScope", {
+          title: tasks.find((task) => task.id === selectedTaskId)?.title ?? "?",
+        })
       : "";
   const condLabel = conditions
     .filter((c) => c.field)
     .map((c) => `${c.field} ${c.op} ${c.value}`)
-    .join(" và ");
-  const actionLabel = actions.map((a) => AUTOMATION_ACTION_LABELS[a.type] ?? a.type).join(", ") || "…";
-  return `Khi ${triggerLabel}${scopeLabel}${condLabel ? ` và ${condLabel}` : ""} → ${actionLabel}`;
+    .join(t("automations.form.conditionJoiner"));
+  const actionLabel =
+    actions.map((a) => automationLabel(t, "action", a.type)).join(", ") ||
+    t("automations.form.noActions");
+  return t("automations.form.summary", {
+    trigger: automationLabel(t, "trigger", triggerType),
+    scope: scopeLabel,
+    conditions: condLabel ? t("automations.form.summaryConditions", { conditions: condLabel }) : "",
+    actions: actionLabel,
+  });
 }
 
 function ConditionRow({
@@ -321,6 +352,7 @@ function ConditionRow({
   onChange: (next: ConditionDraft) => void;
   onRemove: () => void;
 }) {
+  const t = useTranslations();
   const fieldOptions = CONDITION_FIELDS_BY_TRIGGER[triggerType] ?? [];
   const selectedSpec = fieldOptions.find((f) => f.field === condition.field);
 
@@ -334,13 +366,13 @@ function ConditionRow({
         >
           {fieldOptions.map((f) => (
             <option key={f.field} value={f.field}>
-              {f.label}
+              {t(`automations.field.${f.labelKey}` as Parameters<typeof t>[0])}
             </option>
           ))}
         </select>
       ) : (
         <Input
-          placeholder="field (vd: after.statusType)"
+          placeholder={t("automations.form.fieldPlaceholder")}
           value={condition.field}
           onChange={(e) => onChange({ ...condition, field: e.target.value })}
         />
@@ -356,7 +388,12 @@ function ConditionRow({
           </option>
         ))}
       </select>
-      {renderConditionValueInput(selectedSpec?.valueKind, condition.value, members, (v) =>
+      {renderConditionValueInput(
+        t as unknown as Translator,
+        selectedSpec?.valueKind,
+        condition.value,
+        members,
+        (v) =>
         onChange({ ...condition, value: v })
       )}
       <Button type="button" variant="outline" onClick={onRemove}>
@@ -367,6 +404,7 @@ function ConditionRow({
 }
 
 function renderConditionValueInput(
+  t: Translator,
   valueKind: "status-type" | "priority" | "member" | "blocker-status" | undefined,
   value: string,
   members: MemberOption[],
@@ -375,7 +413,7 @@ function renderConditionValueInput(
   if (valueKind === "status-type") {
     return (
       <select className="rounded-lg border border-border px-2" value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">— chọn —</option>
+        <option value="">{t("automations.form.select")}</option>
         {TASK_STATUS_TYPES.map((s) => (
           <option key={s} value={s}>
             {s}
@@ -387,7 +425,7 @@ function renderConditionValueInput(
   if (valueKind === "priority") {
     return (
       <select className="rounded-lg border border-border px-2" value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">— chọn —</option>
+        <option value="">{t("automations.form.select")}</option>
         {PRIORITY_OPTIONS.map((p) => (
           <option key={p} value={p}>
             {p}
@@ -403,7 +441,7 @@ function renderConditionValueInput(
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >
-        <option value="">— chọn thành viên —</option>
+        <option value="">{t("automations.form.selectMember")}</option>
         {members.map((m) => (
           <option key={m.id} value={m.id}>
             {m.fullName}
@@ -415,7 +453,7 @@ function renderConditionValueInput(
   if (valueKind === "blocker-status") {
     return (
       <select className="rounded-lg border border-border px-2" value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">— chọn —</option>
+        <option value="">{t("automations.form.select")}</option>
         {BLOCKER_STATUS_TYPES.map((s) => (
           <option key={s} value={s}>
             {s}
@@ -424,7 +462,13 @@ function renderConditionValueInput(
       </select>
     );
   }
-  return <Input placeholder="value" value={value} onChange={(e) => onChange(e.target.value)} />;
+  return (
+    <Input
+      placeholder={t("automations.form.valuePlaceholder")}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
 }
 
 function ActionRow({
@@ -446,6 +490,7 @@ function ActionRow({
   onParamChange: (key: string, value: unknown) => void;
   onRemove: () => void;
 }) {
+  const t = useTranslations();
   const specs = ACTION_FIELD_SPECS[action.type] ?? [];
 
   return (
@@ -456,9 +501,9 @@ function ActionRow({
           value={action.type}
           onChange={(e) => onTypeChange(e.target.value)}
         >
-          {allowedActionTypes.map((t) => (
-            <option key={t} value={t}>
-              {AUTOMATION_ACTION_LABELS[t] ?? t}
+          {allowedActionTypes.map((actionCode) => (
+            <option key={actionCode} value={actionCode}>
+              {automationLabel(t as unknown as EventTranslator, "action", actionCode)}
             </option>
           ))}
         </select>
@@ -489,13 +534,15 @@ function ActionFieldControl({
   blockers,
   onChange,
 }: {
-  spec: { key: string; label: string; type: ActionFieldType };
+  spec: { key: string; labelKey: string; type: ActionFieldType };
   value: unknown;
   statuses: StatusOption[];
   members: MemberOption[];
   blockers: BlockerOption[];
   onChange: (v: unknown) => void;
 }) {
+  const t = useTranslations();
+  const label = t(`automations.field.${spec.labelKey}` as Parameters<typeof t>[0]);
   const strValue = typeof value === "string" ? value : value != null ? String(value) : "";
 
   if (spec.type === "select-status") {
@@ -505,7 +552,7 @@ function ActionFieldControl({
         value={strValue}
         onChange={(e) => onChange(e.target.value)}
       >
-        <option value="">{spec.label}</option>
+        <option value="">{label}</option>
         {statuses.map((s) => (
           <option key={s.id} value={s.id}>
             {s.name}
@@ -521,7 +568,7 @@ function ActionFieldControl({
         value={strValue}
         onChange={(e) => onChange(e.target.value)}
       >
-        <option value="">{spec.label}</option>
+        <option value="">{label}</option>
         {PRIORITY_OPTIONS.map((p) => (
           <option key={p} value={p}>
             {p}
@@ -537,7 +584,7 @@ function ActionFieldControl({
         value={strValue}
         onChange={(e) => onChange(e.target.value)}
       >
-        <option value="">{spec.label}</option>
+        <option value="">{label}</option>
         {members.map((m) => (
           <option key={m.id} value={m.id}>
             {m.fullName}
@@ -553,7 +600,7 @@ function ActionFieldControl({
         value={strValue}
         onChange={(e) => onChange(e.target.value)}
       >
-        <option value="">{spec.label}</option>
+        <option value="">{label}</option>
         {blockers.map((b) => (
           <option key={b.id} value={b.id}>
             {b.title}
@@ -566,14 +613,14 @@ function ActionFieldControl({
     return (
       <Input
         type="number"
-        placeholder={spec.label}
+        placeholder={label}
         value={strValue}
         onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))}
       />
     );
   }
   if (spec.type === "textarea") {
-    return <Textarea placeholder={spec.label} value={strValue} onChange={(e) => onChange(e.target.value)} />;
+    return <Textarea placeholder={label} value={strValue} onChange={(e) => onChange(e.target.value)} />;
   }
-  return <Input placeholder={spec.label} value={strValue} onChange={(e) => onChange(e.target.value)} />;
+  return <Input placeholder={label} value={strValue} onChange={(e) => onChange(e.target.value)} />;
 }

@@ -2,16 +2,18 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useFormatter, useTranslations } from "next-intl";
 import { Button } from "@vieroc/ui";
 import { toast } from "sonner";
 import { Plus, Trash2, Zap } from "lucide-react";
+import { useActionError } from "@/i18n/use-action-error";
+import { activityEventKey } from "@/i18n/activity-event";
 import {
   deleteAutomationAction,
   retryAutomationRunAction,
   toggleAutomationAction,
 } from "@/modules/automation/automation.actions";
 import { AutomationForm } from "./automation-form";
-import { AUTOMATION_TRIGGER_LABELS } from "@/modules/automation/automation.schema";
 
 interface RunRow {
   id: string;
@@ -76,7 +78,19 @@ export function AutomationsViewClient({
   initialTaskId,
 }: Props) {
   const router = useRouter();
+  const t = useTranslations();
+  const format = useFormatter();
+  const actionError = useActionError();
   const [automations, setAutomations] = useState(initialAutomations);
+  /**
+   * Trigger codes are dotted (`task.status_changed`) and next-intl treats `.`
+   * as a namespace separator, so they are camelized into a catalog leaf the
+   * same way activity-event types are. Unknown codes fall back to the raw code.
+   */
+  const triggerLabel = (code: string) => {
+    const key = `automations.trigger.${activityEventKey(code)}`;
+    return t.has(key as Parameters<typeof t.has>[0]) ? t(key as Parameters<typeof t>[0]) : code;
+  };
   const [showForm, setShowForm] = useState(!!initialTaskId);
   const [retryingRunId, setRetryingRunId] = useState<string | null>(null);
 
@@ -92,7 +106,7 @@ export function AutomationsViewClient({
       isActive,
     });
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       setAutomations((current) =>
         current.map((a) => (a.id === automationId ? { ...a, isActive: !isActive } : a))
       );
@@ -100,7 +114,7 @@ export function AutomationsViewClient({
   }
 
   async function handleDelete(automationId: string) {
-    if (!confirm("Delete this automation?")) return;
+    if (!confirm(t("automations.deleteConfirm"))) return;
     const previous = automations;
     setAutomations((current) => current.filter((a) => a.id !== automationId));
     const res = await deleteAutomationAction({
@@ -110,10 +124,10 @@ export function AutomationsViewClient({
       automationId,
     });
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       setAutomations(previous);
     } else {
-      toast.success("Automation deleted");
+      toast.success(t("automations.toast.deleted"));
       router.refresh();
     }
   }
@@ -128,10 +142,10 @@ export function AutomationsViewClient({
     });
     setRetryingRunId(null);
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
-    toast.success(`Retry finished: ${res.data}`);
+    toast.success(t("automations.toast.retryFinished", { result: String(res.data) }));
     router.refresh();
   }
 
@@ -140,10 +154,10 @@ export function AutomationsViewClient({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Zap className="h-5 w-5 text-accent" />
-          <h2 className="text-lg font-semibold tracking-[-0.014em]">Automations</h2>
+          <h2 className="text-lg font-semibold tracking-[-0.014em]">{t("automations.title")}</h2>
         </div>
         <Button variant="dark" onClick={() => setShowForm((v) => !v)}>
-          <Plus className="mr-1 h-4 w-4" /> New automation
+          <Plus className="mr-1 h-4 w-4" /> {t("automations.new")}
         </Button>
       </div>
 
@@ -167,7 +181,7 @@ export function AutomationsViewClient({
 
       <div className="space-y-3">
         {automations.length === 0 && (
-          <p className="text-sm text-muted-foreground">No automations yet.</p>
+          <p className="text-sm text-muted-foreground">{t("automations.empty")}</p>
         )}
         {automations.map((automation) => (
           <div key={automation.id} className="rounded-2xl border border-border p-4">
@@ -175,9 +189,12 @@ export function AutomationsViewClient({
               <div>
                 <div className="font-medium">{automation.name}</div>
                 <div className="text-sm text-muted-foreground">
-                  {AUTOMATION_TRIGGER_LABELS[automation.triggerType] ?? automation.triggerType} ·{" "}
-                  {automation.actions.length} action(s) · {automation.conditions.length} condition(s)
-                  {automation.targetEntityId && " · Chỉ 1 task cụ thể"}
+                  {triggerLabel(automation.triggerType)} ·{" "}
+                  {t("automations.summary", {
+                    actions: automation.actions.length,
+                    conditions: automation.conditions.length,
+                  })}
+                  {automation.targetEntityId && ` · ${t("automations.scopedToTask")}`}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -187,7 +204,7 @@ export function AutomationsViewClient({
                     checked={automation.isActive}
                     onChange={(e) => handleToggle(automation.id, e.target.checked)}
                   />
-                  Active
+                  {t("automations.active")}
                 </label>
                 <Button variant="outline" onClick={() => handleDelete(automation.id)}>
                   <Trash2 className="h-4 w-4" />
@@ -199,10 +216,10 @@ export function AutomationsViewClient({
               <table className="mt-3 w-full text-xs">
                 <thead>
                   <tr className="text-left text-muted-foreground">
-                    <th className="pr-4">Status</th>
-                    <th className="pr-4">Depth</th>
-                    <th className="pr-4">Started</th>
-                    <th className="pr-4">Error</th>
+                    <th className="pr-4">{t("automations.runs.status")}</th>
+                    <th className="pr-4">{t("automations.runs.depth")}</th>
+                    <th className="pr-4">{t("automations.runs.started")}</th>
+                    <th className="pr-4">{t("automations.runs.error")}</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -211,7 +228,7 @@ export function AutomationsViewClient({
                     <tr key={run.id}>
                       <td className="pr-4">{run.status}</td>
                       <td className="pr-4">{run.chainDepth}</td>
-                      <td className="pr-4">{new Date(run.startedAt).toLocaleString()}</td>
+                      <td className="pr-4">{format.dateTime(new Date(run.startedAt), "dateTime")}</td>
                       <td className="max-w-[200px] truncate pr-4">{run.error ?? ""}</td>
                       <td>
                         {(run.status === "failed" || run.status === "timed_out") && (
@@ -221,7 +238,7 @@ export function AutomationsViewClient({
                             disabled={retryingRunId === run.id}
                             onClick={() => handleRetry(run.id)}
                           >
-                            {retryingRunId === run.id ? "Retrying…" : "Retry"}
+                            {retryingRunId === run.id ? t("automations.retrying") : t("automations.retry")}
                           </button>
                         )}
                       </td>
