@@ -1,9 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@vieroc/ui";
 import { toast } from "sonner";
-import { Activity, CalendarClock, GitBranch, TrendingDown, Copy, Download, FileText } from "lucide-react";
+import {
+  Activity,
+  CalendarClock,
+  GitBranch,
+  TrendingDown,
+  Copy,
+  Download,
+  FileText,
+} from "lucide-react";
 import type { HealthDetails } from "@/modules/project/project.service";
 import type { ScheduleResult, BurndownResult } from "@/modules/project/project.analytics";
 
@@ -17,15 +26,18 @@ interface Props {
 
 function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="p-4 border border-border rounded-2xl bg-card shadow-sm">
-      <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className="text-2xl font-black tabular-nums mt-1">{value}</div>
-      {hint && <div className="text-[10px] text-muted-foreground mt-0.5">{hint}</div>}
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </div>
+      <div className="mt-1 text-2xl font-black tabular-nums">{value}</div>
+      {hint && <div className="mt-0.5 text-[10px] text-muted-foreground">{hint}</div>}
     </div>
   );
 }
 
 function BurndownChart({ burndown }: { burndown: BurndownResult }) {
+  const t = useTranslations();
   const W = 640;
   const H = 200;
   const padL = 42;
@@ -42,47 +54,117 @@ function BurndownChart({ burndown }: { burndown: BurndownResult }) {
   const ideal = pts.map((p, i) => `${x(i)},${y(p.idealHours)}`).join(" ");
 
   if (n === 0) {
-    return <div className="text-xs text-muted-foreground p-8 text-center">No task data to chart yet.</div>;
+    return (
+      <div className="p-8 text-center text-xs text-muted-foreground">
+        {t("analytics.noChartData")}
+      </div>
+    );
   }
 
   return (
     <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[520px]" role="img" aria-label="Burndown chart">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full min-w-[520px]"
+        role="img"
+        aria-label={t("analytics.burndownChartAria")}
+      >
         {/* Axes */}
-        <line x1={padL} y1={padT} x2={padL} y2={H - padB} stroke="currentColor" className="text-border" strokeWidth={1} />
-        <line x1={padL} y1={H - padB} x2={W - padR} y2={H - padB} stroke="currentColor" className="text-border" strokeWidth={1} />
+        <line
+          x1={padL}
+          y1={padT}
+          x2={padL}
+          y2={H - padB}
+          stroke="currentColor"
+          className="text-border"
+          strokeWidth={1}
+        />
+        <line
+          x1={padL}
+          y1={H - padB}
+          x2={W - padR}
+          y2={H - padB}
+          stroke="currentColor"
+          className="text-border"
+          strokeWidth={1}
+        />
         {/* Y labels */}
-        <text x={padL - 6} y={y(maxY) + 3} textAnchor="end" className="fill-muted-foreground" fontSize={9}>
+        <text
+          x={padL - 6}
+          y={y(maxY) + 3}
+          textAnchor="end"
+          className="fill-muted-foreground"
+          fontSize={9}
+        >
           {Math.round(maxY)}h
         </text>
-        <text x={padL - 6} y={y(0) + 3} textAnchor="end" className="fill-muted-foreground" fontSize={9}>
+        <text
+          x={padL - 6}
+          y={y(0) + 3}
+          textAnchor="end"
+          className="fill-muted-foreground"
+          fontSize={9}
+        >
           0h
         </text>
         {/* Ideal line (dashed) */}
-        <polyline points={ideal} fill="none" stroke="currentColor" className="text-muted-foreground/50" strokeWidth={1.5} strokeDasharray="4 3" />
+        <polyline
+          points={ideal}
+          fill="none"
+          stroke="currentColor"
+          className="text-muted-foreground/50"
+          strokeWidth={1.5}
+          strokeDasharray="4 3"
+        />
         {/* Actual remaining */}
-        <polyline points={actual} fill="none" stroke="currentColor" className="text-primary" strokeWidth={2} />
+        <polyline
+          points={actual}
+          fill="none"
+          stroke="currentColor"
+          className="text-primary"
+          strokeWidth={2}
+        />
         {/* X labels: first + last date */}
-        <text x={padL} y={H - padB + 14} textAnchor="start" className="fill-muted-foreground" fontSize={9}>
+        <text
+          x={padL}
+          y={H - padB + 14}
+          textAnchor="start"
+          className="fill-muted-foreground"
+          fontSize={9}
+        >
           {pts[0]!.date}
         </text>
-        <text x={W - padR} y={H - padB + 14} textAnchor="end" className="fill-muted-foreground" fontSize={9}>
+        <text
+          x={W - padR}
+          y={H - padB + 14}
+          textAnchor="end"
+          className="fill-muted-foreground"
+          fontSize={9}
+        >
           {pts[n - 1]!.date}
         </text>
       </svg>
-      <div className="flex items-center gap-4 text-[10px] text-muted-foreground mt-1 pl-10">
+      <div className="mt-1 flex items-center gap-4 pl-10 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1">
-          <span className="inline-block w-4 h-0.5 bg-primary" /> Actual remaining
+          <span className="inline-block h-0.5 w-4 bg-primary" /> {t("analytics.actualRemaining")}
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-4 border-t border-dashed border-muted-foreground/60" /> Ideal
+          <span className="inline-block w-4 border-t border-dashed border-muted-foreground/60" />{" "}
+          {t("analytics.ideal")}
         </span>
       </div>
     </div>
   );
 }
 
-export function AnalyticsViewClient({ projectName, health, schedule, burndown, stakeholderMarkdown }: Props) {
+export function AnalyticsViewClient({
+  projectName,
+  health,
+  schedule,
+  burndown,
+  stakeholderMarkdown,
+}: Props) {
+  const t = useTranslations();
   const [showReport, setShowReport] = useState(false);
 
   const progressPct = Math.round(health.completionPct * 100);
@@ -100,9 +182,9 @@ export function AnalyticsViewClient({ projectName, health, schedule, burndown, s
   async function copyReport() {
     try {
       await navigator.clipboard.writeText(stakeholderMarkdown);
-      toast.success("Stakeholder report copied to clipboard.");
+      toast.success(t("analytics.copiedToast"));
     } catch {
-      toast.error("Could not copy — select the text and copy manually.");
+      toast.error(t("analytics.copyFailedToast"));
     }
   }
 
@@ -116,80 +198,96 @@ export function AnalyticsViewClient({ projectName, health, schedule, burndown, s
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    toast.success("Report downloaded.");
+    toast.success(t("analytics.downloadedToast"));
   }
 
   return (
     <div className="space-y-6">
       {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="Health" value={`${health.score}`} hint="/ 100" />
-        <StatCard label="Progress" value={`${progressPct}%`} hint={`${health.doneTasks}/${health.totalTasks} tasks`} />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <StatCard label={t("analytics.health")} value={`${health.score}`} hint="/ 100" />
         <StatCard
-          label="Forecast finish"
-          value={schedule.forecastCompletionDate ?? "—"}
-          hint={schedule.remainingDurationDays > 0 ? `~${schedule.remainingDurationDays} working day(s) left` : "complete"}
+          label={t("analytics.progress")}
+          value={`${progressPct}%`}
+          hint={t("analytics.doneOfTotal", { done: health.doneTasks, total: health.totalTasks })}
         />
-        <StatCard label="Velocity" value={`${burndown.velocityHoursPerWeek}h`} hint="per week (14d avg)" />
+        <StatCard
+          label={t("analytics.forecastFinish")}
+          value={schedule.forecastCompletionDate ?? "—"}
+          hint={
+            schedule.remainingDurationDays > 0
+              ? t("analytics.workingDaysLeft", { count: schedule.remainingDurationDays })
+              : t("analytics.complete")
+          }
+        />
+        <StatCard
+          label={t("analytics.velocity")}
+          value={`${burndown.velocityHoursPerWeek}h`}
+          hint={t("analytics.perWeekAvg")}
+        />
       </div>
 
       {/* Burndown */}
-      <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-3">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-          <TrendingDown className="w-3.5 h-3.5" /> Burndown
+      <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+          <TrendingDown className="h-3.5 w-3.5" /> {t("analytics.burndown")}
         </h3>
         <BurndownChart burndown={burndown} />
         <p className="text-[11px] text-muted-foreground">
-          {burndown.remainingHours}h remaining of {burndown.totalScopeHours}h scope · {burndown.completedHours}h done.
+          {t("analytics.burndownSummary", {
+            remaining: burndown.remainingHours,
+            scope: burndown.totalScopeHours,
+            done: burndown.completedHours,
+          })}
         </p>
       </div>
 
       {/* Critical path + slack */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-3">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-            <GitBranch className="w-3.5 h-3.5" /> Critical path
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+            <GitBranch className="h-3.5 w-3.5" /> {t("analytics.criticalPath")}
           </h3>
           {schedule.hasCycle && (
-            <p className="text-[11px] text-amber-500">
-              A dependency cycle was detected — schedule is approximate.
-            </p>
+            <p className="text-[11px] text-amber-500">{t("analytics.dependencyCycle")}</p>
           )}
           {criticalTitles.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No critical path (no open dependencies).</p>
+            <p className="text-xs text-muted-foreground">{t("analytics.noCriticalPath")}</p>
           ) : (
             <ol className="space-y-1.5">
               {criticalTitles.map((t, i) => (
                 <li key={t.id} className="flex items-center gap-2 text-xs">
-                  <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center shrink-0">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
                     {i + 1}
                   </span>
-                  <span className="text-foreground truncate">{t.title}</span>
+                  <span className="truncate text-foreground">{t.title}</span>
                 </li>
               ))}
             </ol>
           )}
         </div>
 
-        <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-3">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-            <CalendarClock className="w-3.5 h-3.5" /> Tightest slack
+        <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+            <CalendarClock className="h-3.5 w-3.5" /> {t("analytics.tightestSlack")}
           </h3>
           {slackTasks.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No open tasks to schedule.</p>
+            <p className="text-xs text-muted-foreground">{t("analytics.noOpenTasks")}</p>
           ) : (
             <div className="space-y-1.5">
-              {slackTasks.map((t) => (
-                <div key={t.id} className="flex items-center justify-between gap-2 text-xs">
-                  <span className="truncate text-foreground">{t.title}</span>
+              {slackTasks.map((task) => (
+                <div key={task.id} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="truncate text-foreground">{task.title}</span>
                   <span
-                    className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-bold ${
-                      t.isCritical
-                        ? "bg-red-500/10 text-red-500 border border-red-500/20"
+                    className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-bold ${
+                      task.isCritical
+                        ? "border border-red-500/20 bg-red-500/10 text-red-500"
                         : "bg-muted/60 text-muted-foreground"
                     }`}
                   >
-                    {t.isCritical ? "critical" : `${t.slackDays}d slack`}
+                    {task.isCritical
+                      ? t("analytics.critical")
+                      : t("analytics.slackDays", { days: task.slackDays })}
                   </span>
                 </div>
               ))}
@@ -199,29 +297,37 @@ export function AnalyticsViewClient({ projectName, health, schedule, burndown, s
       </div>
 
       {/* Stakeholder report */}
-      <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-3">
+      <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-            <FileText className="w-3.5 h-3.5" /> Stakeholder report
+          <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+            <FileText className="h-3.5 w-3.5" /> {t("analytics.stakeholderReport")}
           </h3>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" className="h-8 text-[10px] gap-1" onClick={() => setShowReport((v) => !v)}>
-              <Activity className="w-3.5 h-3.5" /> {showReport ? "Hide" : "Preview"}
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1 text-[10px]"
+              onClick={() => setShowReport((v) => !v)}
+            >
+              <Activity className="h-3.5 w-3.5" />{" "}
+              {showReport ? t("analytics.hide") : t("analytics.preview")}
             </Button>
-            <Button size="sm" variant="outline" className="h-8 text-[10px] gap-1" onClick={copyReport}>
-              <Copy className="w-3.5 h-3.5" /> Copy
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1 text-[10px]"
+              onClick={copyReport}
+            >
+              <Copy className="h-3.5 w-3.5" /> {t("analytics.copy")}
             </Button>
-            <Button size="sm" className="h-8 text-[10px] gap-1" onClick={downloadReport}>
-              <Download className="w-3.5 h-3.5" /> Download .md
+            <Button size="sm" className="h-8 gap-1 text-[10px]" onClick={downloadReport}>
+              <Download className="h-3.5 w-3.5" /> {t("analytics.downloadMd")}
             </Button>
           </div>
         </div>
-        <p className="text-[11px] text-muted-foreground">
-          A high-level, external-facing summary generated from live project data. Copy or download it to share
-          outside the internal team.
-        </p>
+        <p className="text-[11px] text-muted-foreground">{t("analytics.stakeholderDesc")}</p>
         {showReport && (
-          <pre className="text-[11px] leading-relaxed whitespace-pre-wrap bg-surface-subtle border border-border rounded-2xl p-4 overflow-x-auto">
+          <pre className="overflow-x-auto whitespace-pre-wrap rounded-2xl border border-border bg-surface-subtle p-4 text-[11px] leading-relaxed">
             {stakeholderMarkdown}
           </pre>
         )}

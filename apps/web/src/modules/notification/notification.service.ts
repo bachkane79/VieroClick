@@ -38,7 +38,7 @@ export async function clearAll(p: { workspaceId: string }) {
   assertCanReadOwnNotifications(ctx);
 
   const activeCount = await repo.countActive(p.workspaceId, ctx.workspaceMemberId);
-  if (activeCount === 0) throw new ValidationError("Inbox is already empty");
+  if (activeCount === 0) throw new ValidationError("Inbox is already empty", "inboxAlreadyEmpty");
 
   return db.transaction(async (tx) => {
     await repo.clearAll(p.workspaceId, ctx.workspaceMemberId, tx);

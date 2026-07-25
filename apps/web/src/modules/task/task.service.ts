@@ -13,7 +13,12 @@ import * as dependencyEvents from "@/modules/task-dependency/task-dependency.eve
 import * as blockerRepo from "@/modules/blocker/blocker.repo";
 import * as blockerEvents from "@/modules/blocker/blocker.events";
 import { recomputeMemberScore } from "@/modules/member-score/member-score.service";
-import { createTaskSchema, updateTaskSchema, moveTaskSchema, reviewTaskSchema } from "./task.schema";
+import {
+  createTaskSchema,
+  updateTaskSchema,
+  moveTaskSchema,
+  reviewTaskSchema,
+} from "./task.schema";
 import { assertCanManageTasks, assertCanReviewTask, assertCanUpdateTask } from "./task.policy";
 import * as repo from "./task.repo";
 import * as events from "./task.events";
@@ -69,7 +74,10 @@ function assertDoneCriteria(criteria: unknown) {
   const normalized = normalizeAcceptanceCriteria(criteria);
   const unchecked = normalized.filter((item) => item.required && !item.checked);
   if (unchecked.length > 0) {
-    throw new ValidationError("Required acceptance criteria must be checked before marking done");
+    throw new ValidationError(
+      "Required acceptance criteria must be checked before marking done",
+      "acceptanceCriteriaUnchecked"
+    );
   }
 }
 
@@ -90,7 +98,8 @@ async function getProjectLead(projectId: string, exec: Executor = db): Promise<s
 
 async function getStatusInProject(statusId: string, projectId: string) {
   const status = await repo.findStatusById(statusId);
-  if (!status || status.projectId !== projectId) throw new ValidationError("Invalid task status");
+  if (!status || status.projectId !== projectId)
+    throw new ValidationError("Invalid task status", "invalidTaskStatus");
   return status;
 }
 
@@ -117,14 +126,16 @@ async function assertCanMoveIntoStatus(p: {
   }
 
   if (targetStatus.type === "blocked" && !p.blockerReason?.trim()) {
-    throw new ValidationError("Blocker reason is required when moving a task to blocked");
+    throw new ValidationError(
+      "Blocker reason is required when moving a task to blocked",
+      "blockerReasonRequired"
+    );
   }
 
   if (targetStatus.type === "in_progress") {
     const blockers = await repo.listBlockingTasks(p.projectId, p.taskId);
     const openBlockers = blockers.filter(
-      (blocker) =>
-        blocker.blockerStatusType !== "done" && blocker.blockerStatusType !== "cancelled"
+      (blocker) => blocker.blockerStatusType !== "done" && blocker.blockerStatusType !== "cancelled"
     );
 
     if (openBlockers.length > 0 && !(isProjectManager(p.ctx) && p.allowBlockedOverride)) {
@@ -210,7 +221,10 @@ export async function createTask(p: { workspaceId: string; projectId: string; in
   const status = await getStatusInProject(data.statusId, p.projectId);
   if (status.type === "done") assertDoneCriteria(data.acceptanceCriteria);
   if (status.type === "blocked" && !data.blockerReason?.trim()) {
-    throw new ValidationError("Blocker reason is required when creating a blocked task");
+    throw new ValidationError(
+      "Blocker reason is required when creating a blocked task",
+      "blockerReasonRequired"
+    );
   }
 
   return db.transaction(async (tx) => {
@@ -298,8 +312,10 @@ export async function updateTask(p: {
     if (data.title !== undefined) values.title = data.title;
     if (data.description !== undefined) values.description = data.description ?? null;
     if (data.priority !== undefined) values.priority = data.priority;
-    if (data.assigneeMemberId !== undefined) values.assigneeMemberId = data.assigneeMemberId ?? null;
-    if (data.reporterMemberId !== undefined) values.reporterMemberId = data.reporterMemberId ?? null;
+    if (data.assigneeMemberId !== undefined)
+      values.assigneeMemberId = data.assigneeMemberId ?? null;
+    if (data.reporterMemberId !== undefined)
+      values.reporterMemberId = data.reporterMemberId ?? null;
     if (data.statusId !== undefined) values.statusId = data.statusId;
     if (data.startDate !== undefined) values.startDate = data.startDate ?? null;
     if (data.dueDate !== undefined) values.dueDate = data.dueDate ?? null;
@@ -313,7 +329,7 @@ export async function updateTask(p: {
     if (data.milestoneId !== undefined) values.milestoneId = data.milestoneId ?? null;
     if (data.parentTaskId !== undefined) {
       if (data.parentTaskId === existing.id) {
-        throw new ValidationError("A task cannot be its own parent");
+        throw new ValidationError("A task cannot be its own parent", "taskSelfParent");
       }
       values.parentTaskId = data.parentTaskId ?? null;
     }
@@ -327,7 +343,9 @@ export async function updateTask(p: {
   }
 
   const nextAcceptanceCriteria =
-    values.acceptanceCriteria !== undefined ? values.acceptanceCriteria : existing.acceptanceCriteria;
+    values.acceptanceCriteria !== undefined
+      ? values.acceptanceCriteria
+      : existing.acceptanceCriteria;
 
   let targetStatus: repo.TaskStatusRow | null = null;
   let previousStatus: repo.TaskStatusRow | null = null;
@@ -347,7 +365,10 @@ export async function updateTask(p: {
   }
 
   if (values.acceptanceCriteria !== undefined && !targetStatus) {
-    const currentStatus = await getStatusInProject(values.statusId ?? existing.statusId, p.projectId);
+    const currentStatus = await getStatusInProject(
+      values.statusId ?? existing.statusId,
+      p.projectId
+    );
     if (currentStatus.type === "done") assertDoneCriteria(nextAcceptanceCriteria);
   }
 
@@ -471,7 +492,10 @@ export async function reviewTask(p: {
   const existing = await getTaskInProject(p.taskId, p.projectId);
   const currentStatus = await getStatusInProject(existing.statusId, p.projectId);
   if (currentStatus.type !== "in_review") {
-    throw new ValidationError("Only a task in review can be approved or sent back for rework");
+    throw new ValidationError(
+      "Only a task in review can be approved or sent back for rework",
+      "taskNotInReview"
+    );
   }
 
   const statuses = await repo.listStatuses(p.projectId);
@@ -484,7 +508,8 @@ export async function reviewTask(p: {
 
     if (data.decision === "approve") {
       const doneStatus = statuses.find((s) => s.type === "done");
-      if (!doneStatus) throw new ValidationError("This project has no 'done' status configured");
+      if (!doneStatus)
+        throw new ValidationError("This project has no 'done' status configured", "noDoneStatus");
       assertDoneCriteria(existing.acceptanceCriteria);
       values.statusId = doneStatus.id;
       values.completedAt = new Date();
@@ -513,7 +538,7 @@ export async function reviewTask(p: {
       // 4.1: closing a task feeds the assignee's operational scores.
       await safeRecomputeScore(ctx.workspaceId, updated.assigneeMemberId, tx);
       await invalidateCache(`board:${p.projectId}`);
-    await invalidateProjectCaches(p.projectId); // WP-I2: dashboard/team-metrics aggregate over tasks too
+      await invalidateProjectCaches(p.projectId); // WP-I2: dashboard/team-metrics aggregate over tasks too
       return updated;
     }
 
@@ -521,7 +546,10 @@ export async function reviewTask(p: {
     const backStatus =
       statuses.find((s) => s.type === "in_progress") ?? statuses.find((s) => s.type === "todo");
     if (!backStatus) {
-      throw new ValidationError("This project has no in-progress/todo status to return the task to");
+      throw new ValidationError(
+        "This project has no in-progress/todo status to return the task to",
+        "noReworkStatus"
+      );
     }
     values.statusId = backStatus.id;
     values.completedAt = null;
@@ -692,7 +720,7 @@ export async function addTaskDependency(p: {
   assertCanManageTasks(ctx);
 
   if (data.blockerTaskId === data.blockedTaskId) {
-    throw new ValidationError("A task cannot depend on itself");
+    throw new ValidationError("A task cannot depend on itself", "taskSelfDependency");
   }
 
   const [blocker, blocked, existing] = await Promise.all([
@@ -700,7 +728,7 @@ export async function addTaskDependency(p: {
     getTaskInProject(data.blockedTaskId, p.projectId),
     repo.findDependencyPair(p.projectId, data.blockerTaskId, data.blockedTaskId),
   ]);
-  if (existing) throw new ValidationError("Dependency already exists");
+  if (existing) throw new ValidationError("Dependency already exists", "dependencyExists");
 
   return db.transaction(async (tx) => {
     const dependency = await repo.createDependency(
@@ -732,7 +760,12 @@ export async function removeTaskDependency(p: {
   if (!existing || existing.projectId !== p.projectId) throw new NotFoundError("Task dependency");
 
   return db.transaction(async (tx) => {
-    await dependencyEvents.dependencyRemoved(tx, ctx, existing.blockedTaskId, existing.blockerTaskId);
+    await dependencyEvents.dependencyRemoved(
+      tx,
+      ctx,
+      existing.blockedTaskId,
+      existing.blockerTaskId
+    );
     await repo.removeDependency(p.dependencyId, tx);
     await invalidateCache(`board:${p.projectId}`);
     await invalidateProjectCaches(p.projectId); // WP-I2: dashboard/team-metrics aggregate over tasks too
@@ -781,11 +814,7 @@ export async function listDeletedTasks(workspaceId: string, projectId: string) {
 
 /** Diacritic/case-insensitive normalize for fuzzy assignee matching. */
 function normalizeName(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/đ/g, "d");
+  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d");
 }
 
 /**
@@ -805,7 +834,7 @@ export async function quickCreateTask(p: {
   const statuses = await repo.listStatuses(p.projectId);
   const status =
     statuses.find((s) => s.isDefault) ?? statuses.find((s) => s.type === "todo") ?? statuses[0];
-  if (!status) throw new ValidationError("Project has no task statuses");
+  if (!status) throw new ValidationError("Project has no task statuses", "projectHasNoStatuses");
 
   let assigneeMemberId: string | null = null;
   let assigneeName: string | null = null;

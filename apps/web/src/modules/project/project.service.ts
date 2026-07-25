@@ -63,7 +63,9 @@ export const listProjects = cache(async function listProjects(workspaceId: strin
     // outside the cache (WP-C3) so a private project never leaks into a non-member's
     // sidebar/list. The cached set is identical for every workspace member (RLS
     // scopes it to the workspace, not the individual) so sharing it is safe.
-    const all = await getOrSetCache(`projects:${workspaceId}`, () => repo.listByWorkspace(workspaceId, exec));
+    const all = await getOrSetCache(`projects:${workspaceId}`, () =>
+      repo.listByWorkspace(workspaceId, exec)
+    );
     const hasPrivate = all.some((p) => p.isPrivate);
     if (!hasPrivate || isWorkspaceAdmin(ctx)) return all;
 
@@ -74,15 +76,14 @@ export const listProjects = cache(async function listProjects(workspaceId: strin
     // the caller (N+1) — batched into 2 queries total regardless of list size.
     const candidates = all.filter((p) => p.isPrivate && !myProjectIds.has(p.id));
     const viewableExtra =
-      candidates.length > 0 ? await resolveViewableSetBatch(ctx, candidates, exec) : new Set<string>();
+      candidates.length > 0
+        ? await resolveViewableSetBatch(ctx, candidates, exec)
+        : new Set<string>();
     return all.filter((p) => !p.isPrivate || myProjectIds.has(p.id) || viewableExtra.has(p.id));
   });
 });
 
-export const getProject = cache(async function getProject(
-  workspaceId: string,
-  projectId: string
-) {
+export const getProject = cache(async function getProject(workspaceId: string, projectId: string) {
   const ctx = await requireActor(workspaceId, projectId);
   const project = await getOrSetCache(`project:${projectId}`, async () => {
     const p = await repo.findById(projectId);
@@ -122,7 +123,10 @@ export async function createProject(workspaceId: string, input: unknown) {
     );
     for (const memberId of memberRoles.keys()) {
       if (!workspaceMemberIds.has(memberId)) {
-        throw new ValidationError("Project members must belong to this workspace");
+        throw new ValidationError(
+          "Project members must belong to this workspace",
+          "memberNotInWorkspace"
+        );
       }
     }
 
@@ -191,7 +195,8 @@ export async function createProject(workspaceId: string, input: unknown) {
         targetRole: "planning",
         senderRole: "assignment",
         projectId: project.id,
-        message: "A new VieroClick project was created. Generate and apply the implementation plan.",
+        message:
+          "A new VieroClick project was created. Generate and apply the implementation plan.",
         actorUserId: ctx.userId,
         payload: {
           projectName: project.name,
@@ -211,11 +216,7 @@ export async function createProject(workspaceId: string, input: unknown) {
  * dispatches the planning agent so the AI populates the plan; turning it OFF
  * just stops future agent activity.
  */
-export async function setAiLeader(p: {
-  workspaceId: string;
-  projectId: string;
-  enabled: boolean;
-}) {
+export async function setAiLeader(p: { workspaceId: string; projectId: string; enabled: boolean }) {
   const ctx = await requireActor(p.workspaceId, p.projectId);
   assertCanManageProject(ctx);
 
@@ -237,7 +238,8 @@ export async function setAiLeader(p: {
       targetRole: "planning",
       senderRole: "assignment",
       projectId: p.projectId,
-      message: "AI Leader was enabled for this project. Generate and apply the implementation plan.",
+      message:
+        "AI Leader was enabled for this project. Generate and apply the implementation plan.",
       actorUserId: ctx.userId,
       payload: { projectName: existing.name, createdBy: ctx.userId },
     }).catch((error) => {
@@ -333,7 +335,11 @@ export async function restoreProject(workspaceId: string, projectId: string) {
 /** WP-D4: soft-deleted projects in a workspace, for a restore panel. Workspace-admin only (broader than per-project manager). */
 export async function listDeletedProjects(workspaceId: string) {
   const ctx = await requireActor(workspaceId);
-  requirePermission(isWorkspaceAdmin(ctx), "Only workspace owners/admins can view deleted projects");
+  requirePermission(
+    isWorkspaceAdmin(ctx),
+    "Only workspace owners/admins can view deleted projects",
+    "workspaceAdminOnly"
+  );
   return repo.listDeletedByWorkspace(workspaceId);
 }
 
@@ -599,10 +605,7 @@ export async function computeHealthDetails(projectId: string): Promise<HealthDet
       .select({ id: blockers.id })
       .from(blockers)
       .where(
-        and(
-          eq(blockers.projectId, projectId),
-          sql`${blockers.status} in ('open','in_review')`
-        )
+        and(eq(blockers.projectId, projectId), sql`${blockers.status} in ('open','in_review')`)
       ),
     db
       .select({ id: projectRisks.id })

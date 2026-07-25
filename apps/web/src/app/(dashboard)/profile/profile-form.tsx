@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { useActionError } from "@/i18n/use-action-error";
 import {
   updateUserAction,
   updateMemberProfileAction,
@@ -33,6 +35,8 @@ interface Props {
 
 export function ProfileForm({ user, workspaces }: Props) {
   const router = useRouter();
+  const t = useTranslations();
+  const actionError = useActionError();
 
   // User details state
   const [fullName, setFullName] = useState(user.fullName);
@@ -41,7 +45,7 @@ export function ProfileForm({ user, workspaces }: Props) {
 
   // Selected workspace state
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(workspaces[0]?.id ?? "");
-  
+
   // Member profile state
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [skills, setSkills] = useState("");
@@ -63,21 +67,23 @@ export function ProfileForm({ user, workspaces }: Props) {
           const profile = res.data.profile;
           setSkills(profile.skills ? profile.skills.join(", ") : "");
           setSeniorityLevel(profile.seniorityLevel ?? 1);
-          setAvailabilityHours(profile.availabilityHoursPerWeek ? String(profile.availabilityHoursPerWeek) : "");
+          setAvailabilityHours(
+            profile.availabilityHoursPerWeek ? String(profile.availabilityHoursPerWeek) : ""
+          );
           setTimezone(profile.timezone ?? "");
           setProfileNotes(profile.profileNotes ?? "");
         } else {
-          toast.error("Failed to load workspace member profile");
+          toast.error(t("profile.toast.loadFailed"));
         }
       } catch {
-        toast.error("An error occurred loading workspace profile");
+        toast.error(t("profile.toast.loadError"));
       } finally {
         setLoadingProfile(false);
       }
     };
 
     fetchProfile();
-  }, [selectedWorkspaceId]);
+  }, [selectedWorkspaceId, t]);
 
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,13 +97,13 @@ export function ProfileForm({ user, workspaces }: Props) {
       });
 
       if (res.ok) {
-        toast.success("Global user profile updated!");
+        toast.success(t("profile.toast.userUpdated"));
         router.refresh();
       } else {
-        toast.error(res.error ?? "Failed to update profile");
+        toast.error(actionError(res, t("profile.toast.updateFailed")));
       }
     } catch {
-      toast.error("An error occurred");
+      toast.error(t("common.somethingWrong"));
     } finally {
       setSavingUser(false);
     }
@@ -129,12 +135,12 @@ export function ProfileForm({ user, workspaces }: Props) {
       });
 
       if (res.ok) {
-        toast.success("Workspace-specific profile updated!");
+        toast.success(t("profile.toast.profileUpdated"));
       } else {
-        toast.error(res.error ?? "Failed to update profile");
+        toast.error(actionError(res, t("profile.toast.updateFailed")));
       }
     } catch {
-      toast.error("An error occurred");
+      toast.error(t("common.somethingWrong"));
     } finally {
       setSavingProfile(false);
     }
@@ -143,16 +149,19 @@ export function ProfileForm({ user, workspaces }: Props) {
   return (
     <div className="space-y-8">
       {/* Global User Info */}
-      <div className="rounded-2xl border bg-card/60 backdrop-blur-md p-6 border-border shadow-md">
-        <h2 className="text-lg font-bold flex items-center gap-2 mb-4">
-          <User className="w-5 h-5 text-primary" />
-          Global Profile Settings
+      <div className="rounded-2xl border border-border bg-card/60 p-6 shadow-md backdrop-blur-md">
+        <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
+          <User className="h-5 w-5 text-primary" />
+          {t("profile.globalSettings.title")}
         </h2>
         <form onSubmit={handleUpdateUser} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-1.5">
-              <label htmlFor="fullName" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Full Name
+              <label
+                htmlFor="fullName"
+                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              >
+                {t("profile.fullName")}
               </label>
               <input
                 id="fullName"
@@ -160,12 +169,15 @@ export function ProfileForm({ user, workspaces }: Props) {
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-xl border border-input bg-background/50 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+                className="w-full rounded-xl border border-input bg-background/50 px-3.5 py-2 text-sm placeholder-neutral-400 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
             </div>
             <div className="space-y-1.5">
-              <label htmlFor="avatarUrl" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Avatar Image URL
+              <label
+                htmlFor="avatarUrl"
+                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              >
+                {t("profile.avatarUrl")}
               </label>
               <input
                 id="avatarUrl"
@@ -173,47 +185,52 @@ export function ProfileForm({ user, workspaces }: Props) {
                 value={avatarUrl}
                 onChange={(e) => setAvatarUrl(e.target.value)}
                 placeholder="https://images.unsplash.com/photo-..."
-                className="w-full px-3.5 py-2 rounded-xl border border-input bg-background/50 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+                className="w-full rounded-xl border border-input bg-background/50 px-3.5 py-2 text-sm placeholder-neutral-400 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
             </div>
           </div>
           <div className="flex justify-end">
             <Button
               type="submit"
-              disabled={savingUser || (fullName === user.fullName && avatarUrl === (user.avatarUrl ?? ""))}
+              disabled={
+                savingUser || (fullName === user.fullName && avatarUrl === (user.avatarUrl ?? ""))
+              }
               className="rounded-xl px-4"
             >
-              {savingUser ? "Saving..." : "Save Identity Info"}
+              {savingUser ? t("profile.saving") : t("profile.saveIdentity")}
             </Button>
           </div>
         </form>
       </div>
 
       {/* Workspace specific profile */}
-      <div className="rounded-2xl border bg-card/60 backdrop-blur-md p-6 border-border shadow-md">
-        <h2 className="text-lg font-bold flex items-center gap-2 mb-2">
-          <Award className="w-5 h-5 text-primary" />
-          Workspace Profile & Telemetry
+      <div className="rounded-2xl border border-border bg-card/60 p-6 shadow-md backdrop-blur-md">
+        <h2 className="mb-2 flex items-center gap-2 text-lg font-bold">
+          <Award className="h-5 w-5 text-primary" />
+          {t("profile.workspaceSection.title")}
         </h2>
-        <p className="text-xs text-muted-foreground mb-6">
-          Define your skills, timezone, availability, and seniority specifically for each workspace.
+        <p className="mb-6 text-xs text-muted-foreground">
+          {t("profile.workspaceSection.description")}
         </p>
 
         {workspaces.length === 0 ? (
-          <div className="text-center py-6 text-muted-foreground text-sm border border-dashed rounded-xl">
-            You must be a member of at least one workspace to configure telemetry settings.
+          <div className="rounded-xl border border-dashed py-6 text-center text-sm text-muted-foreground">
+            {t("profile.noWorkspace")}
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="space-y-1.5 max-w-xs">
-              <label htmlFor="workspace-select" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Configure Workspace
+            <div className="max-w-xs space-y-1.5">
+              <label
+                htmlFor="workspace-select"
+                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              >
+                {t("profile.configureWorkspace")}
               </label>
               <select
                 id="workspace-select"
                 value={selectedWorkspaceId}
                 onChange={(e) => setSelectedWorkspaceId(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-xl border border-input bg-background/50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm appearance-none cursor-pointer"
+                className="w-full cursor-pointer appearance-none rounded-xl border border-input bg-background/50 px-3.5 py-2 text-sm transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               >
                 {workspaces.map((ws) => (
                   <option key={ws.id} value={ws.id}>
@@ -224,17 +241,23 @@ export function ProfileForm({ user, workspaces }: Props) {
             </div>
 
             {loadingProfile ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground py-8 justify-center">
-                <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                Loading workspace profile...
+              <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                {t("profile.loadingProfile")}
               </div>
             ) : (
-              <form onSubmit={handleUpdateProfile} className="space-y-4 pt-2 border-t border-border">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <form
+                onSubmit={handleUpdateProfile}
+                className="space-y-4 border-t border-border pt-2"
+              >
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-1.5">
-                    <label htmlFor="skills" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                      <Layers className="w-3.5 h-3.5" />
-                      Skills (comma-separated)
+                    <label
+                      htmlFor="skills"
+                      className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                    >
+                      <Layers className="h-3.5 w-3.5" />
+                      {t("profile.skills")}
                     </label>
                     <input
                       id="skills"
@@ -242,14 +265,17 @@ export function ProfileForm({ user, workspaces }: Props) {
                       value={skills}
                       onChange={(e) => setSkills(e.target.value)}
                       placeholder="react, typescript, nextjs, python"
-                      className="w-full px-3.5 py-2 rounded-xl border border-input bg-background/50 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+                      className="w-full rounded-xl border border-input bg-background/50 px-3.5 py-2 text-sm placeholder-neutral-400 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label htmlFor="timezone" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                      <Globe className="w-3.5 h-3.5" />
-                      Timezone
+                    <label
+                      htmlFor="timezone"
+                      className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                    >
+                      <Globe className="h-3.5 w-3.5" />
+                      {t("profile.timezone")}
                     </label>
                     <input
                       id="timezone"
@@ -257,14 +283,17 @@ export function ProfileForm({ user, workspaces }: Props) {
                       value={timezone}
                       onChange={(e) => setTimezone(e.target.value)}
                       placeholder="Asia/Ho_Chi_Minh"
-                      className="w-full px-3.5 py-2 rounded-xl border border-input bg-background/50 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+                      className="w-full rounded-xl border border-input bg-background/50 px-3.5 py-2 text-sm placeholder-neutral-400 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label htmlFor="availability" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5" />
-                      Availability (hours per week)
+                    <label
+                      htmlFor="availability"
+                      className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                    >
+                      <Clock className="h-3.5 w-3.5" />
+                      {t("profile.availability")}
                     </label>
                     <input
                       id="availability"
@@ -274,14 +303,17 @@ export function ProfileForm({ user, workspaces }: Props) {
                       value={availabilityHours}
                       onChange={(e) => setAvailabilityHours(e.target.value)}
                       placeholder="40"
-                      className="w-full px-3.5 py-2 rounded-xl border border-input bg-background/50 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+                      className="w-full rounded-xl border border-input bg-background/50 px-3.5 py-2 text-sm placeholder-neutral-400 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label htmlFor="seniority" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                      <Briefcase className="w-3.5 h-3.5" />
-                      Seniority Level (1 - 10)
+                    <label
+                      htmlFor="seniority"
+                      className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                    >
+                      <Briefcase className="h-3.5 w-3.5" />
+                      {t("profile.seniority")}
                     </label>
                     <input
                       id="seniority"
@@ -290,33 +322,32 @@ export function ProfileForm({ user, workspaces }: Props) {
                       max="10"
                       value={seniorityLevel}
                       onChange={(e) => setSeniorityLevel(Number(e.target.value))}
-                      className="w-full px-3.5 py-2 rounded-xl border border-input bg-background/50 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+                      className="w-full rounded-xl border border-input bg-background/50 px-3.5 py-2 text-sm placeholder-neutral-400 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label htmlFor="notes" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                    <FileText className="w-3.5 h-3.5" />
-                    Profile Notes & Context
+                  <label
+                    htmlFor="notes"
+                    className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    {t("profile.notes")}
                   </label>
                   <textarea
                     id="notes"
                     rows={4}
                     value={profileNotes}
                     onChange={(e) => setProfileNotes(e.target.value)}
-                    placeholder="Focusing on frontend scaffolding and DB layer integrations for the next two quarters..."
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-input bg-background/50 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm resize-none"
+                    placeholder={t("profile.notesPlaceholder")}
+                    className="w-full resize-none rounded-xl border border-input bg-background/50 px-3.5 py-2.5 text-sm placeholder-neutral-400 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
 
                 <div className="flex justify-end pt-2">
-                  <Button
-                    type="submit"
-                    disabled={savingProfile}
-                    className="rounded-xl px-4"
-                  >
-                    {savingProfile ? "Saving..." : "Save Workspace Profile"}
+                  <Button type="submit" disabled={savingProfile} className="rounded-xl px-4">
+                    {savingProfile ? t("profile.saving") : t("profile.saveWorkspaceProfile")}
                   </Button>
                 </div>
               </form>

@@ -1,11 +1,10 @@
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { AlertOctagon, AlertTriangle, TrendingDown } from "lucide-react";
 import { detectPlanDeviations } from "@/modules/project/project.service";
 import { GanttClient } from "@/modules/task/components/gantt-client";
 import { loadProjectViewData } from "@/modules/task/task-page-data";
 import { NotFoundError } from "@/server/lib/errors";
-import { ProjectWorkHeader } from "@/modules/task/components/project-work-header";
-import { getLocale } from "@/lib/i18n/server";
 
 interface Props {
   params: Promise<{ slug: string; projectId: string }>;
@@ -13,6 +12,7 @@ interface Props {
 
 export default async function ProjectTimelinePage({ params }: Props) {
   const { slug, projectId } = await params;
+  const t = await getTranslations();
 
   let data;
   let deviations;
@@ -23,12 +23,11 @@ export default async function ProjectTimelinePage({ params }: Props) {
     if (err instanceof NotFoundError) notFound();
     throw err;
   }
-  const locale = await getLocale();
 
   return (
     <div className="mx-auto max-w-[1240px] px-4 py-5 lg:px-6">
       {/* Giant Unified White Shell Container */}
-      <div className="rounded-3xl border border-border bg-surface p-5 sm:p-6 shadow-soft">
+      <div className="rounded-3xl border border-border bg-surface p-5 shadow-soft sm:p-6">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="space-y-4 lg:col-span-2">
             <GanttClient
@@ -44,17 +43,17 @@ export default async function ProjectTimelinePage({ params }: Props) {
 
           <div className="space-y-4">
             <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
-              <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
+              <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 <TrendingDown className="h-4 w-4 text-destructive" />
-                Schedule Deviations
+                {t("project.timeline.scheduleDeviations")}
               </h3>
 
               {deviations.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-border/80 p-6 text-center text-muted-foreground">
                   <span className="mb-2 inline-block rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                    Healthy
+                    {t("project.timeline.healthy")}
                   </span>
-                  <p className="text-xs font-semibold">No deviations detected</p>
+                  <p className="text-xs font-semibold">{t("project.timeline.noDeviations")}</p>
                 </div>
               ) : (
                 <div className="space-y-2.5">
@@ -72,7 +71,7 @@ export default async function ProjectTimelinePage({ params }: Props) {
                         <Icon className="mt-0.5 h-4 w-4 shrink-0" />
                         <div className="space-y-0.5">
                           <p className="font-bold capitalize leading-tight">
-                            {dev.type.replace(/_/g, " ")}
+                            {t(`project.timeline.deviationType.${dev.type}`)}
                           </p>
                           <p className="text-[11px] leading-relaxed opacity-90">{dev.reason}</p>
                         </div>

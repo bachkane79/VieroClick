@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { getWorkspace, listWorkspaceMembers } from "@/modules/workspace/workspace.service";
 import { ProjectIntakeForm } from "@/modules/project/components/project-intake-form";
 import { NotFoundError } from "@/server/lib/errors";
@@ -9,6 +10,7 @@ interface Props {
 
 export default async function NewProjectPage({ params }: Props) {
   const { slug } = await params;
+  const t = await getTranslations("projectsPage");
 
   let workspace;
   try {
@@ -33,7 +35,7 @@ export default async function NewProjectPage({ params }: Props) {
       <div className="rounded-3xl border border-border bg-surface p-6 lg:p-8 shadow-soft space-y-6">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{workspace.name}</p>
-          <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-foreground">New project intake</h1>
+          <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-foreground">{t("intakeTitle")}</h1>
         </div>
         <ProjectIntakeForm workspaceId={workspace.id} workspaceSlug={slug} members={members} />
       </div>

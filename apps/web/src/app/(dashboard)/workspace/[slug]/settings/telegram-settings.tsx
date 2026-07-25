@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@vieroc/ui";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
+import { useActionError } from "@/i18n/use-action-error";
 import { Send, Plug, Power, Radar, CheckCircle2, Trash2 } from "lucide-react";
 import {
   saveTelegramBotAction,
@@ -28,6 +30,8 @@ interface Props {
 
 export function TelegramSettings({ workspaceId, slug, initialConfig }: Props) {
   const router = useRouter();
+  const t = useTranslations();
+  const actionError = useActionError();
   const [config, setConfig] = useState<BotConfig>(initialConfig);
   const [token, setToken] = useState("");
   const [chatId, setChatId] = useState(initialConfig.defaultChatId ?? "");
@@ -48,10 +52,10 @@ export function TelegramSettings({ workspaceId, slug, initialConfig }: Props) {
         setConfig(res.data);
         setToken("");
         setChatId(res.data.defaultChatId ?? "");
-        toast.success(`Connected @${res.data.botUsername ?? "bot"}`);
+        toast.success(t("telegram.connected", { bot: res.data.botUsername ?? "bot" }));
         router.refresh();
       } else {
-        toast.error(res.error ?? "Could not connect bot");
+        toast.error(actionError(res, t("telegram.connectFailed")));
       }
     } finally {
       setBusy(null);
@@ -65,11 +69,11 @@ export function TelegramSettings({ workspaceId, slug, initialConfig }: Props) {
       if (res.ok && res.data) {
         setChatId(res.data.chatId);
         setConfig((c) => ({ ...c, defaultChatId: res.data!.chatId }));
-        toast.success(`Found chat: ${res.data.title}`);
+        toast.success(t("telegram.foundChat", { title: res.data.title }));
       } else if (res.ok) {
-        toast.error("No recent chat found. Send /start to your bot first, then retry.");
+        toast.error(t("telegram.noChat"));
       } else {
-        toast.error(res.error ?? "Detection failed");
+        toast.error(actionError(res, t("telegram.detectFailed")));
       }
     } finally {
       setBusy(null);
@@ -79,12 +83,15 @@ export function TelegramSettings({ workspaceId, slug, initialConfig }: Props) {
   async function saveChatId() {
     setBusy("chat");
     try {
-      const res = await updateTelegramBotAction({ ...base, data: { defaultChatId: chatId || null } });
+      const res = await updateTelegramBotAction({
+        ...base,
+        data: { defaultChatId: chatId || null },
+      });
       if (res.ok) {
         setConfig(res.data);
-        toast.success("Chat ID saved");
+        toast.success(t("telegram.chatSaved"));
       } else {
-        toast.error(res.error ?? "Failed to save");
+        toast.error(actionError(res, t("telegram.saveFailed")));
       }
     } finally {
       setBusy(null);
@@ -95,8 +102,8 @@ export function TelegramSettings({ workspaceId, slug, initialConfig }: Props) {
     setBusy("test");
     try {
       const res = await testTelegramBotAction(base);
-      if (res.ok) toast.success("Test message sent — check Telegram!");
-      else toast.error(res.error ?? "Could not send test message");
+      if (res.ok) toast.success(t("telegram.testSent"));
+      else toast.error(actionError(res, t("telegram.testFailed")));
     } finally {
       setBusy(null);
     }
@@ -108,9 +115,9 @@ export function TelegramSettings({ workspaceId, slug, initialConfig }: Props) {
       const res = await updateTelegramBotAction({ ...base, data: { isActive: !config.isActive } });
       if (res.ok) {
         setConfig(res.data);
-        toast.success(res.data.isActive ? "Notifications enabled" : "Notifications paused");
+        toast.success(res.data.isActive ? t("telegram.enabled") : t("telegram.paused"));
       } else {
-        toast.error(res.error ?? "Failed to update");
+        toast.error(actionError(res, t("telegram.updateFailed")));
       }
     } finally {
       setBusy(null);
@@ -118,17 +125,17 @@ export function TelegramSettings({ workspaceId, slug, initialConfig }: Props) {
   }
 
   async function disconnect() {
-    if (!confirm("Disconnect this Telegram bot? Notifications will stop being forwarded.")) return;
+    if (!confirm(t("telegram.disconnectConfirm"))) return;
     setBusy("disconnect");
     try {
       const res = await removeTelegramBotAction(base);
       if (res.ok) {
         setConfig({ connected: false, isActive: false, botUsername: null, defaultChatId: null });
         setChatId("");
-        toast.success("Bot disconnected");
+        toast.success(t("telegram.disconnected"));
         router.refresh();
       } else {
-        toast.error(res.error ?? "Failed to disconnect");
+        toast.error(actionError(res, t("telegram.disconnectFailed")));
       }
     } finally {
       setBusy(null);
@@ -141,11 +148,8 @@ export function TelegramSettings({ workspaceId, slug, initialConfig }: Props) {
         <div className="flex items-center gap-2">
           <Send className="h-5 w-5 text-primary" />
           <div>
-            <h2 className="text-lg font-bold tracking-tight">Telegram notifications</h2>
-            <p className="text-sm text-muted-foreground">
-              Connect a bot and every task, blocker, report, and AI update in this workspace is
-              pushed to one chat.
-            </p>
+            <h2 className="text-lg font-bold tracking-tight">{t("telegram.title")}</h2>
+            <p className="text-sm text-muted-foreground">{t("telegram.subtitle")}</p>
           </div>
         </div>
         {config.connected && (
@@ -161,7 +165,7 @@ export function TelegramSettings({ workspaceId, slug, initialConfig }: Props) {
                 config.isActive ? "bg-emerald-500" : "bg-muted-foreground"
               }`}
             />
-            {config.isActive ? "Active" : "Paused"}
+            {config.isActive ? t("telegram.active") : t("telegram.pausedBadge")}
           </span>
         )}
       </div>
@@ -170,24 +174,37 @@ export function TelegramSettings({ workspaceId, slug, initialConfig }: Props) {
         <form onSubmit={connect} className="space-y-4">
           <ol className="space-y-1.5 rounded-xl bg-muted/50 p-4 text-sm text-muted-foreground">
             <li>
-              1. Open Telegram, message{" "}
-              <a
-                href="https://t.me/BotFather"
-                target="_blank"
-                rel="noreferrer"
-                className="font-medium text-primary hover:underline"
-              >
-                @BotFather
-              </a>{" "}
-              and send <code className="rounded bg-card px-1 py-0.5 text-xs">/newbot</code>.
+              1.{" "}
+              {t.rich("telegram.step1", {
+                botfather: (chunks) => (
+                  <a
+                    href="https://t.me/BotFather"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-primary hover:underline"
+                  >
+                    {chunks}
+                  </a>
+                ),
+                code: (chunks) => (
+                  <code className="rounded bg-card px-1 py-0.5 text-xs">{chunks}</code>
+                ),
+              })}
             </li>
-            <li>2. Copy the token it gives you and paste it below.</li>
-            <li>3. After connecting, send <code className="rounded bg-card px-1 py-0.5 text-xs">/start</code> to your bot (or add it to a group). The chat ID auto-fills on the next message.</li>
+            <li>2. {t("telegram.step2")}</li>
+            <li>
+              3.{" "}
+              {t.rich("telegram.step3", {
+                code: (chunks) => (
+                  <code className="rounded bg-card px-1 py-0.5 text-xs">{chunks}</code>
+                ),
+              })}
+            </li>
           </ol>
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Bot token
+              {t("telegram.botToken")}
             </label>
             <input
               value={token}
@@ -200,7 +217,7 @@ export function TelegramSettings({ workspaceId, slug, initialConfig }: Props) {
 
           <Button type="submit" disabled={!token.trim() || busy === "connect"} className="gap-2">
             <Plug className="h-4 w-4" />
-            {busy === "connect" ? "Connecting…" : "Connect bot"}
+            {busy === "connect" ? t("telegram.connecting") : t("telegram.connect")}
           </Button>
         </form>
       ) : (
@@ -208,16 +225,16 @@ export function TelegramSettings({ workspaceId, slug, initialConfig }: Props) {
           <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-4 py-3">
             <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             <span className="text-sm">
-              Connected to{" "}
-              <span className="font-semibold">
-                @{config.botUsername ?? "your bot"}
-              </span>
+              {t.rich("telegram.connectedTo", {
+                bot: config.botUsername ? `@${config.botUsername}` : t("telegram.yourBot"),
+                b: (chunks) => <span className="font-semibold">{chunks}</span>,
+              })}
             </span>
           </div>
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Target chat ID
+              {t("telegram.targetChatId")}
             </label>
             <div className="flex flex-wrap gap-2">
               <input
@@ -226,9 +243,15 @@ export function TelegramSettings({ workspaceId, slug, initialConfig }: Props) {
                 placeholder="-1001234567890"
                 className="min-w-0 flex-1 rounded-md border border-input bg-card px-3.5 py-2 font-mono text-sm transition-all placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/25"
               />
-              <Button type="button" variant="outline" onClick={detect} disabled={busy === "detect"} className="gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={detect}
+                disabled={busy === "detect"}
+                className="gap-2"
+              >
                 <Radar className="h-4 w-4" />
-                {busy === "detect" ? "Detecting…" : "Auto-detect"}
+                {busy === "detect" ? t("telegram.detecting") : t("telegram.autoDetect")}
               </Button>
               <Button
                 type="button"
@@ -236,22 +259,35 @@ export function TelegramSettings({ workspaceId, slug, initialConfig }: Props) {
                 onClick={saveChatId}
                 disabled={busy === "chat" || chatId === (config.defaultChatId ?? "")}
               >
-                Save
+                {t("common.save")}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Send <code className="rounded bg-muted px-1 py-0.5">/start</code> to your bot (or add it to a group), then hit Auto-detect.
+              {t.rich("telegram.detectHelp", {
+                code: (chunks) => <code className="rounded bg-muted px-1 py-0.5">{chunks}</code>,
+              })}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
-            <Button type="button" onClick={test} disabled={busy === "test" || !config.defaultChatId} className="gap-2">
+            <Button
+              type="button"
+              onClick={test}
+              disabled={busy === "test" || !config.defaultChatId}
+              className="gap-2"
+            >
               <Send className="h-4 w-4" />
-              {busy === "test" ? "Sending…" : "Send test message"}
+              {busy === "test" ? t("telegram.sending") : t("telegram.sendTest")}
             </Button>
-            <Button type="button" variant="outline" onClick={toggleActive} disabled={busy === "toggle"} className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={toggleActive}
+              disabled={busy === "toggle"}
+              className="gap-2"
+            >
               <Power className="h-4 w-4" />
-              {config.isActive ? "Pause" : "Resume"}
+              {config.isActive ? t("telegram.pause") : t("telegram.resume")}
             </Button>
             <Button
               type="button"
@@ -261,7 +297,7 @@ export function TelegramSettings({ workspaceId, slug, initialConfig }: Props) {
               className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
             >
               <Trash2 className="h-4 w-4" />
-              Disconnect
+              {t("telegram.disconnect")}
             </Button>
           </div>
         </div>

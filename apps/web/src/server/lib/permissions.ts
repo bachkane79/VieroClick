@@ -65,8 +65,16 @@ export function canUpdateOwnTask(ctx: ActorContext, assigneeMemberId: string | n
 // ─── Enforcement helper ───────────────────────────────────────────────────────
 
 /** Throws `ForbiddenError` when `allowed` is false. */
-export function requirePermission(allowed: boolean, message?: string): void {
-  if (!allowed) throw new ForbiddenError(message);
+/**
+ * `message` stays English (it reaches the agent-facing JSON routes and the
+ * logs); `reason` is the catalog key the UI localizes. The 25 policy call sites
+ * collapse onto ~12 reasons because they describe the same *rule* — 17 of them
+ * are variants of "only a project manager may do this", and the user cannot
+ * perceive a difference between "manage risks" and "manage milestones" when
+ * both mean the same denial.
+ */
+export function requirePermission(allowed: boolean, message?: string, reason?: string): void {
+  if (!allowed) throw new ForbiddenError(message, reason);
 }
 
 // ─── Fine-grained permission levels (§4.2, Hybrid model) ─────────────────────

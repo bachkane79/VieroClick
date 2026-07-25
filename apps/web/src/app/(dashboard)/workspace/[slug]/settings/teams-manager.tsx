@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button, Input } from "@vieroc/ui";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { Users, Plus, Trash2, X } from "lucide-react";
 import {
   createTeamAction,
@@ -10,6 +11,7 @@ import {
   listTeamsWithMembersAction,
   setTeamMemberAction,
 } from "@/modules/permission/permission.actions";
+import { useActionError } from "@/i18n/use-action-error";
 
 type Member = { id: string; fullName: string; email: string };
 type Team = { id: string; name: string; memberIds: string[] };
@@ -23,6 +25,8 @@ export function TeamsManager({
   slug: string;
   members: Member[];
 }) {
+  const t = useTranslations();
+  const actionError = useActionError();
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState("");
@@ -47,11 +51,11 @@ export function TeamsManager({
     const res = await createTeamAction({ workspaceId, slug, data: { name } });
     setCreating(false);
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
     setNewName("");
-    toast.success(`Đã tạo team “${name}”`);
+    toast.success(t("teams.created", { name }));
     refresh();
   }
 
@@ -60,10 +64,10 @@ export function TeamsManager({
     const res = await deleteTeamAction({ workspaceId, slug, teamId });
     setBusyTeam(null);
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
-    toast.success("Đã xóa team");
+    toast.success(t("teams.deleted"));
     refresh();
   }
 
@@ -77,7 +81,7 @@ export function TeamsManager({
     });
     setBusyTeam(null);
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
     refresh();
@@ -90,11 +94,8 @@ export function TeamsManager({
       <header className="mb-4 flex items-start gap-2">
         <Users className="mt-0.5 h-5 w-5 text-primary" />
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">Teams</h2>
-          <p className="text-sm text-muted-foreground">
-            Nhóm thành viên để chia sẻ quyền theo nhóm. Được cấp quyền cho một team = mọi thành
-            viên trong team nhận quyền đó.
-          </p>
+          <h2 className="text-lg font-semibold tracking-tight">{t("teams.title")}</h2>
+          <p className="text-sm text-muted-foreground">{t("teams.desc")}</p>
         </div>
       </header>
 
@@ -103,20 +104,20 @@ export function TeamsManager({
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-          placeholder="Tên team mới (vd: Design, Backend)…"
+          placeholder={t("teams.newPlaceholder")}
           className="flex-1"
         />
         <Button onClick={handleCreate} disabled={creating || !newName.trim()}>
           <Plus className="h-4 w-4" />
-          Tạo team
+          {t("teams.create")}
         </Button>
       </div>
 
       {loading ? (
-        <p className="py-4 text-sm text-muted-foreground">Đang tải…</p>
+        <p className="py-4 text-sm text-muted-foreground">{t("common.loading")}</p>
       ) : teams.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border py-6 text-center text-sm text-muted-foreground">
-          Chưa có team nào. Tạo team đầu tiên ở trên.
+          {t("teams.empty")}
         </p>
       ) : (
         <ul className="space-y-3">
@@ -128,7 +129,7 @@ export function TeamsManager({
                   <div className="flex items-center gap-2">
                     <span className="font-semibold">{team.name}</span>
                     <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                      {team.memberIds.length} thành viên
+                      {t("teams.memberCount", { n: team.memberIds.length })}
                     </span>
                   </div>
                   <button
@@ -136,7 +137,7 @@ export function TeamsManager({
                     onClick={() => handleDelete(team.id)}
                     disabled={busyTeam === team.id}
                     className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
-                    title="Xóa team"
+                    title={t("teams.deleteTitle")}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -150,13 +151,13 @@ export function TeamsManager({
                         key={id}
                         className="flex items-center gap-1 rounded-full bg-secondary px-2 py-1 text-xs"
                       >
-                        {m ? m.fullName : "Thành viên đã rời"}
+                        {m ? m.fullName : t("teams.memberLeft")}
                         <button
                           type="button"
                           onClick={() => toggleMember(team.id, id, false)}
                           disabled={busyTeam === team.id}
                           className="rounded-full text-muted-foreground hover:text-destructive disabled:opacity-50"
-                          title="Bỏ khỏi team"
+                          title={t("teams.removeMember")}
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -164,7 +165,7 @@ export function TeamsManager({
                     );
                   })}
                   {team.memberIds.length === 0 && (
-                    <span className="text-xs text-muted-foreground">Chưa có thành viên.</span>
+                    <span className="text-xs text-muted-foreground">{t("teams.noMembers")}</span>
                   )}
                 </div>
 
@@ -173,10 +174,12 @@ export function TeamsManager({
                     <select
                       value=""
                       disabled={busyTeam === team.id}
-                      onChange={(e) => e.target.value && toggleMember(team.id, e.target.value, true)}
+                      onChange={(e) =>
+                        e.target.value && toggleMember(team.id, e.target.value, true)
+                      }
                       className="rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                     >
-                      <option value="">+ Thêm thành viên…</option>
+                      <option value="">{t("teams.addMember")}</option>
                       {available.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.fullName} ({m.email})

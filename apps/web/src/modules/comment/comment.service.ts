@@ -39,13 +39,19 @@ async function assertLinksBelongToProject(links: CommentLink[], projectId: strin
 
   for (const link of links) {
     if (link.type === "task" && !validTaskIds.has(link.id)) {
-      throw new ValidationError("Linked task must belong to this project");
+      throw new ValidationError(
+        "Linked task must belong to this project",
+        "linkedTaskWrongProject"
+      );
     }
     if (link.type === "comment" && !validCommentIds.has(link.id)) {
-      throw new ValidationError("Linked comment must belong to this project");
+      throw new ValidationError(
+        "Linked comment must belong to this project",
+        "linkedCommentWrongProject"
+      );
     }
     if (link.type === "doc" && !validDocIds.has(link.id)) {
-      throw new ValidationError("Linked doc must belong to this project");
+      throw new ValidationError("Linked doc must belong to this project", "linkedDocWrongProject");
     }
   }
 }
@@ -86,7 +92,10 @@ export async function addComment(p: {
   if (data.parentCommentId) {
     const parent = await repo.findByIdInProject(data.parentCommentId, p.projectId);
     if (!parent || parent.taskId !== p.taskId) {
-      throw new ValidationError("Reply target must be a comment on this task");
+      throw new ValidationError(
+        "Reply target must be a comment on this task",
+        "replyTargetWrongTask"
+      );
     }
   }
 
@@ -112,7 +121,11 @@ export async function addComment(p: {
     // Assigned comment: the target member must exist in this workspace.
     if (data.metadata.assignedMemberId) {
       const assigned = allMembers.find((member) => member.id === data.metadata.assignedMemberId);
-      if (!assigned) throw new ValidationError("Assigned member must belong to this workspace");
+      if (!assigned)
+        throw new ValidationError(
+          "Assigned member must belong to this workspace",
+          "memberNotInWorkspace"
+        );
       if (assigned.id !== ctx.workspaceMemberId) {
         await enqueueNotifications(tx, [
           {

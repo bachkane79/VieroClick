@@ -18,12 +18,20 @@ import {
  * A member may enter an open channel of their workspace freely; a DM only if
  * they are one of its two participants. Returns the channel row.
  */
-async function requireChannelAccess(ctx: { workspaceMemberId: string }, channelId: string, workspaceId: string) {
+async function requireChannelAccess(
+  ctx: { workspaceMemberId: string },
+  channelId: string,
+  workspaceId: string
+) {
   const channel = await repo.findById(channelId);
   if (!channel || channel.workspaceId !== workspaceId) throw new NotFoundError("Channel");
   if (channel.type === "dm") {
     const member = await repo.isMember(channelId, ctx.workspaceMemberId);
-    if (!member) throw new ForbiddenError("Not a participant of this conversation");
+    if (!member)
+      throw new ForbiddenError(
+        "Not a participant of this conversation",
+        "notConversationParticipant"
+      );
   }
   return channel;
 }
@@ -84,11 +92,17 @@ export async function getChatUnreadCounts(workspaceId: string): Promise<Record<s
     repo.listChannels(workspaceId),
     repo.listDmsForMember(workspaceId, ctx.workspaceMemberId),
   ]);
-  return repo.getUnreadCounts([...channels.map((c) => c.id), ...dms.map((d) => d.id)], ctx.workspaceMemberId);
+  return repo.getUnreadCounts(
+    [...channels.map((c) => c.id), ...dms.map((d) => d.id)],
+    ctx.workspaceMemberId
+  );
 }
 
 /** WP-E2: marks a channel/DM as read up to now for the caller. */
-export async function markChannelRead(p: { workspaceId: string; channelId: string }): Promise<void> {
+export async function markChannelRead(p: {
+  workspaceId: string;
+  channelId: string;
+}): Promise<void> {
   const ctx = await requireActor(p.workspaceId);
   assertCanAccessChat(ctx);
   await requireChannelAccess(ctx, p.channelId, p.workspaceId);
@@ -127,10 +141,14 @@ export async function openDm(p: { workspaceId: string; input: unknown }) {
   const ctx = await requireActor(p.workspaceId);
   assertCanAccessChat(ctx);
   if (data.targetMemberId === ctx.workspaceMemberId) {
-    throw new ForbiddenError("Cannot open a conversation with yourself");
+    throw new ForbiddenError("Cannot open a conversation with yourself", "selfConversation");
   }
 
-  const existing = await repo.findDmBetween(p.workspaceId, ctx.workspaceMemberId, data.targetMemberId);
+  const existing = await repo.findDmBetween(
+    p.workspaceId,
+    ctx.workspaceMemberId,
+    data.targetMemberId
+  );
   if (existing) return existing;
 
   return db.transaction(async (tx) => {
@@ -174,7 +192,8 @@ export async function deleteChannel(p: { workspaceId: string; channelId: string 
   const ctx = await requireActor(p.workspaceId);
   assertCanAccessChat(ctx);
   const channel = await requireChannelAccess(ctx, p.channelId, p.workspaceId);
-  if (channel.type === "dm") throw new ForbiddenError("Direct messages cannot be deleted here");
+  if (channel.type === "dm")
+    throw new ForbiddenError("Direct messages cannot be deleted here", "dmNotDeletable");
   assertCanManageChannel(ctx, channel.createdByMemberId);
 
   return db.transaction(async (tx) => {
@@ -207,7 +226,8 @@ export async function sendMessage(p: { workspaceId: string; channelId: string; i
   // insert) because the stream payload needs author identity, same shape as
   // listMessages. Not awaited — a slow/down Redis must never delay the send.
   void repo.getMessageWithAuthor(message.id).then((full) => {
-    if (full) void publishChannelMessage(p.channelId, { ...full, createdAt: full.createdAt.toISOString() });
+    if (full)
+      void publishChannelMessage(p.channelId, { ...full, createdAt: full.createdAt.toISOString() });
   });
 
   return message;

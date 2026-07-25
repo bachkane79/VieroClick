@@ -6,6 +6,8 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Button } from "@vieroc/ui";
 import { Settings2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
+import { useActionError } from "@/i18n/use-action-error";
 import { setAiLeaderAction } from "../project.actions";
 import { AiLeaderToggle } from "./ai-leader-toggle";
 
@@ -23,6 +25,8 @@ interface Props {
  */
 export function AiLeaderBanner({ workspaceId, projectId, slug, aiEnabled }: Props) {
   const router = useRouter();
+  const actionError = useActionError();
+  const t = useTranslations();
   const [pending, start] = useTransition();
   if (aiEnabled) return null;
 
@@ -30,10 +34,10 @@ export function AiLeaderBanner({ workspaceId, projectId, slug, aiEnabled }: Prop
     start(async () => {
       const res = await setAiLeaderAction({ workspaceId, projectId, slug, enabled: true });
       if (!res.ok) {
-        toast.error(res.error);
+        toast.error(actionError(res));
         return;
       }
-      toast.success("AI Leader enabled — it will plan this project");
+      toast.success(t("aiLeader.enabledToast"));
       router.refresh();
     });
   }
@@ -46,10 +50,11 @@ export function AiLeaderBanner({ workspaceId, projectId, slug, aiEnabled }: Prop
             <Sparkles className="h-6 w-6" />
           </span>
           <div>
-            <h3 className="text-base font-bold tracking-tight">Dự án đang chạy thủ công</h3>
+            <h3 className="text-base font-bold tracking-tight">{t("aiLeader.manualTitle")}</h3>
             <p className="mt-0.5 max-w-xl text-sm text-muted-foreground">
-              Bật <span className="font-semibold">AI Leader</span> để AI tự sinh kế hoạch, WBS, phân
-              công và theo dõi tiến độ cho dự án này.
+              {t.rich("aiLeader.manualDesc", {
+                b: (c) => <span className="font-semibold">{c}</span>,
+              })}
             </p>
           </div>
         </div>
@@ -57,7 +62,7 @@ export function AiLeaderBanner({ workspaceId, projectId, slug, aiEnabled }: Prop
           <AiLeaderToggle checked={false} onChange={() => enable()} disabled={pending} />
           <Button type="button" className="gap-2" onClick={enable} disabled={pending}>
             <Sparkles className="h-4 w-4" />
-            {pending ? "Đang bật..." : "Bật AI Leader"}
+            {pending ? t("aiLeader.enabling") : t("aiLeader.enable")}
           </Button>
         </div>
       </div>
@@ -72,6 +77,8 @@ export function AiLeaderBanner({ workspaceId, projectId, slug, aiEnabled }: Prop
  */
 export function AiLeaderSettingsMenu({ workspaceId, projectId, slug, aiEnabled }: Props) {
   const router = useRouter();
+  const actionError = useActionError();
+  const t = useTranslations();
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   if (!aiEnabled) return null;
@@ -80,10 +87,10 @@ export function AiLeaderSettingsMenu({ workspaceId, projectId, slug, aiEnabled }
     start(async () => {
       const res = await setAiLeaderAction({ workspaceId, projectId, slug, enabled: false });
       if (!res.ok) {
-        toast.error(res.error);
+        toast.error(actionError(res));
         return;
       }
-      toast.success("AI Leader disabled — project is now manual");
+      toast.success(t("aiLeader.disabledToast"));
       setOpen(false);
       router.refresh();
     });
@@ -94,7 +101,7 @@ export function AiLeaderSettingsMenu({ workspaceId, projectId, slug, aiEnabled }
       <DropdownMenu.Trigger asChild>
         <button
           type="button"
-          aria-label="Project settings"
+          aria-label={t("aiLeader.settingsAria")}
           className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <Settings2 className="h-4 w-4" />
@@ -110,11 +117,9 @@ export function AiLeaderSettingsMenu({ workspaceId, projectId, slug, aiEnabled }
             <Sparkles className="h-4 w-4 text-fuchsia-500" />
             AI Leader
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            AI đang quản lý dự án này. Tắt để chuyển sang làm thủ công (không dispatch agent).
-          </p>
+          <p className="mt-1 text-xs text-muted-foreground">{t("aiLeader.managingDesc")}</p>
           <div className="mt-3 flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2">
-            <span className="text-sm font-medium">Đang bật</span>
+            <span className="text-sm font-medium">{t("aiLeader.on")}</span>
             <AiLeaderToggle checked size="sm" onChange={() => disable()} disabled={pending} />
           </div>
         </DropdownMenu.Content>

@@ -6,7 +6,9 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Button } from "@vieroc/ui";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { listDeletedTasksAction, restoreTaskAction } from "../task.actions";
+import { useActionError } from "@/i18n/use-action-error";
 
 interface DeletedTask {
   id: string;
@@ -22,6 +24,8 @@ interface Props {
 
 /** WP-D4: minimal "Trash" surface — list soft-deleted tasks and restore them. */
 export function DeletedTasksPanel({ workspaceId, workspaceSlug, projectId }: Props) {
+  const t = useTranslations();
+  const actionError = useActionError();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -33,7 +37,7 @@ export function DeletedTasksPanel({ workspaceId, workspaceSlug, projectId }: Pro
     const result = await listDeletedTasksAction({ workspaceId, projectId });
     setLoading(false);
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(actionError(result));
       return;
     }
     setItems(result.data);
@@ -44,10 +48,10 @@ export function DeletedTasksPanel({ workspaceId, workspaceSlug, projectId }: Pro
     const result = await restoreTaskAction({ workspaceId, projectId, slug: workspaceSlug, taskId });
     setRestoringId(null);
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(actionError(result));
       return;
     }
-    toast.success("Task restored");
+    toast.success(t("task.deletedTasks.restored"));
     setItems((prev) => (prev ? prev.filter((t) => t.id !== taskId) : prev));
     router.refresh();
   }
@@ -61,9 +65,14 @@ export function DeletedTasksPanel({ workspaceId, workspaceSlug, projectId }: Pro
       }}
     >
       <DropdownMenu.Trigger asChild>
-        <Button type="button" variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="gap-1.5 text-xs text-muted-foreground"
+        >
           <Trash2 className="h-3.5 w-3.5" />
-          Deleted tasks
+          {t("task.deletedTasks.trigger")}
         </Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
@@ -72,9 +81,13 @@ export function DeletedTasksPanel({ workspaceId, workspaceSlug, projectId }: Pro
           sideOffset={4}
           className="z-50 max-h-80 w-72 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
         >
-          {loading && <p className="px-2 py-2 text-xs text-muted-foreground">Loading…</p>}
+          {loading && (
+            <p className="px-2 py-2 text-xs text-muted-foreground">{t("common.loading")}</p>
+          )}
           {!loading && items?.length === 0 && (
-            <p className="px-2 py-2 text-xs text-muted-foreground">No deleted tasks.</p>
+            <p className="px-2 py-2 text-xs text-muted-foreground">
+              {t("task.deletedTasks.empty")}
+            </p>
           )}
           {!loading &&
             items?.map((task) => (
@@ -91,7 +104,7 @@ export function DeletedTasksPanel({ workspaceId, workspaceSlug, projectId }: Pro
                   disabled={restoringId === task.id}
                   onClick={() => restore(task.id)}
                 >
-                  Restore
+                  {t("task.deletedTasks.restore")}
                 </Button>
               </div>
             ))}

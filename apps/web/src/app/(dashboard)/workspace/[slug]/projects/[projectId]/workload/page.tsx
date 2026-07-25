@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { cn } from "@vieroc/ui";
 import { listMembers as listProjectMembers } from "@/modules/project-member/project-member.service";
 import { loadProjectViewData } from "@/modules/task/task-page-data";
@@ -15,6 +16,7 @@ const WEEKLY_HOURS = 40;
 
 export default async function ProjectWorkloadPage({ params }: Props) {
   const { slug, projectId } = await params;
+  const t = await getTranslations();
 
   let data;
   let projectMembers;
@@ -54,14 +56,16 @@ export default async function ProjectWorkloadPage({ params }: Props) {
   return (
     <div className="mx-auto max-w-[1240px] px-4 py-5 lg:px-6">
       {/* Giant Unified White Shell Container */}
-      <div className="rounded-3xl border border-border bg-surface p-5 sm:p-6 shadow-soft space-y-4">
-
+      <div className="space-y-4 rounded-3xl border border-border bg-surface p-5 shadow-soft sm:p-6">
         <div className="space-y-3">
           {rows.map(({ member, openTasks, load, allocation, capacity }) => {
             const pct = capacity > 0 ? Math.round((load / capacity) * 100) : 0;
             const over = load > capacity;
             return (
-              <div key={member.id} className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+              <div
+                key={member.id}
+                className="rounded-2xl border border-border bg-card p-4 shadow-soft"
+              >
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
                     <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-xs font-bold text-primary">
@@ -75,20 +79,30 @@ export default async function ProjectWorkloadPage({ params }: Props) {
                     <div>
                       <p className="text-xs font-semibold">{member.fullName}</p>
                       <p className="text-[11px] text-muted-foreground">
-                        {openTasks.length} open task{openTasks.length === 1 ? "" : "s"} · {allocation}% allocated
+                        {t("project.workload.memberMeta", { count: openTasks.length, allocation })}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className={cn("text-xs font-bold", over ? "text-destructive" : "text-foreground")}>
+                    <p
+                      className={cn(
+                        "text-xs font-bold",
+                        over ? "text-destructive" : "text-foreground"
+                      )}
+                    >
                       {load}h / {capacity}h
                     </p>
-                    <p className="text-[11px] text-muted-foreground">{pct}% of capacity</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {t("project.workload.ofCapacity", { pct })}
+                    </p>
                   </div>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
                   <div
-                    className={cn("h-full rounded-full", over ? "bg-destructive" : pct > 80 ? "bg-amber-500" : "bg-primary")}
+                    className={cn(
+                      "h-full rounded-full",
+                      over ? "bg-destructive" : pct > 80 ? "bg-amber-500" : "bg-primary"
+                    )}
                     style={{ width: `${Math.min(100, pct)}%` }}
                   />
                 </div>
@@ -106,7 +120,7 @@ export default async function ProjectWorkloadPage({ params }: Props) {
                     ))}
                     {openTasks.length > 8 && (
                       <span className="px-1 text-[11px] text-muted-foreground">
-                        +{openTasks.length - 8} more
+                        {t("project.workload.more", { count: openTasks.length - 8 })}
                       </span>
                     )}
                   </div>
@@ -117,15 +131,17 @@ export default async function ProjectWorkloadPage({ params }: Props) {
 
           {rows.length === 0 && (
             <div className="rounded-2xl border border-dashed border-border/80 p-8 text-center text-xs text-muted-foreground">
-              No project members to show workload for.
+              {t("project.workload.empty")}
             </div>
           )}
 
           {unassigned.length > 0 && (
             <div className="rounded-2xl border border-dashed border-border/80 bg-surface-subtle p-4">
               <p className="mb-2 text-xs font-semibold text-muted-foreground">
-                Unassigned ({unassigned.length}) ·{" "}
-                {unassigned.reduce((s, t) => s + Number(t.estimateHours ?? 0), 0)}h
+                {t("project.workload.unassigned", {
+                  count: unassigned.length,
+                  hours: unassigned.reduce((s, task) => s + Number(task.estimateHours ?? 0), 0),
+                })}
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {unassigned.slice(0, 10).map((t) => (

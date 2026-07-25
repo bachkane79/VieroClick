@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { useActionError } from "@/i18n/use-action-error";
 import { toast } from "sonner";
 import {
   User,
@@ -43,7 +45,9 @@ type Mode = "personal" | "team";
 
 const RESUME_KEY = "vc-onboarding-state";
 
-export function OnboardingWizard({ displayName: _displayName }: { displayName: string }) {
+export function OnboardingWizard() {
+  const t = useTranslations();
+  const actionError = useActionError();
   const router = useRouter();
   const [step, setStep] = useState<Step>("mode");
   const [mode, setMode] = useState<Mode>("personal");
@@ -92,7 +96,11 @@ export function OnboardingWizard({ displayName: _displayName }: { displayName: s
 
   function pickMode(m: Mode) {
     setMode(m);
-    setWsName(m === "personal" ? "Không gian của bạn" : "Nhóm của bạn");
+    setWsName(
+      m === "personal"
+        ? t("onboarding.defaults.personalWorkspace")
+        : t("onboarding.defaults.teamWorkspace")
+    );
     setStep("template");
   }
 
@@ -131,7 +139,7 @@ export function OnboardingWizard({ displayName: _displayName }: { displayName: s
       }
       router.push(`/workspace/${res.data.workspaceSlug}`);
     } else {
-      toast.error(res.error ?? "Không tạo được không gian, thử lại nhé");
+      toast.error(actionError(res, t("onboarding.toast.createFailed")));
       setSubmitting(false);
     }
   }
@@ -143,23 +151,23 @@ export function OnboardingWizard({ displayName: _displayName }: { displayName: s
         <div className="pointer-events-none absolute -right-16 -top-16 h-72 w-72 rounded-full bg-white/10 blur-2xl" />
         <div className="pointer-events-none absolute -left-12 bottom-16 h-52 w-52 rounded-full bg-white/5 blur-2xl" />
         <div className="relative z-10 flex items-center gap-3 text-xl font-extrabold tracking-tight">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-white/25 backdrop-blur">V</span>
+          <span className="grid h-9 w-9 place-items-center rounded-lg bg-white/25 backdrop-blur">
+            V
+          </span>
           VierocClick
         </div>
         <div className="relative z-10">
           <h1 className="max-w-[12ch] text-4xl font-extrabold leading-tight tracking-tight">
-            Từ ý tưởng tới việc-đã-giao trong 5 phút.
+            {t("onboarding.brand.headline")}
           </h1>
-          <p className="mt-4 max-w-[34ch] text-lg text-white/90">
-            Không gian làm việc có AI lập kế hoạch, giao việc và theo dõi từng phase.
-          </p>
+          <p className="mt-4 max-w-[34ch] text-lg text-white/90">{t("onboarding.brand.subhead")}</p>
         </div>
         <div className="relative z-10 flex flex-wrap gap-5 text-sm text-white/90">
           <span className="flex items-center gap-2">
-            <Check className="h-4 w-4" /> Bảo mật theo workspace
+            <Check className="h-4 w-4" /> {t("onboarding.brand.secure")}
           </span>
           <span className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4" /> AI lập kế hoạch
+            <Sparkles className="h-4 w-4" /> {t("onboarding.brand.aiPlanning")}
           </span>
         </div>
       </div>
@@ -179,11 +187,14 @@ export function OnboardingWizard({ displayName: _displayName }: { displayName: s
             ))}
           </div>
 
-          {step === "mode" && (
-            <StepMode onPick={pickMode} />
-          )}
+          {step === "mode" && <StepMode onPick={pickMode} />}
           {step === "template" && (
-            <StepTemplate mode={mode} onPick={pickTemplate} onAi={pickAi} onBack={() => setStep("mode")} />
+            <StepTemplate
+              mode={mode}
+              onPick={pickTemplate}
+              onAi={pickAi}
+              onBack={() => setStep("mode")}
+            />
           )}
           {step === "ai" && (
             <StepAi
@@ -214,25 +225,24 @@ export function OnboardingWizard({ displayName: _displayName }: { displayName: s
 }
 
 function StepMode({ onPick }: { onPick: (m: Mode) => void }) {
+  const t = useTranslations();
   return (
     <div>
-      <h2 className="text-2xl font-bold tracking-tight">Bạn dùng VierocClick cho việc gì?</h2>
-      <p className="mt-2 text-[15px] text-muted-foreground">
-        Chọn để chúng tôi dựng đúng không gian. Đổi lại sau lúc nào cũng được.
-      </p>
+      <h2 className="text-2xl font-bold tracking-tight">{t("onboarding.mode.title")}</h2>
+      <p className="mt-2 text-[15px] text-muted-foreground">{t("onboarding.mode.subtitle")}</p>
       <div className="mt-7 flex flex-col gap-3">
         <ChoiceCard
           icon={User}
           iconClass="bg-primary"
-          title="Cá nhân"
-          desc="Lập kế hoạch và theo dõi việc của riêng bạn."
+          title={t("onboarding.mode.personal.title")}
+          desc={t("onboarding.mode.personal.desc")}
           onClick={() => onPick("personal")}
         />
         <ChoiceCard
           icon={Users}
           iconClass="bg-coral"
-          title="Nhóm"
-          desc="Làm việc cùng người khác, giao việc và theo dõi tiến độ."
+          title={t("onboarding.mode.team.title")}
+          desc={t("onboarding.mode.team.desc")}
           onClick={() => onPick("team")}
         />
       </div>
@@ -258,7 +268,9 @@ function ChoiceCard({
       onClick={onClick}
       className="group flex items-center gap-4 rounded-lg border border-border bg-card p-4 text-left shadow-soft transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-elevated"
     >
-      <span className={`grid h-11 w-11 flex-none place-items-center rounded-xl text-white ${iconClass}`}>
+      <span
+        className={`grid h-11 w-11 flex-none place-items-center rounded-xl text-white ${iconClass}`}
+      >
         <Icon className="h-5 w-5" />
       </span>
       <span className="flex-1">
@@ -281,13 +293,12 @@ function StepTemplate({
   onAi: () => void;
   onBack: () => void;
 }) {
+  const t = useTranslations();
   const order = TEMPLATE_ORDER[mode];
   return (
     <div>
-      <h2 className="text-2xl font-bold tracking-tight">Chọn điểm bắt đầu</h2>
-      <p className="mt-2 text-[15px] text-muted-foreground">
-        Mỗi mẫu tạo sẵn các phase và việc mẫu để bạn không phải bắt đầu từ trang trắng.
-      </p>
+      <h2 className="text-2xl font-bold tracking-tight">{t("onboarding.template.title")}</h2>
+      <p className="mt-2 text-[15px] text-muted-foreground">{t("onboarding.template.subtitle")}</p>
       <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {order.map((id) => (
           <TemplateCard key={id} def={TEMPLATES[id]} onClick={() => onPick(id)} />
@@ -296,25 +307,32 @@ function StepTemplate({
           onClick={onAi}
           className="relative col-span-full overflow-hidden rounded-lg border border-transparent bg-gradient-to-br from-lavender-soft to-peach-soft p-4 text-left shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-elevated"
         >
-          <span className="absolute right-3 top-3 text-[11px] font-bold text-lavender">MỚI</span>
+          <span className="absolute right-3 top-3 text-[11px] font-bold text-lavender">
+            {t("onboarding.template.newBadge")}
+          </span>
           <span className="mb-2.5 grid h-8 w-8 place-items-center rounded-lg bg-lavender text-white">
             <Sparkles className="h-4 w-4" />
           </span>
-          <span className="block text-[15px] font-semibold">✨ {AI_TEMPLATE.name}</span>
-          <span className="mt-0.5 block text-[12.5px] text-muted-foreground">{AI_TEMPLATE.description}</span>
+          <span className="block text-[15px] font-semibold">
+            ✨ {t(AI_TEMPLATE.nameKey as Parameters<typeof t>[0])}
+          </span>
+          <span className="mt-0.5 block text-[12.5px] text-muted-foreground">
+            {t(AI_TEMPLATE.descKey as Parameters<typeof t>[0])}
+          </span>
         </button>
       </div>
       <button
         onClick={onBack}
         className="mt-4 flex items-center gap-1 text-[13px] font-medium text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="h-3.5 w-3.5" /> Quay lại
+        <ArrowLeft className="h-3.5 w-3.5" /> {t("onboarding.actions.back")}
       </button>
     </div>
   );
 }
 
 function TemplateCard({ def, onClick }: { def: TemplateDef; onClick: () => void }) {
+  const t = useTranslations();
   const Icon = ICONS[def.icon] ?? Plus;
   const first = def.seed[0];
   return (
@@ -322,11 +340,17 @@ function TemplateCard({ def, onClick }: { def: TemplateDef; onClick: () => void 
       onClick={onClick}
       className="overflow-hidden rounded-lg border border-border bg-card p-3.5 text-left shadow-soft transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-elevated"
     >
-      <span className={`mb-2.5 grid h-8 w-8 place-items-center rounded-lg text-white ${TONE[def.tone] ?? "bg-primary"}`}>
+      <span
+        className={`mb-2.5 grid h-8 w-8 place-items-center rounded-lg text-white ${TONE[def.tone] ?? "bg-primary"}`}
+      >
         <Icon className="h-4 w-4" />
       </span>
-      <span className="block text-[15px] font-semibold">{def.name}</span>
-      <span className="mt-0.5 block text-[12.5px] leading-snug text-muted-foreground">{def.description}</span>
+      <span className="block text-[15px] font-semibold">
+        {t(def.nameKey as Parameters<typeof t>[0])}
+      </span>
+      <span className="mt-0.5 block text-[12.5px] leading-snug text-muted-foreground">
+        {t(def.descKey as Parameters<typeof t>[0])}
+      </span>
       {first && (
         <span className="mt-2.5 block">
           <span className="block text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -355,17 +379,16 @@ function StepAi({
   onNext: () => void;
   onBack: () => void;
 }) {
+  const t = useTranslations();
   return (
     <div>
-      <h2 className="text-2xl font-bold tracking-tight">Tả dự án của bạn</h2>
-      <p className="mt-2 text-[15px] text-muted-foreground">
-        Một hai câu là đủ. AI sẽ lập kế hoạch (phase + việc) ngay sau khi bạn tạo — bạn duyệt trước khi áp dụng.
-      </p>
+      <h2 className="text-2xl font-bold tracking-tight">{t("onboarding.ai.title")}</h2>
+      <p className="mt-2 text-[15px] text-muted-foreground">{t("onboarding.ai.subtitle")}</p>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
         rows={3}
-        placeholder="VD: Tôi cần ra mắt website bán hàng trong 6 tuần"
+        placeholder={t("onboarding.ai.placeholder")}
         className="mt-4 w-full rounded-lg border border-input bg-background/50 px-3.5 py-3 text-[15px] leading-relaxed focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
       />
       <div className="mt-4 flex items-center gap-3">
@@ -374,13 +397,13 @@ function StepAi({
           disabled={!value.trim()}
           className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-[15px] font-semibold text-primary-foreground shadow-soft transition hover:bg-primary/90 disabled:opacity-50"
         >
-          <Sparkles className="h-4 w-4" /> Tiếp tục
+          <Sparkles className="h-4 w-4" /> {t("onboarding.actions.continue")}
         </button>
         <button
           onClick={onBack}
           className="flex items-center gap-1 text-[13px] font-medium text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-3.5 w-3.5" /> Quay lại
+          <ArrowLeft className="h-3.5 w-3.5" /> {t("onboarding.actions.back")}
         </button>
       </div>
     </div>
@@ -410,19 +433,20 @@ function StepName({
   onCreate: () => void;
   onBack: () => void;
 }) {
+  const t = useTranslations();
   return (
     <div>
-      <h2 className="text-2xl font-bold tracking-tight">Đặt tên và bắt đầu</h2>
-      <p className="mt-2 text-[15px] text-muted-foreground">Gần xong rồi. Bạn sửa được mọi thứ sau.</p>
+      <h2 className="text-2xl font-bold tracking-tight">{t("onboarding.name.title")}</h2>
+      <p className="mt-2 text-[15px] text-muted-foreground">{t("onboarding.name.subtitle")}</p>
 
-      <Field label="Tên không gian làm việc">
+      <Field label={t("onboarding.name.workspaceLabel")}>
         <input
           value={wsName}
           onChange={(e) => onWs(e.target.value)}
           className="w-full rounded-lg border border-input bg-background/50 px-3.5 py-2.5 text-[15px] focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
         />
       </Field>
-      <Field label="Tên dự án đầu tiên">
+      <Field label={t("onboarding.name.projectLabel")}>
         <input
           value={projName}
           onChange={(e) => onProj(e.target.value)}
@@ -430,16 +454,16 @@ function StepName({
         />
       </Field>
       {mode === "team" && (
-        <Field label="Mời thành viên (tùy chọn)">
+        <Field label={t("onboarding.name.invitesLabel")}>
           <textarea
             value={invites}
             onChange={(e) => onInvites(e.target.value)}
             rows={2}
-            placeholder="Dán email, cách nhau bằng dấu phẩy…"
+            placeholder={t("onboarding.name.invitesPlaceholder")}
             className="w-full rounded-lg border border-input bg-background/50 px-3.5 py-2.5 text-[15px] focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
           <p className="mt-1.5 text-[12.5px] text-muted-foreground">
-            Chưa có tài khoản cũng không sao — họ nhận lời mời qua email.
+            {t("onboarding.name.invitesHint")}
           </p>
         </Field>
       )}
@@ -451,7 +475,7 @@ function StepName({
           className="inline-flex h-12 items-center gap-2 rounded-lg bg-primary px-6 text-[16px] font-semibold text-primary-foreground shadow-soft transition hover:bg-primary/90 disabled:opacity-50"
         >
           {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Tạo và bắt đầu
+          {t("onboarding.actions.createAndStart")}
           {!submitting && <ArrowRight className="h-4 w-4" />}
         </button>
         <button
@@ -459,7 +483,7 @@ function StepName({
           disabled={submitting}
           className="flex items-center gap-1 text-[13px] font-medium text-muted-foreground hover:text-foreground disabled:opacity-50"
         >
-          <ArrowLeft className="h-3.5 w-3.5" /> Quay lại
+          <ArrowLeft className="h-3.5 w-3.5" /> {t("onboarding.actions.back")}
         </button>
       </div>
     </div>

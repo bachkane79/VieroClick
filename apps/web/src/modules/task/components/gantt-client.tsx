@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useFormatter, useTranslations } from "next-intl";
 import { cn } from "@vieroc/ui";
 import { Calendar, Clock } from "lucide-react";
 import { toast } from "sonner";
@@ -9,6 +10,7 @@ import { updateTaskAction } from "../task.actions";
 import { useOptimisticTasks } from "./use-optimistic-tasks";
 import type { TaskView } from "../task.view";
 import type { Deviation } from "@/server/lib/deviations";
+import { useActionError } from "@/i18n/use-action-error";
 
 interface Props {
   workspaceId: string;
@@ -46,6 +48,9 @@ export function GanttClient({
   projectEnd,
 }: Props) {
   const router = useRouter();
+  const t = useTranslations();
+  const format = useFormatter();
+  const actionError = useActionError();
   const { effectiveTasks, applyOptimistic } = useOptimisticTasks(tasks);
   const trackRef = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<{ taskId: string; deltaDays: number } | null>(null);
@@ -103,13 +108,13 @@ export function GanttClient({
       if (!result.ok) {
         applyOptimistic(task.id, null);
         if (result.code === "conflict") {
-          toast.error("This task was updated by someone else — refreshing with the latest data.");
+          toast.error(t("task.gantt.conflict"));
           router.refresh();
         } else {
-          toast.error(result.error);
+          toast.error(actionError(result));
         }
       } else {
-        toast.success("Dates updated");
+        toast.success(t("task.gantt.datesUpdated"));
       }
     }
     window.addEventListener("pointermove", onMove);
@@ -121,18 +126,18 @@ export function GanttClient({
       <div className="flex items-center justify-between border-b border-border bg-muted/10 p-4">
         <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
           <Calendar className="h-3.5 w-3.5" />
-          Interactive Gantt — drag a bar to reschedule
+          {t("task.gantt.headerTitle")}
         </span>
-        <span className="text-[10px] text-muted-foreground">Showing {totalDays} days</span>
+        <span className="text-[10px] text-muted-foreground">
+          {t("task.gantt.showingDays", { days: totalDays })}
+        </span>
       </div>
 
       {timelineTasks.length === 0 ? (
         <div className="p-12 text-center text-muted-foreground">
           <Clock className="mx-auto mb-3 h-8 w-8 text-primary opacity-40" />
-          <p className="text-sm font-semibold">No scheduled tasks yet</p>
-          <p className="mx-auto mt-1 max-w-sm text-xs">
-            Add start and due dates to tasks to plot them on the Gantt chart.
-          </p>
+          <p className="text-sm font-semibold">{t("task.gantt.emptyTitle")}</p>
+          <p className="mx-auto mt-1 max-w-sm text-xs">{t("task.gantt.emptyDescription")}</p>
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -140,7 +145,7 @@ export function GanttClient({
             {/* Header */}
             <div className="flex bg-muted/5">
               <div className="w-1/3 shrink-0 border-r border-border p-3 text-xs font-bold text-muted-foreground">
-                Task Title
+                {t("task.gantt.taskTitleColumn")}
               </div>
               <div className="flex flex-1">
                 {daysArray.map((day, idx) => {
@@ -160,7 +165,7 @@ export function GanttClient({
                       )}
                     >
                       <span>{day.getDate()}</span>
-                      <span>{day.toLocaleDateString("en", { weekday: "narrow" })}</span>
+                      <span>{format.dateTime(day, "weekdayNarrow")}</span>
                     </div>
                   );
                 })}
@@ -170,7 +175,9 @@ export function GanttClient({
             {/* Rows */}
             <div className="divide-y divide-neutral-200/40 dark:divide-neutral-800/40">
               {timelineTasks.map((t) => {
-                const tStart = t.startDate ? new Date(t.startDate + "T00:00:00").getTime() : timelineStart;
+                const tStart = t.startDate
+                  ? new Date(t.startDate + "T00:00:00").getTime()
+                  : timelineStart;
                 const tEnd = t.dueDate ? new Date(t.dueDate + "T00:00:00").getTime() : timelineEnd;
                 const leftPct = Math.max(
                   0,
@@ -185,7 +192,10 @@ export function GanttClient({
                   drag?.taskId === t.id ? (drag.deltaDays / totalDays) * 100 : 0;
 
                 return (
-                  <div key={t.id} className="group flex hover:bg-neutral-50/50 dark:hover:bg-neutral-900/50">
+                  <div
+                    key={t.id}
+                    className="group flex hover:bg-neutral-50/50 dark:hover:bg-neutral-900/50"
+                  >
                     <div className="flex w-1/3 shrink-0 items-center justify-between border-r border-border p-3 text-xs font-semibold">
                       <span className="truncate">{t.title}</span>
                       {t.isMilestone && (
@@ -194,7 +204,10 @@ export function GanttClient({
                         </span>
                       )}
                     </div>
-                    <div ref={trackRef} className="relative flex flex-1 items-center overflow-hidden py-3">
+                    <div
+                      ref={trackRef}
+                      className="relative flex flex-1 items-center overflow-hidden py-3"
+                    >
                       <div className="pointer-events-none absolute inset-0 flex">
                         {daysArray.map((day, idx) => (
                           <div

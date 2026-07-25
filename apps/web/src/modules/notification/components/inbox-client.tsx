@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useFormatter, useTranslations } from "next-intl";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Button, cn } from "@vieroc/ui";
 import { Bell, Check, CheckCheck, Clock, Sparkles, Trash2 } from "lucide-react";
@@ -15,6 +16,7 @@ import {
 } from "../notification.actions";
 import type { InboxTab } from "../notification.repo";
 import { notificationHref, type NotificationView } from "../notification.view";
+import { useActionError } from "@/i18n/use-action-error";
 
 interface Props {
   workspaceId: string;
@@ -22,31 +24,25 @@ interface Props {
   notifications: NotificationView[];
 }
 
-const TABS: { key: InboxTab; label: string }[] = [
-  { key: "primary", label: "Primary" },
-  { key: "other", label: "Other" },
-  { key: "later", label: "Later" },
-  { key: "cleared", label: "Cleared" },
+const TABS: { key: InboxTab }[] = [
+  { key: "primary" },
+  { key: "other" },
+  { key: "later" },
+  { key: "cleared" },
 ];
 
-const SNOOZE_PRESETS: { label: string; hours: number }[] = [
-  { label: "1 hour", hours: 1 },
-  { label: "Tomorrow", hours: 24 },
-  { label: "Next week", hours: 24 * 7 },
+const SNOOZE_PRESETS: { labelKey: "oneHour" | "tomorrow" | "nextWeek"; hours: number }[] = [
+  { labelKey: "oneHour", hours: 1 },
+  { labelKey: "tomorrow", hours: 24 },
+  { labelKey: "nextWeek", hours: 24 * 7 },
 ];
-
-function relativeTime(iso: string): string {
-  const then = new Date(iso).getTime();
-  const now = Date.now();
-  const diff = Math.round((now - then) / 1000);
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(iso));
-}
 
 export function InboxClient({ workspaceId, workspaceSlug, notifications: initial }: Props) {
+  const t = useTranslations();
+  const actionError = useActionError();
+  const format = useFormatter();
+  const now = new Date();
+  const relativeTime = (iso: string) => format.relativeTime(new Date(iso), now);
   const router = useRouter();
   const [tab, setTab] = useState<InboxTab>("primary");
   const [items, setItems] = useState<NotificationView[]>(initial);
@@ -58,7 +54,7 @@ export function InboxClient({ workspaceId, workspaceSlug, notifications: initial
     const res = await listInboxAction({ workspaceId, tab: next });
     setLoading(false);
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
     setItems(res.data);
@@ -68,7 +64,7 @@ export function InboxClient({ workspaceId, workspaceSlug, notifications: initial
     if (ids.length === 0) return;
     setItems((cur) => cur.map((n) => (ids.includes(n.id) ? { ...n, isRead: true } : n)));
     const res = await markNotificationsReadAction({ workspaceId, data: { ids } });
-    if (!res.ok) toast.error(res.error);
+    if (!res.ok) toast.error(actionError(res));
   }
 
   async function markAll() {
@@ -76,8 +72,8 @@ export function InboxClient({ workspaceId, workspaceSlug, notifications: initial
     if (ids.length === 0) return;
     setItems((cur) => cur.map((n) => ({ ...n, isRead: true })));
     const res = await markAllReadAction({ workspaceId });
-    if (!res.ok) toast.error(res.error);
-    else toast.success("All caught up");
+    if (!res.ok) toast.error(actionError(res));
+    else toast.success(t("notifications.toast.allCaughtUp"));
   }
 
   async function handleSnooze(id: string, hours: number) {
@@ -85,19 +81,19 @@ export function InboxClient({ workspaceId, workspaceSlug, notifications: initial
     setItems((cur) => cur.filter((n) => n.id !== id));
     const res = await snoozeAction({ workspaceId, ids: [id], until });
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
-    toast.success("Snoozed");
+    toast.success(t("notifications.toast.snoozed"));
   }
 
   async function handleClearAll() {
     const res = await clearAllAction({ workspaceId });
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
-    toast.success(`Cleared ${res.data.cleared} notification${res.data.cleared === 1 ? "" : "s"}`);
+    toast.success(t("notifications.toast.cleared", { count: res.data.cleared }));
     setItems([]);
   }
 
@@ -114,15 +110,15 @@ export function InboxClient({ workspaceId, workspaceSlug, notifications: initial
     <div className="mx-auto max-w-3xl">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex rounded-md border bg-card p-1">
-          {TABS.map((t) => (
+          {TABS.map((item) => (
             <Button
-              key={t.key}
+              key={item.key}
               type="button"
               size="sm"
-              variant={tab === t.key ? "default" : "ghost"}
-              onClick={() => loadTab(t.key)}
+              variant={tab === item.key ? "default" : "ghost"}
+              onClick={() => loadTab(item.key)}
             >
-              {t.label}
+              {t(`notifications.tabs.${item.key}`)}
             </Button>
           ))}
         </div>
@@ -136,7 +132,7 @@ export function InboxClient({ workspaceId, workspaceSlug, notifications: initial
             onClick={markAll}
           >
             <CheckCheck className="h-4 w-4" />
-            Mark all read
+            {t("notifications.markAllRead")}
           </Button>
           <Button
             type="button"
@@ -147,21 +143,21 @@ export function InboxClient({ workspaceId, workspaceSlug, notifications: initial
             onClick={handleClearAll}
           >
             <Trash2 className="h-4 w-4" />
-            Clear all
+            {t("notifications.clearAll")}
           </Button>
         </div>
       </div>
 
       {loading ? (
         <div className="rounded-lg border border-dashed p-12 text-center text-sm text-muted-foreground">
-          Loading…
+          {t("common.loading")}
         </div>
       ) : items.length === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center">
           <Bell className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
-          <p className="text-sm font-semibold">Nothing here</p>
+          <p className="text-sm font-semibold">{t("notifications.empty.title")}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Mentions, assignments, and AI observer signals land here.
+            {t("notifications.empty.description")}
           </p>
         </div>
       ) : (
@@ -194,7 +190,9 @@ export function InboxClient({ workspaceId, workspaceSlug, notifications: initial
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     {!n.isRead && <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />}
-                    <p className={cn("truncate text-sm", n.isRead ? "font-medium" : "font-semibold")}>
+                    <p
+                      className={cn("truncate text-sm", n.isRead ? "font-medium" : "font-semibold")}
+                    >
                       {n.title}
                     </p>
                   </div>
@@ -203,7 +201,7 @@ export function InboxClient({ workspaceId, workspaceSlug, notifications: initial
                   )}
                   <p className="mt-1 text-[11px] text-muted-foreground">
                     {tab === "later" && n.snoozedUntil
-                      ? `Returns ${relativeTime(n.snoozedUntil)}`
+                      ? t("notifications.returns", { time: relativeTime(n.snoozedUntil) })
                       : relativeTime(n.createdAt)}
                   </p>
                 </div>
@@ -212,7 +210,7 @@ export function InboxClient({ workspaceId, workspaceSlug, notifications: initial
                     <DropdownMenu.Trigger asChild>
                       <button
                         type="button"
-                        aria-label="Snooze"
+                        aria-label={t("notifications.ariaSnooze")}
                         onClick={(e) => e.stopPropagation()}
                         className="mt-0.5 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
                       >
@@ -227,11 +225,11 @@ export function InboxClient({ workspaceId, workspaceSlug, notifications: initial
                       >
                         {SNOOZE_PRESETS.map((preset) => (
                           <DropdownMenu.Item
-                            key={preset.label}
+                            key={preset.labelKey}
                             onSelect={() => handleSnooze(n.id, preset.hours)}
                             className="cursor-pointer rounded-sm px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent"
                           >
-                            {preset.label}
+                            {t(`notifications.snooze.${preset.labelKey}`)}
                           </DropdownMenu.Item>
                         ))}
                       </DropdownMenu.Content>
@@ -241,7 +239,7 @@ export function InboxClient({ workspaceId, workspaceSlug, notifications: initial
                 {!n.isRead && (
                   <button
                     type="button"
-                    aria-label="Mark read"
+                    aria-label={t("notifications.ariaMarkRead")}
                     onClick={(e) => {
                       e.stopPropagation();
                       void markRead([n.id]);

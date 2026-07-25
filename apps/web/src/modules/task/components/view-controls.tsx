@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Button, cn, Input } from "@vieroc/ui";
 import { ArrowUpDown, Bookmark, Check, Filter, Group, Search, X } from "lucide-react";
@@ -19,19 +20,19 @@ interface Props {
   showGroupBy?: boolean;
 }
 
-const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
-  { value: "status", label: "Status" },
-  { value: "phase", label: "Phase" },
-  { value: "assignee", label: "Assignee" },
-  { value: "none", label: "None" },
+const GROUP_OPTIONS: { value: GroupBy; labelKey: string }[] = [
+  { value: "status", labelKey: "task.viewControls.status" },
+  { value: "phase", labelKey: "task.viewControls.phase" },
+  { value: "assignee", labelKey: "task.viewControls.assignee" },
+  { value: "none", labelKey: "common.none" },
 ];
 
-const SORT_OPTIONS: { value: SortField; label: string }[] = [
-  { value: "manual", label: "Manual" },
-  { value: "title", label: "Title" },
-  { value: "dueDate", label: "Due date" },
-  { value: "priority", label: "Priority" },
-  { value: "status", label: "Status" },
+const SORT_OPTIONS: { value: SortField; labelKey: string }[] = [
+  { value: "manual", labelKey: "task.viewControls.sortManual" },
+  { value: "title", labelKey: "common.title" },
+  { value: "dueDate", labelKey: "task.dueDate" },
+  { value: "priority", labelKey: "task.priority.label" },
+  { value: "status", labelKey: "task.viewControls.status" },
 ];
 
 const menuContent =
@@ -40,9 +41,22 @@ const menuItem =
   "flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent";
 
 export function ViewControls({ api, statuses, members, showGroupBy = true }: Props) {
-  const { prefs, setGroupBy, setSort, setFilter, savedViews, saveView, applyView, deleteView, resetPrefs } =
-    api;
+  const t = useTranslations();
+  const {
+    prefs,
+    setGroupBy,
+    setSort,
+    setFilter,
+    savedViews,
+    saveView,
+    applyView,
+    deleteView,
+    resetPrefs,
+  } = api;
   const [saveName, setSaveName] = useState("");
+
+  const activeGroupKey = GROUP_OPTIONS.find((g) => g.value === prefs.groupBy)?.labelKey;
+  const activeSortKey = SORT_OPTIONS.find((s) => s.value === prefs.sortField)?.labelKey;
 
   const filterCount =
     prefs.filter.statusIds.length +
@@ -60,7 +74,7 @@ export function ViewControls({ api, statuses, members, showGroupBy = true }: Pro
         <Input
           value={prefs.filter.search}
           onChange={(e) => setFilter((f) => ({ ...f, search: e.target.value }))}
-          placeholder="Search tasks…"
+          placeholder={t("task.viewControls.searchPlaceholder")}
           className="h-8 w-44 pl-8 text-sm"
         />
       </div>
@@ -70,7 +84,9 @@ export function ViewControls({ api, statuses, members, showGroupBy = true }: Pro
           <DropdownMenu.Trigger asChild>
             <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5">
               <Group className="h-3.5 w-3.5" />
-              Group: {GROUP_OPTIONS.find((g) => g.value === prefs.groupBy)?.label}
+              {t("task.viewControls.groupTrigger", {
+                label: activeGroupKey ? t(activeGroupKey as Parameters<typeof t>[0]) : "",
+              })}
             </Button>
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
@@ -81,7 +97,7 @@ export function ViewControls({ api, statuses, members, showGroupBy = true }: Pro
                   className={menuItem}
                   onSelect={() => setGroupBy(opt.value)}
                 >
-                  {opt.label}
+                  {t(opt.labelKey as Parameters<typeof t>[0])}
                   {prefs.groupBy === opt.value && <Check className="ml-auto h-3.5 w-3.5" />}
                 </DropdownMenu.Item>
               ))}
@@ -94,7 +110,9 @@ export function ViewControls({ api, statuses, members, showGroupBy = true }: Pro
         <DropdownMenu.Trigger asChild>
           <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5">
             <ArrowUpDown className="h-3.5 w-3.5" />
-            Sort: {SORT_OPTIONS.find((s) => s.value === prefs.sortField)?.label}
+            {t("task.viewControls.sortTrigger", {
+              label: activeSortKey ? t(activeSortKey as Parameters<typeof t>[0]) : "",
+            })}
             {prefs.sortField !== "manual" && ` (${prefs.sortDir === "asc" ? "↑" : "↓"})`}
           </Button>
         </DropdownMenu.Trigger>
@@ -112,7 +130,7 @@ export function ViewControls({ api, statuses, members, showGroupBy = true }: Pro
                   )
                 }
               >
-                {opt.label}
+                {t(opt.labelKey as Parameters<typeof t>[0])}
                 {prefs.sortField === opt.value && <Check className="ml-auto h-3.5 w-3.5" />}
               </DropdownMenu.Item>
             ))}
@@ -129,13 +147,18 @@ export function ViewControls({ api, statuses, members, showGroupBy = true }: Pro
             className="h-8 gap-1.5"
           >
             <Filter className="h-3.5 w-3.5" />
-            Filter{filterCount ? ` (${filterCount})` : ""}
+            {t("common.filter")}
+            {filterCount ? ` (${filterCount})` : ""}
           </Button>
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
-          <DropdownMenu.Content align="start" sideOffset={4} className={cn(menuContent, "max-h-[70vh] overflow-y-auto")}>
+          <DropdownMenu.Content
+            align="start"
+            sideOffset={4}
+            className={cn(menuContent, "max-h-[70vh] overflow-y-auto")}
+          >
             <DropdownMenu.Label className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-              Status
+              {t("task.viewControls.status")}
             </DropdownMenu.Label>
             {statuses.map((s) => (
               <DropdownMenu.CheckboxItem
@@ -150,7 +173,8 @@ export function ViewControls({ api, statuses, members, showGroupBy = true }: Pro
                 <span
                   className={cn(
                     "flex h-3.5 w-3.5 items-center justify-center rounded-sm border",
-                    prefs.filter.statusIds.includes(s.id) && "border-primary bg-primary text-primary-foreground"
+                    prefs.filter.statusIds.includes(s.id) &&
+                      "border-primary bg-primary text-primary-foreground"
                   )}
                 >
                   {prefs.filter.statusIds.includes(s.id) && <Check className="h-2.5 w-2.5" />}
@@ -160,7 +184,7 @@ export function ViewControls({ api, statuses, members, showGroupBy = true }: Pro
             ))}
             <DropdownMenu.Separator className="my-1 h-px bg-border" />
             <DropdownMenu.Label className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-              Priority
+              {t("task.priority.label")}
             </DropdownMenu.Label>
             {PRIORITY_ORDER.map((p) => (
               <DropdownMenu.CheckboxItem
@@ -175,17 +199,18 @@ export function ViewControls({ api, statuses, members, showGroupBy = true }: Pro
                 <span
                   className={cn(
                     "flex h-3.5 w-3.5 items-center justify-center rounded-sm border",
-                    prefs.filter.priorities.includes(p) && "border-primary bg-primary text-primary-foreground"
+                    prefs.filter.priorities.includes(p) &&
+                      "border-primary bg-primary text-primary-foreground"
                   )}
                 >
                   {prefs.filter.priorities.includes(p) && <Check className="h-2.5 w-2.5" />}
                 </span>
-                {p}
+                {t(`task.priority.${p}`)}
               </DropdownMenu.CheckboxItem>
             ))}
             <DropdownMenu.Separator className="my-1 h-px bg-border" />
             <DropdownMenu.Label className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-              Assignee
+              {t("task.viewControls.assignee")}
             </DropdownMenu.Label>
             {members.map((m) => (
               <DropdownMenu.CheckboxItem
@@ -200,7 +225,8 @@ export function ViewControls({ api, statuses, members, showGroupBy = true }: Pro
                 <span
                   className={cn(
                     "flex h-3.5 w-3.5 items-center justify-center rounded-sm border",
-                    prefs.filter.assigneeIds.includes(m.id) && "border-primary bg-primary text-primary-foreground"
+                    prefs.filter.assigneeIds.includes(m.id) &&
+                      "border-primary bg-primary text-primary-foreground"
                   )}
                 >
                   {prefs.filter.assigneeIds.includes(m.id) && <Check className="h-2.5 w-2.5" />}
@@ -214,11 +240,16 @@ export function ViewControls({ api, statuses, members, showGroupBy = true }: Pro
                 <DropdownMenu.Item
                   className={cn(menuItem, "text-muted-foreground")}
                   onSelect={() =>
-                    setFilter(() => ({ search: prefs.filter.search, statusIds: [], assigneeIds: [], priorities: [] }))
+                    setFilter(() => ({
+                      search: prefs.filter.search,
+                      statusIds: [],
+                      assigneeIds: [],
+                      priorities: [],
+                    }))
                   }
                 >
                   <X className="h-3.5 w-3.5" />
-                  Clear filters
+                  {t("task.viewControls.clearFilters")}
                 </DropdownMenu.Item>
               </>
             )}
@@ -259,18 +290,22 @@ function SavedViewsMenu({
   onDelete: (name: string) => void;
   onReset: () => void;
 }) {
+  const t = useTranslations();
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
         <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5">
           <Bookmark className="h-3.5 w-3.5" />
-          Views{savedViews.length ? ` (${savedViews.length})` : ""}
+          {t("task.viewControls.views")}
+          {savedViews.length ? ` (${savedViews.length})` : ""}
         </Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content align="end" sideOffset={4} className={menuContent}>
           {savedViews.length === 0 && (
-            <p className="px-2 py-1.5 text-xs text-muted-foreground">No saved views yet.</p>
+            <p className="px-2 py-1.5 text-xs text-muted-foreground">
+              {t("task.viewControls.noSavedViews")}
+            </p>
           )}
           {savedViews.map((v) => (
             <div key={v.name} className="flex items-center">
@@ -280,7 +315,7 @@ function SavedViewsMenu({
               </DropdownMenu.Item>
               <button
                 type="button"
-                aria-label={`Delete view ${v.name}`}
+                aria-label={t("task.viewControls.deleteView", { name: v.name })}
                 onClick={() => onDelete(v.name)}
                 className="mr-1 rounded p-1 text-muted-foreground hover:bg-accent hover:text-red-500"
               >
@@ -299,16 +334,22 @@ function SavedViewsMenu({
                   onSave();
                 }
               }}
-              placeholder="Save current as…"
+              placeholder={t("task.viewControls.saveCurrentPlaceholder")}
               className="h-7 text-xs"
             />
-            <Button type="button" size="sm" className="h-7" disabled={!saveName.trim()} onClick={onSave}>
-              Save
+            <Button
+              type="button"
+              size="sm"
+              className="h-7"
+              disabled={!saveName.trim()}
+              onClick={onSave}
+            >
+              {t("common.save")}
             </Button>
           </div>
           <DropdownMenu.Item className={cn(menuItem, "text-muted-foreground")} onSelect={onReset}>
             <X className="h-3.5 w-3.5" />
-            Reset to default
+            {t("task.viewControls.resetToDefault")}
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>

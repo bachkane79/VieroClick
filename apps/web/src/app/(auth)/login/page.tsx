@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Image from "next/image";
+import { getTranslations } from "next-intl/server";
 import { Check, Globe, Sparkles } from "lucide-react";
 import { auth } from "@/server/auth";
 import { devBypassEnabled } from "@/server/auth/config";
@@ -12,6 +13,8 @@ import { LoginForm } from "@/modules/auth/components/login-form";
 export default async function LoginPage() {
   const session = await auth();
   if (session?.user?.id) redirect("/dashboard");
+
+  const t = await getTranslations();
 
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
@@ -33,22 +36,19 @@ export default async function LoginPage() {
         </div>
         <div className="relative z-10">
           <h1 className="max-w-[12ch] text-4xl font-extrabold leading-tight tracking-tight">
-            Từ ý tưởng tới việc-đã-giao trong 5 phút.
+            {t("auth.heroTitle")}
           </h1>
-          <p className="mt-4 max-w-[34ch] text-lg text-white/90">
-            Không gian làm việc có AI lập kế hoạch, giao việc và theo dõi từng phase — cho cá
-            nhân và cả team.
-          </p>
+          <p className="mt-4 max-w-[34ch] text-lg text-white/90">{t("auth.heroSubtitle")}</p>
         </div>
         <div className="relative z-10 flex flex-wrap gap-5 text-sm text-white/90">
           <span className="flex items-center gap-2">
-            <Check className="h-4 w-4" /> Bảo mật theo workspace
+            <Check className="h-4 w-4" /> {t("auth.featureSecurity")}
           </span>
           <span className="flex items-center gap-2">
-            <Globe className="h-4 w-4" /> Song ngữ Việt / Anh
+            <Globe className="h-4 w-4" /> {t("auth.featureBilingual")}
           </span>
           <span className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4" /> AI lập kế hoạch
+            <Sparkles className="h-4 w-4" /> {t("auth.featurePlanning")}
           </span>
         </div>
       </div>
@@ -71,15 +71,17 @@ export default async function LoginPage() {
                 Viero<span className="text-primary">Click</span>
               </span>
             </div>
-            <h1 className="text-[26px] font-bold leading-tight tracking-tight">Bắt đầu nào</h1>
+            <h1 className="text-[26px] font-bold leading-tight tracking-tight">
+              {t("auth.getStartedTitle")}
+            </h1>
             <p className="mt-1.5 text-[15px] text-muted-foreground">
-              Đăng nhập để tạo không gian của bạn. Không cần thẻ, không cần cài đặt.
+              {t("auth.getStartedSubtitle")}
             </p>
           </div>
           <LoginForm showDevBypass={devBypassEnabled} />
           <p className="mt-8 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
             <Check className="h-3.5 w-3.5 text-mint" />
-            Chúng tôi không lưu mật khẩu — đăng nhập an toàn qua nhà cung cấp.
+            {t("auth.noPasswordNote")}
           </p>
         </div>
       </div>

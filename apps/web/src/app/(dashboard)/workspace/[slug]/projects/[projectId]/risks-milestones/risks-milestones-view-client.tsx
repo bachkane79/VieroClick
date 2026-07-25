@@ -1,13 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { Button, Input, Textarea } from "@vieroc/ui";
 import { toast } from "sonner";
 import { Calendar, AlertTriangle, Plus, Trash2, ShieldAlert, Flag } from "lucide-react";
-import { createMilestoneAction, deleteMilestoneAction } from "@/modules/milestone/milestone.actions";
+import {
+  createMilestoneAction,
+  deleteMilestoneAction,
+} from "@/modules/milestone/milestone.actions";
 import { createRiskAction, deleteRiskAction } from "@/modules/risk/risk.actions";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { useActionError } from "@/i18n/use-action-error";
 
 interface MilestoneRow {
   id: string;
@@ -56,7 +61,9 @@ export function RisksMilestonesViewClient({
   initialRisks,
   members,
 }: Props) {
+  const t = useTranslations();
   const router = useRouter();
+  const actionError = useActionError();
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<"milestones" | "risks">("milestones");
   const [deleteMilestoneCandidateId, setDeleteMilestoneCandidateId] = useState<string | null>(null);
@@ -118,7 +125,7 @@ export function RisksMilestonesViewClient({
       createdAt: new Date(),
     };
     setMilestones((current) => [...current, newMilestone]);
-    toast.success("Milestone created");
+    toast.success(t("risksMilestones.toast.milestoneCreated"));
 
     setSubmitting(true);
     const res = await createMilestoneAction({
@@ -134,7 +141,7 @@ export function RisksMilestonesViewClient({
     setSubmitting(false);
 
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       // rollback
       setMilestones((current) => current.filter((m) => m.id !== tempId));
     } else {
@@ -149,7 +156,7 @@ export function RisksMilestonesViewClient({
   async function executeDeleteMilestone(milestoneId: string) {
     const previousMilestones = [...milestones];
     setMilestones((current) => current.filter((m) => m.id !== milestoneId));
-    toast.success("Milestone deleted");
+    toast.success(t("risksMilestones.toast.milestoneDeleted"));
 
     setSubmitting(true);
     const res = await deleteMilestoneAction({
@@ -161,7 +168,7 @@ export function RisksMilestonesViewClient({
     setSubmitting(false);
 
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       // rollback
       setMilestones(previousMilestones);
     } else {
@@ -204,7 +211,7 @@ export function RisksMilestonesViewClient({
       createdAt: new Date(),
     };
     setRisks((current) => [...current, newRisk]);
-    toast.success("Risk reported");
+    toast.success(t("risksMilestones.toast.riskReported"));
 
     setSubmitting(true);
     const res = await createRiskAction({
@@ -224,7 +231,7 @@ export function RisksMilestonesViewClient({
     setSubmitting(false);
 
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       // rollback
       setRisks((current) => current.filter((r) => r.id !== tempId));
     } else {
@@ -239,7 +246,7 @@ export function RisksMilestonesViewClient({
   async function executeDeleteRisk(riskId: string) {
     const previousRisks = [...risks];
     setRisks((current) => current.filter((r) => r.id !== riskId));
-    toast.success("Risk deleted");
+    toast.success(t("risksMilestones.toast.riskDeleted"));
 
     setSubmitting(true);
     const res = await deleteRiskAction({
@@ -251,7 +258,7 @@ export function RisksMilestonesViewClient({
     setSubmitting(false);
 
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       // rollback
       setRisks(previousRisks);
     } else {
@@ -272,69 +279,78 @@ export function RisksMilestonesViewClient({
       <div className="flex border-b border-border">
         <button
           onClick={() => setActiveTab("milestones")}
-          className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all ${
+          className={`flex items-center gap-2 border-b-2 px-5 py-3 text-xs font-bold transition-all ${
             activeTab === "milestones"
               ? "border-primary text-primary"
               : "border-transparent text-muted-foreground hover:text-foreground"
           }`}
         >
-          <Flag className="w-4 h-4" />
-          Project Milestones
+          <Flag className="h-4 w-4" />
+          {t("risksMilestones.tab.milestones")}
         </button>
         <button
           onClick={() => setActiveTab("risks")}
-          className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all ${
+          className={`flex items-center gap-2 border-b-2 px-5 py-3 text-xs font-bold transition-all ${
             activeTab === "risks"
               ? "border-primary text-primary"
               : "border-transparent text-muted-foreground hover:text-foreground"
           }`}
         >
-          <ShieldAlert className="w-4 h-4" />
-          Project Risks Register
+          <ShieldAlert className="h-4 w-4" />
+          {t("risksMilestones.tab.risks")}
         </button>
       </div>
 
       {activeTab === "milestones" ? (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
           {/* Milestones List */}
-          <div className="xl:col-span-2 space-y-4">
-            <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                  Milestones Tracker
+          <div className="space-y-4 xl:col-span-2">
+            <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <div className="flex items-center justify-between border-b border-neutral-100 pb-3 dark:border-neutral-800">
+                <h3 className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                  {t("risksMilestones.milestonesTracker")}
                 </h3>
                 {!showAddMilestone && (
-                  <Button size="sm" onClick={() => setShowAddMilestone(true)} className="gap-1.5 text-xs">
-                    <Plus className="w-3.5 h-3.5" /> Add Milestone
+                  <Button
+                    size="sm"
+                    onClick={() => setShowAddMilestone(true)}
+                    className="gap-1.5 text-xs"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> {t("risksMilestones.addMilestone")}
                   </Button>
                 )}
               </div>
 
               {milestones.length === 0 ? (
-                <div className="p-12 text-center text-muted-foreground border border-dashed rounded-xl">
-                  <Calendar className="w-8 h-8 mx-auto mb-3 opacity-40 text-primary" />
-                  <p className="text-sm font-semibold">No milestones set</p>
-                  <p className="text-xs mt-0.5">Define key project milestones to track execution targets.</p>
+                <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground">
+                  <Calendar className="mx-auto mb-3 h-8 w-8 text-primary opacity-40" />
+                  <p className="text-sm font-semibold">
+                    {t("risksMilestones.empty.milestonesTitle")}
+                  </p>
+                  <p className="mt-0.5 text-xs">{t("risksMilestones.empty.milestonesDesc")}</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {milestones.map((m) => (
                     <div
                       key={m.id}
-                      className="p-4 border border-neutral-200/40 dark:border-neutral-800/40 rounded-xl bg-card flex items-start justify-between gap-3 shadow-sm"
+                      className="flex items-start justify-between gap-3 rounded-xl border border-neutral-200/40 bg-card p-4 shadow-sm dark:border-neutral-800/40"
                     >
                       <div className="space-y-1">
-                        <span className="font-bold text-xs text-foreground block">{m.title}</span>
+                        <span className="block text-xs font-bold text-foreground">{m.title}</span>
                         {m.description && (
                           <p className="text-xs text-muted-foreground">{m.description}</p>
                         )}
-                        <span className="text-[10px] text-muted-foreground block mt-1.5">
-                          Target Date: <strong className="text-foreground">{m.targetDate ?? "Not set"}</strong>
+                        <span className="mt-1.5 block text-[10px] text-muted-foreground">
+                          {t("risksMilestones.targetDateLabel")}{" "}
+                          <strong className="text-foreground">
+                            {m.targetDate ?? t("risksMilestones.notSet")}
+                          </strong>
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="px-2 py-0.5 rounded bg-muted/40 text-[9px] font-bold text-muted-foreground capitalize border">
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="rounded border bg-muted/40 px-2 py-0.5 text-[9px] font-bold capitalize text-muted-foreground">
                           {m.status}
                         </span>
 
@@ -346,7 +362,7 @@ export function RisksMilestonesViewClient({
                           disabled={submitting}
                           onClick={() => handleDeleteMilestone(m.id)}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </div>
@@ -359,29 +375,35 @@ export function RisksMilestonesViewClient({
           {/* Add Milestone Form */}
           <div className="space-y-4">
             {showAddMilestone && (
-              <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
-                  <h3 className="text-sm font-semibold text-foreground">Create Milestone</h3>
+              <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <div className="flex items-center justify-between border-b border-neutral-100 pb-3 dark:border-neutral-800">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {t("risksMilestones.createMilestone")}
+                  </h3>
                   <Button variant="ghost" size="sm" onClick={() => setShowAddMilestone(false)}>
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                 </div>
 
                 <form onSubmit={handleAddMilestone} className="space-y-4 text-xs font-semibold">
                   <div className="space-y-1.5">
-                    <label className="text-muted-foreground">Title</label>
+                    <label className="text-muted-foreground">
+                      {t("risksMilestones.field.title")}
+                    </label>
                     <Input
                       required
-                      placeholder="e.g. Phase 1 Release"
+                      placeholder={t("risksMilestones.placeholder.milestoneTitle")}
                       value={mTitle}
                       onChange={(e) => setMTitle(e.target.value)}
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-muted-foreground">Description</label>
+                    <label className="text-muted-foreground">
+                      {t("risksMilestones.field.description")}
+                    </label>
                     <Textarea
-                      placeholder="Milestone scope and targets..."
+                      placeholder={t("risksMilestones.placeholder.milestoneDesc")}
                       value={mDescription}
                       onChange={(e) => setMDescription(e.target.value)}
                       className="min-h-20"
@@ -389,7 +411,9 @@ export function RisksMilestonesViewClient({
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-muted-foreground">Target Date</label>
+                    <label className="text-muted-foreground">
+                      {t("risksMilestones.field.targetDate")}
+                    </label>
                     <Input
                       type="date"
                       value={mTargetDate}
@@ -398,7 +422,7 @@ export function RisksMilestonesViewClient({
                   </div>
 
                   <Button type="submit" disabled={submitting} className="w-full text-xs">
-                    {submitting ? "Saving..." : "Save Milestone"}
+                    {submitting ? t("risksMilestones.saving") : t("risksMilestones.saveMilestone")}
                   </Button>
                 </form>
               </div>
@@ -406,53 +430,66 @@ export function RisksMilestonesViewClient({
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
           {/* Risks list */}
-          <div className="xl:col-span-2 space-y-4">
-            <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
+          <div className="space-y-4 xl:col-span-2">
+            <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <div className="flex items-center justify-between border-b border-neutral-100 pb-3 dark:border-neutral-800">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                  Active Risks Register
+                  {t("risksMilestones.activeRisksRegister")}
                 </h3>
                 {!showAddRisk && (
-                  <Button size="sm" onClick={() => setShowAddRisk(true)} className="gap-1.5 text-xs">
-                    <Plus className="w-3.5 h-3.5" /> Log Risk
+                  <Button
+                    size="sm"
+                    onClick={() => setShowAddRisk(true)}
+                    className="gap-1.5 text-xs"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> {t("risksMilestones.logRisk")}
                   </Button>
                 )}
               </div>
 
               {risks.length === 0 ? (
-                <div className="p-12 text-center text-muted-foreground border border-dashed rounded-xl">
-                  <ShieldAlert className="w-8 h-8 mx-auto mb-3 opacity-40 text-primary" />
-                  <p className="text-sm font-semibold">No risks identified</p>
-                  <p className="text-xs mt-0.5 font-normal">Log hypothetical project risks to align mitigation plans.</p>
+                <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground">
+                  <ShieldAlert className="mx-auto mb-3 h-8 w-8 text-primary opacity-40" />
+                  <p className="text-sm font-semibold">{t("risksMilestones.empty.risksTitle")}</p>
+                  <p className="mt-0.5 text-xs font-normal">
+                    {t("risksMilestones.empty.risksDesc")}
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {risks.map((r) => {
-                    const ownerName = memberNameMap.get(r.ownerMemberId ?? "") ?? "Unassigned";
+                    const ownerName =
+                      memberNameMap.get(r.ownerMemberId ?? "") ?? t("task.unassigned");
                     const score = (r.probability ?? 1) * (r.impact ?? 1);
 
                     return (
                       <div
                         key={r.id}
-                        className="p-4 border border-neutral-200/40 dark:border-neutral-800/40 rounded-xl bg-card flex flex-col gap-3 shadow-sm hover:border-neutral-300 transition-all"
+                        className="flex flex-col gap-3 rounded-xl border border-neutral-200/40 bg-card p-4 shadow-sm transition-all hover:border-neutral-300 dark:border-neutral-800/40"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="space-y-1">
-                            <span className="font-bold text-xs text-foreground block">{r.title}</span>
+                            <span className="block text-xs font-bold text-foreground">
+                              {r.title}
+                            </span>
                             {r.description && (
                               <p className="text-xs text-muted-foreground">{r.description}</p>
                             )}
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex shrink-0 items-center gap-2">
                             <span
-                              className={`px-2 py-0.5 rounded text-[9px] font-bold border flex items-center gap-1 ${getRiskScoreClass(
+                              className={`flex items-center gap-1 rounded border px-2 py-0.5 text-[9px] font-bold ${getRiskScoreClass(
                                 r.probability,
                                 r.impact
                               )}`}
                             >
-                              Score: {score} ({r.probability}x{r.impact})
+                              {t("risksMilestones.riskScoreBadge", {
+                                score,
+                                probability: r.probability ?? 0,
+                                impact: r.impact ?? 0,
+                              })}
                             </span>
                             <Button
                               type="button"
@@ -462,24 +499,30 @@ export function RisksMilestonesViewClient({
                               disabled={submitting}
                               onClick={() => handleDeleteRisk(r.id)}
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </div>
                         </div>
 
                         {r.mitigation && (
-                          <div className="p-2.5 rounded-xl border border-border bg-surface-subtle text-xs">
-                            <span className="font-bold text-[10px] text-muted-foreground block mb-1">
-                              Mitigation Plan:
+                          <div className="rounded-xl border border-border bg-surface-subtle p-2.5 text-xs">
+                            <span className="mb-1 block text-[10px] font-bold text-muted-foreground">
+                              {t("risksMilestones.mitigationPlanLabel")}
                             </span>
-                            <p className="text-foreground leading-normal">{r.mitigation}</p>
+                            <p className="leading-normal text-foreground">{r.mitigation}</p>
                           </div>
                         )}
 
-                        <div className="flex flex-wrap items-center justify-between text-[10px] text-muted-foreground border-t pt-2 border-neutral-100 dark:border-neutral-800">
-                          <span>Owner: <strong className="text-foreground">{ownerName}</strong></span>
+                        <div className="flex flex-wrap items-center justify-between border-t border-neutral-100 pt-2 text-[10px] text-muted-foreground dark:border-neutral-800">
+                          <span>
+                            {t("risksMilestones.ownerLabel")}{" "}
+                            <strong className="text-foreground">{ownerName}</strong>
+                          </span>
                           {r.escalationPath && (
-                            <span>Escalation: <strong className="text-foreground">{r.escalationPath}</strong></span>
+                            <span>
+                              {t("risksMilestones.escalationLabel")}{" "}
+                              <strong className="text-foreground">{r.escalationPath}</strong>
+                            </span>
                           )}
                         </div>
                       </div>
@@ -493,29 +536,35 @@ export function RisksMilestonesViewClient({
           {/* Add Risk Form */}
           <div className="space-y-4">
             {showAddRisk && (
-              <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4 animate-in fade-in duration-200">
-                <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
-                  <h3 className="text-sm font-semibold text-foreground">Log Project Risk</h3>
+              <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm duration-200 animate-in fade-in">
+                <div className="flex items-center justify-between border-b border-neutral-100 pb-3 dark:border-neutral-800">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {t("risksMilestones.logProjectRisk")}
+                  </h3>
                   <Button variant="ghost" size="sm" onClick={() => setShowAddRisk(false)}>
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                 </div>
 
                 <form onSubmit={handleAddRisk} className="space-y-4 text-xs font-semibold">
                   <div className="space-y-1.5">
-                    <label className="text-muted-foreground">Title</label>
+                    <label className="text-muted-foreground">
+                      {t("risksMilestones.field.title")}
+                    </label>
                     <Input
                       required
-                      placeholder="e.g. Integration API Downtime"
+                      placeholder={t("risksMilestones.placeholder.riskTitle")}
                       value={rTitle}
                       onChange={(e) => setRTitle(e.target.value)}
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-muted-foreground">Description</label>
+                    <label className="text-muted-foreground">
+                      {t("risksMilestones.field.description")}
+                    </label>
                     <Textarea
-                      placeholder="Potential impact description..."
+                      placeholder={t("risksMilestones.placeholder.riskDesc")}
                       value={rDescription}
                       onChange={(e) => setRDescription(e.target.value)}
                       className="min-h-16"
@@ -524,11 +573,13 @@ export function RisksMilestonesViewClient({
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <label className="text-muted-foreground">Probability (1-5)</label>
+                      <label className="text-muted-foreground">
+                        {t("risksMilestones.field.probability")}
+                      </label>
                       <select
                         value={rProbability}
                         onChange={(e) => setRProbability(Number(e.target.value))}
-                        className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                       >
                         {[1, 2, 3, 4, 5].map((lvl) => (
                           <option key={lvl} value={lvl}>
@@ -539,11 +590,13 @@ export function RisksMilestonesViewClient({
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-muted-foreground">Impact (1-5)</label>
+                      <label className="text-muted-foreground">
+                        {t("risksMilestones.field.impact")}
+                      </label>
                       <select
                         value={rImpact}
                         onChange={(e) => setRImpact(Number(e.target.value))}
-                        className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                       >
                         {[1, 2, 3, 4, 5].map((lvl) => (
                           <option key={lvl} value={lvl}>
@@ -555,13 +608,15 @@ export function RisksMilestonesViewClient({
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-muted-foreground">Owner</label>
+                    <label className="text-muted-foreground">
+                      {t("risksMilestones.field.owner")}
+                    </label>
                     <select
                       value={rOwnerMemberId}
                       onChange={(e) => setROwnerMemberId(e.target.value)}
-                      className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                     >
-                      <option value="">Select Member...</option>
+                      <option value="">{t("risksMilestones.selectMember")}</option>
                       {members.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.fullName}
@@ -571,9 +626,11 @@ export function RisksMilestonesViewClient({
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-muted-foreground">Mitigation Plan</label>
+                    <label className="text-muted-foreground">
+                      {t("risksMilestones.field.mitigationPlan")}
+                    </label>
                     <Textarea
-                      placeholder="Mitigation steps to bypass risk..."
+                      placeholder={t("risksMilestones.placeholder.mitigation")}
                       value={rMitigation}
                       onChange={(e) => setRMitigation(e.target.value)}
                       className="min-h-16"
@@ -581,33 +638,37 @@ export function RisksMilestonesViewClient({
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-muted-foreground">Escalation Path</label>
+                    <label className="text-muted-foreground">
+                      {t("risksMilestones.field.escalationPath")}
+                    </label>
                     <Input
-                      placeholder="e.g. Notify Workspace Admin"
+                      placeholder={t("risksMilestones.placeholder.escalation")}
                       value={rEscalation}
                       onChange={(e) => setREscalation(e.target.value)}
                     />
                   </div>
 
                   <Button type="submit" disabled={submitting} className="w-full text-xs">
-                    {submitting ? "Logging..." : "Log Project Risk"}
+                    {submitting
+                      ? t("risksMilestones.logging")
+                      : t("risksMilestones.logProjectRisk")}
                   </Button>
                 </form>
               </div>
             )}
 
-            <div className="p-5 border border-border rounded-2xl bg-card shadow-sm text-xs space-y-3">
-              <h4 className="font-semibold text-foreground flex items-center gap-1">
-                <AlertTriangle className="w-4 h-4 text-amber-500" />
-                Risk Calculations
+            <div className="space-y-3 rounded-2xl border border-border bg-card p-5 text-xs shadow-sm">
+              <h4 className="flex items-center gap-1 font-semibold text-foreground">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                {t("risksMilestones.riskCalculations")}
               </h4>
-              <p className="text-muted-foreground leading-relaxed">
-                Risk Score is computed as <strong>Probability * Impact</strong>.
+              <p className="leading-relaxed text-muted-foreground">
+                {t.rich("risksMilestones.riskFormula", { strong: (c) => <strong>{c}</strong> })}
               </p>
-              <ul className="space-y-1 text-muted-foreground list-disc pl-4">
-                <li>Scores 15+ represent High risk (Red).</li>
-                <li>Scores 8-12 represent Medium risk (Yellow).</li>
-                <li>Scores under 8 are Low risk (Green).</li>
+              <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
+                <li>{t("risksMilestones.riskHigh")}</li>
+                <li>{t("risksMilestones.riskMedium")}</li>
+                <li>{t("risksMilestones.riskLow")}</li>
               </ul>
             </div>
           </div>
@@ -619,10 +680,10 @@ export function RisksMilestonesViewClient({
         onOpenChange={(open) => {
           if (!open) setDeleteMilestoneCandidateId(null);
         }}
-        title="Delete Milestone"
-        description="Are you sure you want to delete this milestone? This action cannot be undone."
+        title={t("risksMilestones.deleteMilestoneTitle")}
+        description={t("risksMilestones.deleteMilestoneDesc")}
         variant="destructive"
-        confirmLabel="Delete"
+        confirmLabel={t("common.delete")}
         onConfirm={async () => {
           if (deleteMilestoneCandidateId) {
             await executeDeleteMilestone(deleteMilestoneCandidateId);
@@ -636,10 +697,10 @@ export function RisksMilestonesViewClient({
         onOpenChange={(open) => {
           if (!open) setDeleteRiskCandidateId(null);
         }}
-        title="Delete Risk"
-        description="Are you sure you want to delete this risk? This action cannot be undone."
+        title={t("risksMilestones.deleteRiskTitle")}
+        description={t("risksMilestones.deleteRiskDesc")}
         variant="destructive"
-        confirmLabel="Delete"
+        confirmLabel={t("common.delete")}
         onConfirm={async () => {
           if (deleteRiskCandidateId) {
             await executeDeleteRisk(deleteRiskCandidateId);

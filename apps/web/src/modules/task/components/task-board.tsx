@@ -14,7 +14,9 @@ import {
 } from "@dnd-kit/core";
 import { Button, cn } from "@vieroc/ui";
 import { CheckSquare, Flag, Plus } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
+import { useActionError } from "@/i18n/use-action-error";
 import { changeTaskStatusAction } from "../task.actions";
 import {
   checklistProgress,
@@ -58,6 +60,8 @@ export function TaskBoard({
   const [selectedTask, setSelectedTask] = useState<TaskView | null>(null);
   const [initialStatusId, setInitialStatusId] = useState<string | undefined>();
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const t = useTranslations();
+  const actionError = useActionError();
 
   const api = useViewPrefs(projectId, "status");
   const { effectiveTasks, applyOptimistic } = useOptimisticTasks(tasks);
@@ -121,20 +125,24 @@ export function TaskBoard({
     });
     if (!result.ok) {
       applyOptimistic(taskId, null);
-      toast.error(result.error);
+      toast.error(actionError(result));
     }
   }
 
   return (
     <>
-      <div className="flex flex-col gap-4 h-full">
+      <div className="flex h-full flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <ViewControls api={api} statuses={statuses} members={members} />
           <div className="flex items-center gap-2">
             {actions}
-            <Button type="button" className="h-8 gap-2" onClick={() => createInStatus(statuses[0]?.id ?? "")}>
+            <Button
+              type="button"
+              className="h-8 gap-2"
+              onClick={() => createInStatus(statuses[0]?.id ?? "")}
+            >
               <Plus className="h-4 w-4" />
-              New task
+              {t("task.board.newTask")}
             </Button>
           </div>
         </div>
@@ -147,44 +155,48 @@ export function TaskBoard({
           onDragCancel={() => setActiveTaskId(null)}
         >
           <div className="flex h-full gap-3 overflow-x-auto py-1">
-          {statuses.map((status) => (
-            <BoardColumn
-              key={status.id}
-              status={status}
-              tasks={tasksByStatus[status.id] ?? []}
-              onAddTask={() => createInStatus(status.id)}
-            >
-              {(tasksByStatus[status.id] ?? []).map((task) => (
-                <BoardCard
-                  key={task.id}
-                  task={task}
-                  memberById={memberById}
-                  isDragging={task.id === activeTaskId}
-                  onOpen={() => openTask(task)}
-                  quickActions={
-                    <TaskQuickActions
-                      workspaceId={workspaceId}
-                      workspaceSlug={workspaceSlug}
-                      projectId={projectId}
-                      task={task}
-                      statuses={statuses}
-                      members={members}
-                      onOptimistic={applyOptimistic}
-                      className="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100"
-                    />
-                  }
-                />
-              ))}
-            </BoardColumn>
-          ))}
-        </div>
+            {statuses.map((status) => (
+              <BoardColumn
+                key={status.id}
+                status={status}
+                tasks={tasksByStatus[status.id] ?? []}
+                onAddTask={() => createInStatus(status.id)}
+              >
+                {(tasksByStatus[status.id] ?? []).map((task) => (
+                  <BoardCard
+                    key={task.id}
+                    task={task}
+                    memberById={memberById}
+                    isDragging={task.id === activeTaskId}
+                    onOpen={() => openTask(task)}
+                    quickActions={
+                      <TaskQuickActions
+                        workspaceId={workspaceId}
+                        workspaceSlug={workspaceSlug}
+                        projectId={projectId}
+                        task={task}
+                        statuses={statuses}
+                        members={members}
+                        onOptimistic={applyOptimistic}
+                        className="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100"
+                      />
+                    }
+                  />
+                ))}
+              </BoardColumn>
+            ))}
+          </div>
 
-        <DragOverlay dropAnimation={null}>
-          {activeTask ? (
-            <BoardCardBody task={activeTask} memberById={memberById} className="rotate-2 shadow-lg" />
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+          <DragOverlay dropAnimation={null}>
+            {activeTask ? (
+              <BoardCardBody
+                task={activeTask}
+                memberById={memberById}
+                className="rotate-2 shadow-lg"
+              />
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       </div>
 
       <TaskDetailDrawer
@@ -219,6 +231,7 @@ function BoardColumn({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status.id });
   const colors = statusColor(status.type);
+  const t = useTranslations();
 
   return (
     <section className="flex w-80 shrink-0 flex-col">
@@ -238,7 +251,7 @@ function BoardColumn({
           type="button"
           size="icon"
           variant="ghost"
-          aria-label={`Add task to ${status.name}`}
+          aria-label={t("task.board.addTaskToColumn", { column: status.name })}
           onClick={onAddTask}
         >
           <Plus className="h-4 w-4" />
@@ -257,7 +270,7 @@ function BoardColumn({
           onClick={onAddTask}
           className="rounded-md px-2 py-1.5 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
-          + Add Task
+          {t("task.board.addTask")}
         </button>
       </div>
     </section>
@@ -286,9 +299,7 @@ function BoardCard({
       {...listeners}
       onClick={onOpen}
       style={
-        transform
-          ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
-          : undefined
+        transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined
       }
       className={cn("group relative cursor-grab touch-none", isDragging && "opacity-40")}
     >
@@ -307,6 +318,7 @@ function BoardCardBody({
   memberById: Map<string, MemberOptionView>;
   className?: string;
 }) {
+  const t = useTranslations();
   const assignees = task.assigneeMemberIds
     .map((id) => memberById.get(id))
     .filter((m): m is MemberOptionView => Boolean(m));
@@ -340,7 +352,9 @@ function BoardCardBody({
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Flag
           className={cn("h-3.5 w-3.5", PRIORITY_FLAG_COLORS[task.priority] ?? "text-neutral-400")}
-          aria-label={`Priority: ${task.priority}`}
+          aria-label={t("task.board.priorityAria", {
+            priority: t(`task.priority.${task.priority}`),
+          })}
         />
         {task.dueDate && <span className="text-xs text-muted-foreground">{task.dueDate}</span>}
         {checklist.total > 0 && (

@@ -18,24 +18,53 @@ export interface DashboardKpis {
   openTotal: number;
 }
 
+/** One localizable sentence of the executive summary. */
+export interface SummaryPart {
+  /** Catalog key under `dashboards.summary.*`. */
+  key: string;
+  params?: Record<string, string | number>;
+}
+
 /**
  * Deterministic executive summary (no LLM hop — renders instantly and never
  * hallucinates). Mirrors the tone of ClickUp's AI Executive Summary card.
+ *
+ * Returns catalog **keys + params**, not prose: this is `server-only` module
+ * code with no request locale, and the previous version emitted a hardcoded
+ * Vietnamese paragraph that rendered unchanged for English users. The caller
+ * (a Server Component) resolves each part with `t()` and joins them — each part
+ * is a whole sentence, so this is not fragment concatenation (§5.3).
+ *
+ * The lead sentence has three separate keys rather than one key with an
+ * interpolated mood adjective, so each locale can phrase the whole clause
+ * naturally instead of receiving a word into a fixed slot.
  */
-function buildSummary(health: HealthDetails, kpis: DashboardKpis): string {
-  const parts: string[] = [];
-  const mood = health.score >= 80 ? "ổn định" : health.score >= 50 ? "cần chú ý" : "đang gặp rủi ro";
-  parts.push(
-    `Dự án ${mood} với điểm sức khỏe ${health.score}/100 — đã hoàn thành ${health.doneTasks}/${health.totalTasks} việc (${health.completionPct}%).`
-  );
-  if (kpis.overdue > 0) parts.push(`${kpis.overdue} việc quá hạn cần xử lý trước tiên.`);
-  if (health.openBlockerCount > 0) parts.push(`${health.openBlockerCount} blocker đang mở.`);
-  if (kpis.unassigned > 0) parts.push(`${kpis.unassigned} việc đang mở chưa được giao cho ai.`);
-  if (health.highRiskCount > 0) parts.push(`${health.highRiskCount} rủi ro mức cao cần theo dõi.`);
+function buildSummary(health: HealthDetails, kpis: DashboardKpis): SummaryPart[] {
+  const parts: SummaryPart[] = [];
+  const lead =
+    health.score >= 80 ? "leadStable" : health.score >= 50 ? "leadAttention" : "leadAtRisk";
+  parts.push({
+    key: lead,
+    params: {
+      score: health.score,
+      done: health.doneTasks,
+      total: health.totalTasks,
+      // `completionPct` is a 0–1 fraction (every other call site multiplies by
+      // 100); the old template printed it raw next to a literal "%", yielding
+      // "0.2857142857142857%".
+      pct: Math.round((health.completionPct || 0) * 100),
+    },
+  });
+  if (kpis.overdue > 0) parts.push({ key: "overdue", params: { n: kpis.overdue } });
+  if (health.openBlockerCount > 0)
+    parts.push({ key: "blockers", params: { n: health.openBlockerCount } });
+  if (kpis.unassigned > 0) parts.push({ key: "unassigned", params: { n: kpis.unassigned } });
+  if (health.highRiskCount > 0)
+    parts.push({ key: "highRisk", params: { n: health.highRiskCount } });
   if (parts.length === 1 && kpis.openTotal === 0 && health.totalTasks > 0) {
-    parts.push("Không còn việc mở — sẵn sàng đóng dự án hoặc lên kế hoạch giai đoạn tiếp theo.");
+    parts.push({ key: "allClear" });
   }
-  return parts.join(" ");
+  return parts;
 }
 
 export interface StatusSlice {
@@ -74,7 +103,7 @@ export interface ProjectDashboard {
   byAssignee: AssigneeSlice[];
   dueSoon: DueTaskRow[];
   latestActivity: ActivityRow[];
-  summary: string;
+  summary: SummaryPart[];
 }
 
 const OPEN_TYPES = ["todo", "in_progress", "in_review", "blocked"] as const;
@@ -88,11 +117,15 @@ const OPEN_TYPES = ["todo", "in_progress", "in_review", "blocked"] as const;
  * immediately — the TTL is just the fallback for anything that doesn't.
  */
 export async function computeProjectDashboard(projectId: string): Promise<ProjectDashboard> {
-  const result = await getOrSetCache(`dashboard:${projectId}`, () => computeProjectDashboardUncached(projectId), {
-    ttlSeconds: 30,
-  });
+  const result = await getOrSetCache(
+    `dashboard:${projectId}`,
+    () => computeProjectDashboardUncached(projectId),
+    {
+      ttlSeconds: 30,
+    }
+  );
   // Cached values round-trip Dates as ISO strings (see cache.ts) — rewrap so
-  // callers (e.g. dashboard/page.tsx's `event.createdAt.toLocaleString(...)`)
+  // callers (e.g. dashboard/page.tsx formatting `event.createdAt` via next-intl)
   // always get a real Date regardless of cache hit/miss.
   return {
     ...result,
@@ -107,84 +140,85 @@ async function computeProjectDashboardUncached(projectId: string): Promise<Proje
   // WP-I1: unassignedRow used to be a 6th query awaited *after* this Promise.all
   // resolved, despite having no dependency on the other five — a free extra
   // round-trip on every dashboard load. Folded in as a 6th parallel branch.
-  const [health, statusRows, assigneeRows, dueRows, activityRows, unassignedRows] = await Promise.all([
-    computeHealthDetails(projectId),
+  const [health, statusRows, assigneeRows, dueRows, activityRows, unassignedRows] =
+    await Promise.all([
+      computeHealthDetails(projectId),
 
-    db
-      .select({
-        name: taskStatuses.name,
-        type: taskStatuses.type,
-        count: sql<number>`count(${tasks.id})::int`,
-      })
-      .from(taskStatuses)
-      .leftJoin(tasks, eq(tasks.statusId, taskStatuses.id))
-      .where(eq(taskStatuses.projectId, projectId))
-      .groupBy(taskStatuses.id, taskStatuses.name, taskStatuses.type, taskStatuses.position)
-      .orderBy(taskStatuses.position),
+      db
+        .select({
+          name: taskStatuses.name,
+          type: taskStatuses.type,
+          count: sql<number>`count(${tasks.id})::int`,
+        })
+        .from(taskStatuses)
+        .leftJoin(tasks, eq(tasks.statusId, taskStatuses.id))
+        .where(eq(taskStatuses.projectId, projectId))
+        .groupBy(taskStatuses.id, taskStatuses.name, taskStatuses.type, taskStatuses.position)
+        .orderBy(taskStatuses.position),
 
-    db
-      .select({
-        memberId: tasks.assigneeMemberId,
-        name: users.fullName,
-        count: sql<number>`count(*)::int`,
-      })
-      .from(tasks)
-      .innerJoin(taskStatuses, eq(taskStatuses.id, tasks.statusId))
-      .leftJoin(workspaceMembers, eq(workspaceMembers.id, tasks.assigneeMemberId))
-      .leftJoin(users, eq(users.id, workspaceMembers.userId))
-      .where(and(eq(tasks.projectId, projectId), inArray(taskStatuses.type, [...OPEN_TYPES])))
-      .groupBy(tasks.assigneeMemberId, users.fullName)
-      .orderBy(desc(sql`count(*)`)),
+      db
+        .select({
+          memberId: tasks.assigneeMemberId,
+          name: users.fullName,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(tasks)
+        .innerJoin(taskStatuses, eq(taskStatuses.id, tasks.statusId))
+        .leftJoin(workspaceMembers, eq(workspaceMembers.id, tasks.assigneeMemberId))
+        .leftJoin(users, eq(users.id, workspaceMembers.userId))
+        .where(and(eq(tasks.projectId, projectId), inArray(taskStatuses.type, [...OPEN_TYPES])))
+        .groupBy(tasks.assigneeMemberId, users.fullName)
+        .orderBy(desc(sql`count(*)`)),
 
-    db
-      .select({
-        id: tasks.id,
-        title: tasks.title,
-        dueDate: tasks.dueDate,
-        assigneeName: users.fullName,
-      })
-      .from(tasks)
-      .innerJoin(taskStatuses, eq(taskStatuses.id, tasks.statusId))
-      .leftJoin(workspaceMembers, eq(workspaceMembers.id, tasks.assigneeMemberId))
-      .leftJoin(users, eq(users.id, workspaceMembers.userId))
-      .where(
-        and(
-          eq(tasks.projectId, projectId),
-          inArray(taskStatuses.type, [...OPEN_TYPES]),
-          sql`${tasks.dueDate} is not null`,
-          lt(tasks.dueDate, weekAhead)
+      db
+        .select({
+          id: tasks.id,
+          title: tasks.title,
+          dueDate: tasks.dueDate,
+          assigneeName: users.fullName,
+        })
+        .from(tasks)
+        .innerJoin(taskStatuses, eq(taskStatuses.id, tasks.statusId))
+        .leftJoin(workspaceMembers, eq(workspaceMembers.id, tasks.assigneeMemberId))
+        .leftJoin(users, eq(users.id, workspaceMembers.userId))
+        .where(
+          and(
+            eq(tasks.projectId, projectId),
+            inArray(taskStatuses.type, [...OPEN_TYPES]),
+            sql`${tasks.dueDate} is not null`,
+            lt(tasks.dueDate, weekAhead)
+          )
         )
-      )
-      .orderBy(tasks.dueDate)
-      .limit(12),
+        .orderBy(tasks.dueDate)
+        .limit(12),
 
-    db
-      .select({
-        id: activityEvents.id,
-        actorName: users.fullName,
-        actorType: activityEvents.actorType,
-        entityType: activityEvents.entityType,
-        eventType: activityEvents.eventType,
-        createdAt: activityEvents.createdAt,
-      })
-      .from(activityEvents)
-      .leftJoin(users, eq(users.id, activityEvents.actorUserId))
-      .where(eq(activityEvents.projectId, projectId))
-      .orderBy(desc(activityEvents.createdAt))
-      .limit(10),
+      db
+        .select({
+          id: activityEvents.id,
+          actorName: users.fullName,
+          actorType: activityEvents.actorType,
+          entityType: activityEvents.entityType,
+          eventType: activityEvents.eventType,
+          createdAt: activityEvents.createdAt,
+        })
+        .from(activityEvents)
+        .leftJoin(users, eq(users.id, activityEvents.actorUserId))
+        .where(eq(activityEvents.projectId, projectId))
+        .orderBy(desc(activityEvents.createdAt))
+        .limit(10),
 
-    db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(tasks)
-      .innerJoin(taskStatuses, eq(taskStatuses.id, tasks.statusId))
-      .where(
-        and(
-          eq(tasks.projectId, projectId),
-          inArray(taskStatuses.type, [...OPEN_TYPES]),
-          isNull(tasks.assigneeMemberId)
-        )
-      ),
-  ]);
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(tasks)
+        .innerJoin(taskStatuses, eq(taskStatuses.id, tasks.statusId))
+        .where(
+          and(
+            eq(tasks.projectId, projectId),
+            inArray(taskStatuses.type, [...OPEN_TYPES]),
+            isNull(tasks.assigneeMemberId)
+          )
+        ),
+    ]);
 
   const countOf = (type: string) =>
     statusRows.filter((s) => s.type === type).reduce((sum, s) => sum + s.count, 0);
@@ -194,8 +228,7 @@ async function computeProjectDashboardUncached(projectId: string): Promise<Proje
     inProgress: countOf("in_progress") + countOf("in_review"),
     completed: countOf("done"),
     overdue: health.overdueTaskCount,
-    openTotal:
-      countOf("todo") + countOf("in_progress") + countOf("in_review") + countOf("blocked"),
+    openTotal: countOf("todo") + countOf("in_progress") + countOf("in_review") + countOf("blocked"),
   };
 
   const byAssignee: AssigneeSlice[] = assigneeRows.map((r) => ({

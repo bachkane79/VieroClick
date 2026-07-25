@@ -1,5 +1,6 @@
 import type { Project } from "@vieroc/types";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { ArrowUpRight, CalendarClock } from "lucide-react";
 
 interface Props {
@@ -15,7 +16,11 @@ const STATUS_COLORS: Record<string, string> = {
   archived: "bg-muted text-muted-foreground",
 };
 
-export function ProjectCard({ project, workspaceSlug }: Props) {
+/** Server Component: its only consumer (`workspace/[slug]/projects/page.tsx`)
+ *  is one too, so the status label resolves from the catalog here rather than
+ *  rendering the raw DB enum. */
+export async function ProjectCard({ project, workspaceSlug }: Props) {
+  const t = await getTranslations();
   return (
     <Link
       href={`/workspace/${workspaceSlug}/projects/${project.id}/overview`}
@@ -44,11 +49,11 @@ export function ProjectCard({ project, workspaceSlug }: Props) {
 
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/60 pt-2.5">
         <span
-          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold capitalize ${
+          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
             STATUS_COLORS[project.status] ?? "bg-secondary text-secondary-foreground"
           }`}
         >
-          {project.status}
+          {(t as unknown as (k: string) => string)(`project.status.${project.status}`)}
         </span>
         {project.targetEndDate && (
           <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
