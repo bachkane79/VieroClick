@@ -1,56 +1,32 @@
 import type { ReactNode } from "react";
 import { CalendarDays, GanttChartSquare, KanbanSquare, ListChecks, Table2 } from "lucide-react";
-import type { Locale } from "@/lib/i18n/dict";
+import { useTranslations } from "next-intl";
 
 type WorkView = "list" | "board" | "calendar" | "gantt" | "table";
 
-const VIEW_META = {
-  list: {
-    icon: ListChecks,
-    vi: ["Danh sách", "Quét nhanh, lọc và cập nhật công việc"],
-    en: ["List", "Scan, filter and update work"],
-  },
-  board: {
-    icon: KanbanSquare,
-    vi: ["Bảng", "Theo dõi luồng công việc theo trạng thái"],
-    en: ["Board", "Track work across statuses"],
-  },
-  calendar: {
-    icon: CalendarDays,
-    vi: ["Lịch", "Lập kế hoạch theo ngày đến hạn"],
-    en: ["Calendar", "Plan work by due date"],
-  },
-  gantt: {
-    icon: GanttChartSquare,
-    vi: ["Gantt", "Kiểm soát thời gian và phụ thuộc"],
-    en: ["Gantt", "Manage timing and dependencies"],
-  },
-  table: {
-    icon: Table2,
-    vi: ["Bảng dữ liệu", "So sánh trường công việc ở mật độ cao"],
-    en: ["Table", "Compare task fields at high density"],
-  },
-} satisfies Record<
-  WorkView,
-  { icon: typeof ListChecks; vi: [string, string]; en: [string, string] }
->;
+const VIEW_ICONS = {
+  list: ListChecks,
+  board: KanbanSquare,
+  calendar: CalendarDays,
+  gantt: GanttChartSquare,
+  table: Table2,
+} satisfies Record<WorkView, typeof ListChecks>;
 
 export function ProjectWorkHeader({
   view,
   projectName,
   taskCount,
-  locale,
   actions,
 }: {
   view: WorkView;
   projectName: string;
   taskCount: number;
-  locale: Locale;
   actions?: ReactNode;
 }) {
-  const meta = VIEW_META[view];
-  const Icon = meta.icon;
-  const [label, description] = meta[locale];
+  const t = useTranslations();
+  const Icon = VIEW_ICONS[view];
+  const label = t(`task.workHeader.views.${view}.label`);
+  const description = t(`task.workHeader.views.${view}.description`);
 
   return (
     <header className="flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-border/80 pb-3">

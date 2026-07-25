@@ -5,8 +5,6 @@ import { TopBar } from "@/components/layout/top-bar";
 import { CommandPalette } from "@/components/layout/command-palette";
 import { listMyWorkspaces } from "@/modules/workspace/workspace.service";
 import { listMyOrganizations } from "@/modules/organization/organization.service";
-import { getLocale } from "@/lib/i18n/server";
-import { LocaleProvider } from "@/lib/i18n/client";
 
 export const dynamic = "force-dynamic";
 
@@ -34,20 +32,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect("/login");
   }
 
-  const locale = await getLocale();
-
   return (
-    <LocaleProvider locale={locale}>
-      {/* Fullscreen, edge-to-edge shell — reference styling (white icon rail,
-          canvas content, pill header), no floating container. */}
-      <div className="flex h-screen overflow-hidden bg-canvas">
-        <AppSidebar user={session.user} workspaces={workspaces} organizations={organizations} />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <TopBar user={session.user} workspaces={workspaces} organizations={organizations} />
-          <main className="min-h-0 flex-1 overflow-y-auto bg-canvas">{children}</main>
-        </div>
-        <CommandPalette workspaces={workspaces} />
+    /* Fullscreen, edge-to-edge shell — reference styling (white icon rail,
+       canvas content, pill header), no floating container. */
+    <div className="flex h-screen overflow-hidden bg-canvas">
+      <AppSidebar user={session.user} workspaces={workspaces} organizations={organizations} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopBar user={session.user} workspaces={workspaces} organizations={organizations} />
+        <main className="min-h-0 flex-1 overflow-y-auto bg-canvas">{children}</main>
       </div>
-    </LocaleProvider>
+      <CommandPalette workspaces={workspaces} />
+    </div>
   );
 }

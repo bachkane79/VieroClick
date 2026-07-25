@@ -3,7 +3,12 @@ import type { PermissionLevel } from "@vieroc/types";
 import { db, type Executor } from "@vieroc/db";
 import type { ActorContext } from "@/server/lib/context";
 import { ForbiddenError } from "@/server/lib/errors";
-import { isWorkspaceAdmin, roleDefaultLevel, LEVEL_RANK, meetsLevel } from "@/server/lib/permissions";
+import {
+  isWorkspaceAdmin,
+  roleDefaultLevel,
+  LEVEL_RANK,
+  meetsLevel,
+} from "@/server/lib/permissions";
 import * as repo from "./permission.repo";
 
 /**
@@ -149,7 +154,15 @@ export async function assertLevel(
 ): Promise<PermissionLevel> {
   const level = await resolveEffectiveLevel(ctx, resource, exec);
   if (!meetsLevel(level, required)) {
-    throw new ForbiddenError(`This action requires ${required} access to the ${resource.type}`);
+    // The English message keeps the level + resource type for logs and the
+    // agent-facing routes. The localized copy is deliberately non-parametric:
+    // interpolating them would mean localizing `required` (a PermissionLevel)
+    // and `resource.type` inside a toast, and the user already knows which
+    // item they acted on.
+    throw new ForbiddenError(
+      `This action requires ${required} access to the ${resource.type}`,
+      "insufficientLevel"
+    );
   }
   return level!;
 }

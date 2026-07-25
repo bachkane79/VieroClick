@@ -93,7 +93,10 @@ export async function saveBot(p: { workspaceId: string; input: unknown }): Promi
   // Validate the token against Telegram before persisting.
   const identity = await tg.getMe(data.botToken);
   if (!identity) {
-    throw new ValidationError("Telegram rejected this token. Double-check it with @BotFather.");
+    throw new ValidationError(
+      "Telegram rejected this token. Double-check it with @BotFather.",
+      "telegramTokenRejected"
+    );
   }
 
   const bot = await db.transaction(async (tx) => {
@@ -189,7 +192,10 @@ export async function sendTest(p: { workspaceId: string }): Promise<{ ok: true }
   const bot = await repo.findBotByWorkspace(p.workspaceId);
   if (!bot) throw new NotFoundError("Telegram bot");
   if (!bot.defaultChatId) {
-    throw new ValidationError("No chat linked yet. Send /start to your bot first.");
+    throw new ValidationError(
+      "No chat linked yet. Send /start to your bot first.",
+      "telegramNoChatLinked"
+    );
   }
 
   const res = await tg.sendMessage(
@@ -218,7 +224,8 @@ export async function linkChannel(p: { workspaceId: string; input: unknown }) {
   assertCanManageTelegram(ctx);
 
   const duplicate = await repo.findByChatId(p.workspaceId, data.telegramChatId);
-  if (duplicate) throw new ValidationError("This Telegram chat is already linked");
+  if (duplicate)
+    throw new ValidationError("This Telegram chat is already linked", "telegramChatAlreadyLinked");
 
   return db.transaction(async (tx) => {
     const channel = await repo.createChannel(
@@ -238,11 +245,7 @@ export async function linkChannel(p: { workspaceId: string; input: unknown }) {
   });
 }
 
-export async function updateChannel(p: {
-  workspaceId: string;
-  channelId: string;
-  input: unknown;
-}) {
+export async function updateChannel(p: { workspaceId: string; channelId: string; input: unknown }) {
   const data = updateChannelSchema.parse(p.input);
   const ctx = await requireActor(p.workspaceId);
   assertCanManageTelegram(ctx);

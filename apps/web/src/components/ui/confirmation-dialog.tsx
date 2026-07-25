@@ -1,5 +1,8 @@
+"use client";
+
 import * as Dialog from "@radix-ui/react-dialog";
 import { Button } from "@vieroc/ui";
+import { useTranslations } from "next-intl";
 
 interface ConfirmationDialogProps {
   isOpen: boolean;
@@ -18,10 +21,14 @@ export function ConfirmationDialog({
   title,
   description,
   onConfirm,
-  confirmLabel = "Confirm",
-  cancelLabel = "Cancel",
+  confirmLabel,
+  cancelLabel,
   variant = "primary",
 }: ConfirmationDialogProps) {
+  // Both labels default from the catalog rather than English literals: every
+  // call site passes `confirmLabel` but none passes `cancelLabel`, so a literal
+  // default leaked an English "Cancel" into the Vietnamese UI.
+  const t = useTranslations("common");
   return (
     <Dialog.Root open={isOpen} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -36,7 +43,7 @@ export function ConfirmationDialog({
           <div className="flex items-center justify-end gap-2.5">
             <Dialog.Close asChild>
               <Button type="button" variant="ghost" size="sm" className="text-xs font-medium">
-                {cancelLabel}
+                {cancelLabel ?? t("cancel")}
               </Button>
             </Dialog.Close>
             <Button
@@ -49,7 +56,7 @@ export function ConfirmationDialog({
                 onOpenChange(false);
               }}
             >
-              {confirmLabel}
+              {confirmLabel ?? t("confirm")}
             </Button>
           </div>
         </Dialog.Content>

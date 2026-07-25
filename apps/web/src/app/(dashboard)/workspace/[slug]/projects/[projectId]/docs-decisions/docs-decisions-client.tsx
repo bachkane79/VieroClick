@@ -2,12 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations, useFormatter } from "next-intl";
 import { Button, Input, Textarea } from "@vieroc/ui";
 import { toast } from "sonner";
 import { FileText, Plus, Trash2, BookOpen, AlertCircle, Sparkles } from "lucide-react";
 import { createDocAction, deleteDocAction } from "@/modules/project-doc/project-doc.actions";
-import { logDecisionAction, deleteDecisionAction } from "@/modules/decision-log/decision-log.actions";
+import {
+  logDecisionAction,
+  deleteDecisionAction,
+} from "@/modules/decision-log/decision-log.actions";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { useActionError } from "@/i18n/use-action-error";
 
 interface DocRow {
   id: string;
@@ -61,6 +66,9 @@ export function DocsDecisionsClient({
   tasks,
 }: Props) {
   const router = useRouter();
+  const t = useTranslations();
+  const format = useFormatter();
+  const actionError = useActionError();
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<"docs" | "decisions">("docs");
   const [deleteDocCandidateId, setDeleteDocCandidateId] = useState<string | null>(null);
@@ -72,7 +80,9 @@ export function DocsDecisionsClient({
 
   // Form states - Doc
   const [dTitle, setDTitle] = useState("");
-  const [dType, setDType] = useState<"requirement" | "technical_note" | "decision" | "meeting_note" | "scope" | "other">("other");
+  const [dType, setDType] = useState<
+    "requirement" | "technical_note" | "decision" | "meeting_note" | "scope" | "other"
+  >("other");
   const [dContent, setDContent] = useState("");
 
   // Form states - Decision
@@ -121,7 +131,7 @@ export function DocsDecisionsClient({
       updatedAt: new Date(),
     };
     setDocs((current) => [newDoc, ...current]);
-    toast.success("Document created");
+    toast.success(t("docs.toast.docCreated"));
 
     setSubmitting(true);
     const res = await createDocAction({
@@ -137,7 +147,7 @@ export function DocsDecisionsClient({
     setSubmitting(false);
 
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       // rollback
       setDocs((current) => current.filter((doc) => doc.id !== tempId));
     } else {
@@ -152,7 +162,7 @@ export function DocsDecisionsClient({
   async function executeDeleteDoc(docId: string) {
     const previousDocs = [...docs];
     setDocs((current) => current.filter((d) => d.id !== docId));
-    toast.success("Document deleted");
+    toast.success(t("docs.toast.docDeleted"));
 
     setSubmitting(true);
     const res = await deleteDocAction({
@@ -164,7 +174,7 @@ export function DocsDecisionsClient({
     setSubmitting(false);
 
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       // rollback
       setDocs(previousDocs);
     } else {
@@ -202,7 +212,7 @@ export function DocsDecisionsClient({
       createdAt: new Date(),
     };
     setDecisions((current) => [newDecision, ...current]);
-    toast.success("Decision logged");
+    toast.success(t("docs.toast.decisionLogged"));
 
     setSubmitting(true);
     const res = await logDecisionAction({
@@ -220,7 +230,7 @@ export function DocsDecisionsClient({
     setSubmitting(false);
 
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       // rollback
       setDecisions((current) => current.filter((d) => d.id !== tempId));
     } else {
@@ -235,7 +245,7 @@ export function DocsDecisionsClient({
   async function executeDeleteDecision(decisionId: string) {
     const previousDecisions = [...decisions];
     setDecisions((current) => current.filter((d) => d.id !== decisionId));
-    toast.success("Decision deleted");
+    toast.success(t("docs.toast.decisionDeleted"));
 
     setSubmitting(true);
     const res = await deleteDecisionAction({
@@ -247,7 +257,7 @@ export function DocsDecisionsClient({
     setSubmitting(false);
 
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       // rollback
       setDecisions(previousDecisions);
     } else {
@@ -267,67 +277,69 @@ export function DocsDecisionsClient({
       <div className="flex border-b border-border">
         <button
           onClick={() => setActiveTab("docs")}
-          className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all ${
+          className={`flex items-center gap-2 border-b-2 px-5 py-3 text-xs font-bold transition-all ${
             activeTab === "docs"
               ? "border-primary text-primary"
               : "border-transparent text-muted-foreground hover:text-foreground"
           }`}
         >
-          <BookOpen className="w-4 h-4" />
-          Wiki & Documents
+          <BookOpen className="h-4 w-4" />
+          {t("docs.tabDocs")}
         </button>
         <button
           onClick={() => setActiveTab("decisions")}
-          className={`flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all ${
+          className={`flex items-center gap-2 border-b-2 px-5 py-3 text-xs font-bold transition-all ${
             activeTab === "decisions"
               ? "border-primary text-primary"
               : "border-transparent text-muted-foreground hover:text-foreground"
           }`}
         >
-          <AlertCircle className="w-4 h-4" />
-          Decision Log
+          <AlertCircle className="h-4 w-4" />
+          {t("docs.tabDecisions")}
         </button>
       </div>
 
       {activeTab === "docs" ? (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
           {/* Docs list */}
-          <div className="xl:col-span-2 space-y-4">
-            <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
+          <div className="space-y-4 xl:col-span-2">
+            <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <div className="flex items-center justify-between border-b border-neutral-100 pb-3 dark:border-neutral-800">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                  Project Wiki Docs
+                  {t("docs.wikiDocsHeading")}
                 </h3>
                 {!showAddDoc && (
                   <Button size="sm" onClick={() => setShowAddDoc(true)} className="gap-1.5 text-xs">
-                    <Plus className="w-3.5 h-3.5" /> Create Document
+                    <Plus className="h-3.5 w-3.5" /> {t("docs.createDocument")}
                   </Button>
                 )}
               </div>
 
               {docs.length === 0 ? (
-                <div className="p-12 text-center text-muted-foreground border border-dashed rounded-xl">
-                  <FileText className="w-8 h-8 mx-auto mb-3 opacity-40 text-primary" />
-                  <p className="text-sm font-semibold">No documents posted yet</p>
-                  <p className="text-xs mt-0.5">Write technical specs, requirements, or meeting notes.</p>
+                <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground">
+                  <FileText className="mx-auto mb-3 h-8 w-8 text-primary opacity-40" />
+                  <p className="text-sm font-semibold">{t("docs.emptyDocsTitle")}</p>
+                  <p className="mt-0.5 text-xs">{t("docs.emptyDocsHint")}</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {docs.map((doc) => (
                     <div
                       key={doc.id}
-                      className="p-4 border border-neutral-200/40 dark:border-neutral-800/40 rounded-xl bg-card flex flex-col gap-3 shadow-sm hover:border-neutral-300 transition-all"
+                      className="flex flex-col gap-3 rounded-xl border border-neutral-200/40 bg-card p-4 shadow-sm transition-all hover:border-neutral-300 dark:border-neutral-800/40"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-xs text-foreground">{doc.title}</span>
-                            <span className="px-2 py-0.5 rounded bg-muted text-[8px] font-bold text-muted-foreground uppercase border">
-                              {doc.type.replace("_", " ")}
+                            <span className="text-xs font-bold text-foreground">{doc.title}</span>
+                            <span className="rounded border bg-muted px-2 py-0.5 text-[8px] font-bold uppercase text-muted-foreground">
+                              {t(`docs.docType.${doc.type}`)}
                             </span>
                           </div>
-                          <span className="text-[10px] text-muted-foreground block mt-0.5">
-                            Created: {new Date(doc.createdAt).toLocaleDateString()}
+                          <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                            {t("docs.createdOn", {
+                              date: format.dateTime(new Date(doc.createdAt), "short"),
+                            })}
                           </span>
                         </div>
 
@@ -335,15 +347,15 @@ export function DocsDecisionsClient({
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-red-500 hover:bg-red-500/10 shrink-0"
+                          className="h-8 w-8 shrink-0 text-red-500 hover:bg-red-500/10"
                           disabled={submitting}
                           onClick={() => handleDeleteDoc(doc.id)}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
 
-                      <div className="p-3 rounded-2xl border border-border bg-surface-subtle text-xs leading-relaxed text-foreground whitespace-pre-wrap font-normal max-h-48 overflow-y-auto">
+                      <div className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-2xl border border-border bg-surface-subtle p-3 text-xs font-normal leading-relaxed text-foreground">
                         {doc.content}
                       </div>
                     </div>
@@ -356,46 +368,48 @@ export function DocsDecisionsClient({
           {/* Add Doc Form */}
           <div className="space-y-4">
             {showAddDoc && (
-              <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
-                  <h3 className="text-sm font-semibold text-foreground">Write Document</h3>
+              <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <div className="flex items-center justify-between border-b border-neutral-100 pb-3 dark:border-neutral-800">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {t("docs.writeDocument")}
+                  </h3>
                   <Button variant="ghost" size="sm" onClick={() => setShowAddDoc(false)}>
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                 </div>
 
                 <form onSubmit={handleAddDoc} className="space-y-4 text-xs font-semibold">
                   <div className="space-y-1.5">
-                    <label className="text-muted-foreground">Title</label>
+                    <label className="text-muted-foreground">{t("docs.titleLabel")}</label>
                     <Input
                       required
-                      placeholder="e.g. Requirement Spec v1.0"
+                      placeholder={t("docs.titlePlaceholder")}
                       value={dTitle}
                       onChange={(e) => setDTitle(e.target.value)}
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-muted-foreground">Type</label>
+                    <label className="text-muted-foreground">{t("docs.typeLabel")}</label>
                     <select
                       value={dType}
                       onChange={(e) => setDType(e.target.value as any)}
-                      className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                     >
-                      <option value="requirement">Requirement Note</option>
-                      <option value="technical_note">Technical Note</option>
-                      <option value="decision">Decision Documentation</option>
-                      <option value="meeting_note">Meeting Note</option>
-                      <option value="scope">Project Scope Doc</option>
-                      <option value="other">Other</option>
+                      <option value="requirement">{t("docs.typeOption.requirement")}</option>
+                      <option value="technical_note">{t("docs.typeOption.technical_note")}</option>
+                      <option value="decision">{t("docs.typeOption.decision")}</option>
+                      <option value="meeting_note">{t("docs.typeOption.meeting_note")}</option>
+                      <option value="scope">{t("docs.typeOption.scope")}</option>
+                      <option value="other">{t("docs.typeOption.other")}</option>
                     </select>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-muted-foreground">Content (Markdown / Text)</label>
+                    <label className="text-muted-foreground">{t("docs.contentLabel")}</label>
                     <Textarea
                       required
-                      placeholder="Type details..."
+                      placeholder={t("docs.contentPlaceholder")}
                       value={dContent}
                       onChange={(e) => setDContent(e.target.value)}
                       className="min-h-36"
@@ -403,7 +417,7 @@ export function DocsDecisionsClient({
                   </div>
 
                   <Button type="submit" disabled={submitting} className="w-full text-xs">
-                    {submitting ? "Saving..." : "Save Document"}
+                    {submitting ? t("docs.saving") : t("docs.saveDocument")}
                   </Button>
                 </form>
               </div>
@@ -411,85 +425,95 @@ export function DocsDecisionsClient({
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
           {/* Decisions List */}
-          <div className="xl:col-span-2 space-y-4">
-            <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
+          <div className="space-y-4 xl:col-span-2">
+            <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <div className="flex items-center justify-between border-b border-neutral-100 pb-3 dark:border-neutral-800">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                  Project Decision Log
+                  {t("docs.decisionLogHeading")}
                 </h3>
                 {!showAddDecision && (
-                  <Button size="sm" onClick={() => setShowAddDecision(true)} className="gap-1.5 text-xs">
-                    <Plus className="w-3.5 h-3.5" /> Log Decision
+                  <Button
+                    size="sm"
+                    onClick={() => setShowAddDecision(true)}
+                    className="gap-1.5 text-xs"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> {t("docs.logDecision")}
                   </Button>
                 )}
               </div>
 
               {decisions.length === 0 ? (
-                <div className="p-12 text-center text-muted-foreground border border-dashed rounded-xl">
-                  <AlertCircle className="w-8 h-8 mx-auto mb-3 opacity-40 text-primary" />
-                  <p className="text-sm font-semibold">No decisions logged yet</p>
-                  <p className="text-xs mt-0.5 font-normal">Log architectural or product scope decisions for team alignment.</p>
+                <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground">
+                  <AlertCircle className="mx-auto mb-3 h-8 w-8 text-primary opacity-40" />
+                  <p className="text-sm font-semibold">{t("docs.emptyDecisionsTitle")}</p>
+                  <p className="mt-0.5 text-xs font-normal">{t("docs.emptyDecisionsHint")}</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {decisions.map((dec) => {
-                    const decider = memberNameMap.get(dec.decidedByMemberId ?? "") ?? "Workspace member";
+                    const decider =
+                      memberNameMap.get(dec.decidedByMemberId ?? "") ?? t("docs.unknownDecider");
                     return (
                       <div
                         key={dec.id}
-                        className="p-4 border border-neutral-200/40 dark:border-neutral-800/40 rounded-xl bg-card flex flex-col gap-3 shadow-sm hover:border-neutral-300 transition-all"
+                        className="flex flex-col gap-3 rounded-xl border border-neutral-200/40 bg-card p-4 shadow-sm transition-all hover:border-neutral-300 dark:border-neutral-800/40"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="space-y-0.5">
-                            <span className="font-bold text-xs text-foreground block">{dec.title}</span>
+                            <span className="block text-xs font-bold text-foreground">
+                              {dec.title}
+                            </span>
                             <span className="text-[10px] text-muted-foreground">
-                              Decided by: <strong>{decider}</strong> · logged{" "}
-                              {new Date(dec.createdAt).toLocaleDateString()}
+                              {t.rich("docs.decidedByLogged", {
+                                strong: (c) => <strong>{c}</strong>,
+                                decider,
+                                date: format.dateTime(new Date(dec.createdAt), "short"),
+                              })}
                             </span>
                           </div>
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-red-500 hover:bg-red-500/10 shrink-0"
+                            className="h-8 w-8 shrink-0 text-red-500 hover:bg-red-500/10"
                             disabled={submitting}
                             onClick={() => handleDeleteDecision(dec.id)}
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs leading-normal font-normal">
+                        <div className="grid grid-cols-1 gap-3 text-xs font-normal leading-normal md:grid-cols-2">
                           <div className="space-y-1">
-                            <span className="font-bold text-[10px] text-muted-foreground block">
-                              Decision Outcome:
+                            <span className="block text-[10px] font-bold text-muted-foreground">
+                              {t("docs.decisionOutcomeHeading")}
                             </span>
-                            <p className="text-foreground whitespace-pre-wrap">{dec.decision}</p>
+                            <p className="whitespace-pre-wrap text-foreground">{dec.decision}</p>
                           </div>
                           {dec.reason && (
                             <div className="space-y-1">
-                              <span className="font-bold text-[10px] text-muted-foreground block">
-                                Decision Rationale:
+                              <span className="block text-[10px] font-bold text-muted-foreground">
+                                {t("docs.decisionRationaleHeading")}
                               </span>
-                              <p className="text-foreground whitespace-pre-wrap">{dec.reason}</p>
+                              <p className="whitespace-pre-wrap text-foreground">{dec.reason}</p>
                             </div>
                           )}
                         </div>
 
                         {dec.affectedTaskIds && dec.affectedTaskIds.length > 0 && (
-                          <div className="border-t pt-2 border-neutral-100 dark:border-neutral-800 space-y-1">
-                            <span className="font-bold text-[9px] text-muted-foreground block uppercase">
-                              Affected Tasks:
+                          <div className="space-y-1 border-t border-neutral-100 pt-2 dark:border-neutral-800">
+                            <span className="block text-[9px] font-bold uppercase text-muted-foreground">
+                              {t("docs.affectedTasksHeading")}
                             </span>
                             <div className="flex flex-wrap gap-1.5">
                               {dec.affectedTaskIds.map((taskId) => {
-                                const tTitle = taskTitleMap.get(taskId) ?? "Task";
+                                const tTitle = taskTitleMap.get(taskId) ?? t("docs.unknownTask");
                                 return (
                                   <span
                                     key={taskId}
-                                    className="px-2 py-0.5 bg-primary/5 text-primary text-[10px] font-bold rounded border border-primary/10"
+                                    className="rounded border border-primary/10 bg-primary/5 px-2 py-0.5 text-[10px] font-bold text-primary"
                                   >
                                     {tTitle}
                                   </span>
@@ -509,30 +533,34 @@ export function DocsDecisionsClient({
           {/* Add Decision Form */}
           <div className="space-y-4">
             {showAddDecision && (
-              <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
-                  <h3 className="text-sm font-semibold text-foreground">Log Project Decision</h3>
+              <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <div className="flex items-center justify-between border-b border-neutral-100 pb-3 dark:border-neutral-800">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {t("docs.logProjectDecision")}
+                  </h3>
                   <Button variant="ghost" size="sm" onClick={() => setShowAddDecision(false)}>
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                 </div>
 
                 <form onSubmit={handleAddDecision} className="space-y-4 text-xs font-semibold">
                   <div className="space-y-1.5">
-                    <label className="text-muted-foreground">Decision Title</label>
+                    <label className="text-muted-foreground">{t("docs.decisionTitleLabel")}</label>
                     <Input
                       required
-                      placeholder="e.g. Switch to Neon Serverless Postgres"
+                      placeholder={t("docs.decisionTitlePlaceholder")}
                       value={decTitle}
                       onChange={(e) => setDecTitle(e.target.value)}
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-muted-foreground">Decision Outcome</label>
+                    <label className="text-muted-foreground">
+                      {t("docs.decisionOutcomeLabel")}
+                    </label>
                     <Textarea
                       required
-                      placeholder="Describe the final decision made..."
+                      placeholder={t("docs.decisionOutcomePlaceholder")}
                       value={decDecision}
                       onChange={(e) => setDecDecision(e.target.value)}
                       className="min-h-20"
@@ -540,9 +568,9 @@ export function DocsDecisionsClient({
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-muted-foreground">Rationale / Reason</label>
+                    <label className="text-muted-foreground">{t("docs.rationaleLabel")}</label>
                     <Textarea
-                      placeholder="Why was this decision taken?"
+                      placeholder={t("docs.rationalePlaceholder")}
                       value={decReason}
                       onChange={(e) => setDecReason(e.target.value)}
                       className="min-h-16"
@@ -550,13 +578,13 @@ export function DocsDecisionsClient({
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-muted-foreground">Decided By</label>
+                    <label className="text-muted-foreground">{t("docs.decidedByLabel")}</label>
                     <select
                       value={decByMemberId}
                       onChange={(e) => setDecByMemberId(e.target.value)}
-                      className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                     >
-                      <option value="">Select Member...</option>
+                      <option value="">{t("docs.selectMember")}</option>
                       {members.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.fullName}
@@ -566,18 +594,20 @@ export function DocsDecisionsClient({
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-muted-foreground block mb-1">Affected Project Tasks</label>
-                    <div className="border rounded-lg max-h-36 overflow-y-auto p-2 bg-background space-y-1">
+                    <label className="mb-1 block text-muted-foreground">
+                      {t("docs.affectedTasksLabel")}
+                    </label>
+                    <div className="max-h-36 space-y-1 overflow-y-auto rounded-lg border bg-background p-2">
                       {tasks.map((task) => (
                         <label
                           key={task.id}
-                          className="flex items-center gap-2 p-1.5 hover:bg-muted/40 rounded transition-colors cursor-pointer text-[10px]"
+                          className="flex cursor-pointer items-center gap-2 rounded p-1.5 text-[10px] transition-colors hover:bg-muted/40"
                         >
                           <input
                             type="checkbox"
                             checked={decAffectedTasks.includes(task.id)}
                             onChange={() => toggleTaskSelection(task.id)}
-                            className="rounded border-input text-primary focus:ring-primary h-3.5 w-3.5"
+                            className="h-3.5 w-3.5 rounded border-input text-primary focus:ring-primary"
                           />
                           <span className="truncate">{task.title}</span>
                         </label>
@@ -586,19 +616,19 @@ export function DocsDecisionsClient({
                   </div>
 
                   <Button type="submit" disabled={submitting} className="w-full text-xs">
-                    {submitting ? "Logging..." : "Log Project Decision"}
+                    {submitting ? t("docs.logging") : t("docs.logProjectDecision")}
                   </Button>
                 </form>
               </div>
             )}
 
-            <div className="p-5 border border-border rounded-2xl bg-card shadow-sm text-xs space-y-3">
-              <h4 className="font-semibold text-foreground flex items-center gap-1">
-                <Sparkles className="w-4 h-4 text-primary" />
-                Decision Logs Trigger
+            <div className="space-y-3 rounded-2xl border border-border bg-card p-5 text-xs shadow-sm">
+              <h4 className="flex items-center gap-1 font-semibold text-foreground">
+                <Sparkles className="h-4 w-4 text-primary" />
+                {t("docs.decisionTriggerHeading")}
               </h4>
-              <p className="text-muted-foreground leading-relaxed">
-                Logging a project decision triggers automatic <code>decision.created</code> notifications to all project members, keeping everyone in sync.
+              <p className="leading-relaxed text-muted-foreground">
+                {t.rich("docs.decisionTriggerBody", { code: (c) => <code>{c}</code> })}
               </p>
             </div>
           </div>
@@ -610,10 +640,10 @@ export function DocsDecisionsClient({
         onOpenChange={(open) => {
           if (!open) setDeleteDocCandidateId(null);
         }}
-        title="Delete Document"
-        description="Are you sure you want to delete this document? This action cannot be undone."
+        title={t("docs.deleteDocTitle")}
+        description={t("docs.deleteDocDescription")}
         variant="destructive"
-        confirmLabel="Delete"
+        confirmLabel={t("common.delete")}
         onConfirm={async () => {
           if (deleteDocCandidateId) {
             await executeDeleteDoc(deleteDocCandidateId);
@@ -627,10 +657,10 @@ export function DocsDecisionsClient({
         onOpenChange={(open) => {
           if (!open) setDeleteDecisionCandidateId(null);
         }}
-        title="Delete Decision Log"
-        description="Are you sure you want to delete this decision log? This action cannot be undone."
+        title={t("docs.deleteDecisionTitle")}
+        description={t("docs.deleteDecisionDescription")}
         variant="destructive"
-        confirmLabel="Delete"
+        confirmLabel={t("common.delete")}
         onConfirm={async () => {
           if (deleteDecisionCandidateId) {
             await executeDeleteDecision(deleteDecisionCandidateId);

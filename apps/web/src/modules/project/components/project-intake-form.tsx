@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button, cn, Input, Textarea } from "@vieroc/ui";
 import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
+import { useActionError } from "@/i18n/use-action-error";
 import { createProjectAction } from "../project.actions";
 import { AiLeaderToggle } from "./ai-leader-toggle";
 
@@ -32,6 +34,8 @@ function lines(value: string) {
 
 export function ProjectIntakeForm({ workspaceId, workspaceSlug, members }: Props) {
   const router = useRouter();
+  const t = useTranslations();
+  const actionError = useActionError();
   const [submitting, setSubmitting] = useState(false);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [aiEnabled, setAiEnabled] = useState(true);
@@ -66,19 +70,17 @@ export function ProjectIntakeForm({ workspaceId, workspaceSlug, members }: Props
     setSubmitting(false);
 
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(actionError(result));
       return;
     }
 
-    toast.success(aiEnabled ? "Project created — AI Leader is planning it" : "Project created");
+    toast.success(aiEnabled ? t("project.createdWithAi") : t("project.created"));
     router.push(`/workspace/${workspaceSlug}/projects/${result.data.id}/overview`);
   }
 
   function toggleMember(memberId: string) {
     setSelectedMemberIds((current) =>
-      current.includes(memberId)
-        ? current.filter((id) => id !== memberId)
-        : [...current, memberId]
+      current.includes(memberId) ? current.filter((id) => id !== memberId) : [...current, memberId]
     );
   }
 
@@ -102,11 +104,9 @@ export function ProjectIntakeForm({ workspaceId, workspaceSlug, members }: Props
               <Sparkles className="h-5 w-5" />
             </span>
             <div>
-              <h2 className="text-base font-bold tracking-tight">Sử dụng AI Leader</h2>
+              <h2 className="text-base font-bold tracking-tight">{t("project.useAiLeader")}</h2>
               <p className="mt-0.5 max-w-xl text-sm text-muted-foreground">
-                {aiEnabled
-                  ? "AI sẽ tự sinh kế hoạch, WBS, phân công và theo dõi dự án từ phần intake bên dưới."
-                  : "Tạo dự án trống để làm thủ công (giống tạo repo). Có thể bật AI Leader sau ở trang tổng quan."}
+                {aiEnabled ? t("project.aiOnDesc") : t("project.aiOffDesc")}
               </p>
             </div>
           </div>
@@ -120,14 +120,14 @@ export function ProjectIntakeForm({ workspaceId, workspaceSlug, members }: Props
           <div className="grid gap-4">
             <div className="grid gap-2">
               <label htmlFor="project-name" className="text-sm font-medium">
-                Project name
+                {t("project.nameLabel")}
               </label>
               <Input id="project-name" name="name" required maxLength={200} autoFocus />
             </div>
 
             <div className="grid gap-2">
               <label htmlFor="project-description" className="text-sm font-medium">
-                Description
+                {t("common.description")}
               </label>
               <Textarea id="project-description" name="description" className="min-h-24" />
             </div>
@@ -135,13 +135,13 @@ export function ProjectIntakeForm({ workspaceId, workspaceSlug, members }: Props
             <div className="grid gap-4 md:grid-cols-2">
               <div className="grid gap-2">
                 <label htmlFor="project-deadline" className="text-sm font-medium">
-                  Deadline
+                  {t("project.deadlineLabel")}
                 </label>
                 <Input id="project-deadline" name="targetEndDate" type="date" />
               </div>
               <div className="grid gap-2">
                 <label htmlFor="project-status" className="text-sm font-medium">
-                  Status
+                  {t("project.statusLabel")}
                 </label>
                 <select
                   id="project-status"
@@ -149,9 +149,9 @@ export function ProjectIntakeForm({ workspaceId, workspaceSlug, members }: Props
                   defaultValue="active"
                   className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
-                  <option value="draft">Draft</option>
-                  <option value="active">Active</option>
-                  <option value="paused">Paused</option>
+                  <option value="draft">{t("project.status.draft")}</option>
+                  <option value="active">{t("project.status.active")}</option>
+                  <option value="paused">{t("project.status.paused")}</option>
                 </select>
               </div>
             </div>
@@ -162,14 +162,14 @@ export function ProjectIntakeForm({ workspaceId, workspaceSlug, members }: Props
           <div className="grid gap-4">
             <div className="grid gap-2">
               <label htmlFor="project-lead" className="text-sm font-medium">
-                Lead
+                {t("project.leadLabel")}
               </label>
               <select
                 id="project-lead"
                 name="leadMemberId"
                 className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
-                <option value="">Current user</option>
+                <option value="">{t("project.currentUser")}</option>
                 {members.map((member) => (
                   <option key={member.id} value={member.id}>
                     {member.fullName}
@@ -179,7 +179,7 @@ export function ProjectIntakeForm({ workspaceId, workspaceSlug, members }: Props
             </div>
 
             <div className="grid gap-2">
-              <p className="text-sm font-medium">Members</p>
+              <p className="text-sm font-medium">{t("project.membersLabel")}</p>
               <div className="max-h-[360px] overflow-y-auto rounded-md border">
                 {members.map((member) => (
                   <label
@@ -213,37 +213,41 @@ export function ProjectIntakeForm({ workspaceId, workspaceSlug, members }: Props
           <section className="rounded-lg border bg-card p-5 shadow-sm">
             <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-fuchsia-600 dark:text-fuchsia-400">
               <Sparkles className="h-4 w-4" />
-              AI intake
+              {t("project.aiIntake")}
             </div>
             <div className="grid gap-2">
               <label htmlFor="project-scope" className="text-sm font-medium">
-                Scope
+                {t("project.scopeLabel")}
               </label>
               <Textarea id="project-scope" name="scope" className="min-h-24" />
             </div>
             <div className="mt-4 grid gap-4 md:grid-cols-3">
               <div className="grid gap-2">
                 <label htmlFor="project-goals" className="text-sm font-medium">
-                  Goals
+                  {t("project.goalsLabel")}
                 </label>
                 <Textarea id="project-goals" name="goals" className="min-h-36" />
               </div>
               <div className="grid gap-2">
                 <label htmlFor="project-constraints" className="text-sm font-medium">
-                  Constraints
+                  {t("project.constraintsLabel")}
                 </label>
                 <Textarea id="project-constraints" name="constraints" className="min-h-36" />
               </div>
               <div className="grid gap-2">
                 <label htmlFor="project-deliverables" className="text-sm font-medium">
-                  Expected deliverables
+                  {t("project.deliverablesLabel")}
                 </label>
-                <Textarea id="project-deliverables" name="expectedDeliverables" className="min-h-36" />
+                <Textarea
+                  id="project-deliverables"
+                  name="expectedDeliverables"
+                  className="min-h-36"
+                />
               </div>
             </div>
             <div className="mt-4 grid gap-2">
               <label htmlFor="project-context" className="text-sm font-medium">
-                Initial context
+                {t("project.contextLabel")}
               </label>
               <Textarea id="project-context" name="initialContext" className="min-h-32" />
             </div>
@@ -253,15 +257,15 @@ export function ProjectIntakeForm({ workspaceId, workspaceSlug, members }: Props
 
       <div className="flex items-center justify-end gap-3 border-t pt-4">
         <Button type="button" variant="outline" onClick={() => router.back()}>
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button type="submit" disabled={submitting} className={aiEnabled ? "gap-2" : ""}>
           {aiEnabled && <Sparkles className="h-4 w-4" />}
           {submitting
-            ? "Creating..."
+            ? t("project.creating")
             : aiEnabled
-              ? "Create with AI Leader"
-              : "Create project"}
+              ? t("project.createWithAi")
+              : t("project.createBtn")}
         </Button>
       </div>
     </form>

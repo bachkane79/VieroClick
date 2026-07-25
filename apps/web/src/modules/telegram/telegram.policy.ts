@@ -4,6 +4,7 @@ import { isWorkspaceAdmin, isProjectManager, requirePermission } from "@/server/
 export function assertCanManageTelegram(ctx: ActorContext): void {
   requirePermission(
     isWorkspaceAdmin(ctx) || ctx.workspaceRole === "leader" || isProjectManager(ctx),
-    "You do not have permission to manage Telegram channels"
+    "You do not have permission to manage Telegram channels",
+    "telegramManagerOnly"
   );
 }

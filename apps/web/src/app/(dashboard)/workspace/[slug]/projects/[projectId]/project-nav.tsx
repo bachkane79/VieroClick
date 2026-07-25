@@ -6,8 +6,7 @@ import { usePathname } from "next/navigation";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { cn } from "@vieroc/ui";
 import { useDock } from "@/components/layout/use-dock";
-import { useLocale } from "@/lib/i18n/client";
-import { t, type MessageKey } from "@/lib/i18n/dict";
+import { useTranslations } from "next-intl";
 import {
   Info,
   ListTodo,
@@ -41,7 +40,7 @@ interface Props {
 type ViewDef = {
   key: string;
   name: string;
-  nameKey?: MessageKey;
+  nameKey?: string; // catalog key resolved in-component; falls back to `name`
   path: string; // segment after /projects/{id}/
   icon: LucideIcon;
   match?: string[]; // extra pathname fragments that count as active
@@ -54,32 +53,77 @@ type ViewDef = {
  * opened once or pinned onto the bar (persisted per project). Stable tab
  * dimensions keep navigation from shifting during repeated use.
  */
-// Essential names are message keys (localized); extra views keep their
-// product names (identical in both locales).
-const ESSENTIAL: ViewDef[] = [
-  { key: "overview", name: "", nameKey: "nav.overview", path: "overview", icon: Info },
-  { key: "tasks", name: "", nameKey: "nav.list", path: "tasks", icon: ListTodo },
-  { key: "board", name: "", nameKey: "nav.board", path: "board", icon: Kanban },
-  { key: "calendar", name: "", nameKey: "nav.calendar", path: "calendar", icon: CalendarDays },
-  { key: "timeline", name: "Gantt", path: "timeline", icon: CalendarRange },
-  { key: "table", name: "Table", path: "table", icon: Table2 },
-  { key: "dashboard", name: "Dashboard", path: "dashboard", icon: LayoutDashboard },
-];
-
+// Extra views resolve their names from the catalog like the essential ones.
+// (They previously kept English `name` literals on the theory that they were
+// "identical in both locales" — but the sidebar already renders these same
+// destinations as "Khối lượng", "Hằng ngày", "Mục tiêu", so the bar was showing
+// English for views the sidebar showed in Vietnamese.)
+//
+// `name` remains the last-resort fallback for a view whose key is missing from
+// the catalog. WBS and Gantt stay English deliberately (§6.1 keep-list), as
+// does "AI Manager" — a product feature name, like "AI Leader" in §6.6.
 const EXTRA: ViewDef[] = [
   { key: "wbs", name: "WBS", path: "wbs", icon: Network },
-  { key: "workload", name: "Workload", path: "workload", icon: Gauge },
-  { key: "daily", name: "Daily Updates", path: "daily", icon: ClipboardList },
-  { key: "blockers", name: "Blockers", path: "blockers", icon: AlertOctagon },
-  { key: "risks", name: "Risks & Milestones", path: "risks-milestones", icon: AlertTriangle },
-  { key: "docs", name: "Docs & Decisions", path: "docs-decisions", icon: FileText },
-  { key: "reports", name: "Reports", path: "reports", icon: TrendingUp },
-  { key: "analytics", name: "Analytics", path: "analytics", icon: BarChart3 },
-  { key: "team", name: "Team", path: "team", icon: Users },
-  { key: "assign", name: "Giao việc AI", path: "assign", icon: Wand2 },
+  {
+    key: "workload",
+    name: "Workload",
+    nameKey: "projectNav.workload",
+    path: "workload",
+    icon: Gauge,
+  },
+  {
+    key: "daily",
+    name: "Daily Updates",
+    nameKey: "projectNav.daily",
+    path: "daily",
+    icon: ClipboardList,
+  },
+  {
+    key: "blockers",
+    name: "Blockers",
+    nameKey: "projectNav.blockers",
+    path: "blockers",
+    icon: AlertOctagon,
+  },
+  {
+    key: "risks",
+    name: "Risks & Milestones",
+    nameKey: "projectNav.risks",
+    path: "risks-milestones",
+    icon: AlertTriangle,
+  },
+  {
+    key: "docs",
+    name: "Docs & Decisions",
+    nameKey: "projectNav.docs",
+    path: "docs-decisions",
+    icon: FileText,
+  },
+  {
+    key: "reports",
+    name: "Reports",
+    nameKey: "projectNav.reports",
+    path: "reports",
+    icon: TrendingUp,
+  },
+  {
+    key: "analytics",
+    name: "Analytics",
+    nameKey: "projectNav.analytics",
+    path: "analytics",
+    icon: BarChart3,
+  },
+  { key: "team", name: "Team", nameKey: "projectNav.team", path: "team", icon: Users },
+  {
+    key: "assign",
+    name: "Giao việc AI",
+    nameKey: "projectNav.assign",
+    path: "assign",
+    icon: Wand2,
+  },
   // AI is a global entry (top bar); it stays reachable here as a normal view,
   // but no longer competes as a highlighted tab (redesign §7.1).
-  { key: "ai", name: "AI Manager", path: "ai", icon: Sparkles },
+  { key: "ai", name: "AI Manager", nameKey: "projectNav.ai", path: "ai", icon: Sparkles },
 ];
 
 function storageKey(projectId: string) {
@@ -88,7 +132,7 @@ function storageKey(projectId: string) {
 
 export function ProjectNav({ slug, projectId }: Props) {
   const pathname = usePathname();
-  const locale = useLocale();
+  const t = useTranslations();
   const [pinned, setPinned] = useState<string[]>([]);
   const [hydrated, setHydrated] = useState(false);
 
@@ -116,6 +160,10 @@ export function ProjectNav({ slug, projectId }: Props) {
 
   const base = `/workspace/${slug}/projects/${projectId}`;
 
+  // Resolve the catalog name; `name` is the fallback for the few views that
+  // are English in both locales by design (WBS, Gantt, AI Manager).
+  const viewName = (v: ViewDef) => (v.nameKey ? t(v.nameKey as Parameters<typeof t>[0]) : v.name);
+
   const isActive = (v: ViewDef) => {
     if (pathname === `${base}/${v.path}`) return true;
     return (v.match ?? []).some((m) => pathname.includes(m));
@@ -125,16 +173,34 @@ export function ProjectNav({ slug, projectId }: Props) {
   // current location is never hidden inside the dropdown.
   const activeExtraKey = EXTRA.find((v) => isActive(v))?.key ?? null;
   const barViews = useMemo(() => {
+    const essential: ViewDef[] = [
+      { key: "overview", name: t("projectNav.overview"), path: "overview", icon: Info },
+      { key: "tasks", name: t("projectNav.list"), path: "tasks", icon: ListTodo },
+      { key: "board", name: t("projectNav.board"), path: "board", icon: Kanban },
+      { key: "calendar", name: t("projectNav.calendar"), path: "calendar", icon: CalendarDays },
+      // "Gantt" is a proper noun and stays English in both locales (§6.1).
+      { key: "timeline", name: "Gantt", path: "timeline", icon: CalendarRange },
+      { key: "table", name: t("projectNav.table"), path: "table", icon: Table2 },
+      {
+        key: "dashboard",
+        name: t("projectNav.dashboard"),
+        path: "dashboard",
+        icon: LayoutDashboard,
+      },
+    ];
     const pinnedViews = EXTRA.filter((v) => pinned.includes(v.key) || v.key === activeExtraKey);
-    return [...ESSENTIAL, ...pinnedViews];
-  }, [pinned, activeExtraKey]);
+    return [...essential, ...pinnedViews];
+  }, [pinned, activeExtraKey, t]);
 
   // macOS-Dock magnification, same feel as the top-bar action cluster: tabs
   // near the cursor scale up (neighbours ease down). The last dock slot is the
   // "Add view" trigger. Origin is centred + shift kept tiny so growth stays
   // inside the row's vertical padding (no clip through the overflow-x scroller).
   const dock = useDock(barViews.length + 1, "x", { radius: 110, max: 0.12, shift: 1 });
-  const dockStyle = (i: number) => ({ ...dock.style(i), transformOrigin: "center center" as const });
+  const dockStyle = (i: number) => ({
+    ...dock.style(i),
+    transformOrigin: "center center" as const,
+  });
 
   return (
     <div className="sticky top-0 z-20 border-b border-border bg-surface px-4">
@@ -162,11 +228,12 @@ export function ProjectNav({ slug, projectId }: Props) {
               )}
             >
               <Icon
-                className={cn("h-3.5 w-3.5 shrink-0", active ? "text-primary" : "text-text-secondary")}
+                className={cn(
+                  "h-3.5 w-3.5 shrink-0",
+                  active ? "text-primary" : "text-text-secondary"
+                )}
               />
-              <span>
-                {"nameKey" in tab && tab.nameKey ? t(locale, tab.nameKey as MessageKey) : tab.name}
-              </span>
+              <span>{viewName(tab)}</span>
               {active && (
                 <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary" />
               )}
@@ -186,7 +253,7 @@ export function ProjectNav({ slug, projectId }: Props) {
               )}
             >
               <Plus className="h-3.5 w-3.5" />
-              {t(locale, "nav.addView")}
+              {t("projectNav.addView")}
             </button>
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
@@ -196,7 +263,7 @@ export function ProjectNav({ slug, projectId }: Props) {
               className="z-50 w-64 rounded-lg border border-border bg-card p-1.5 shadow-elevated"
             >
               <p className="px-2.5 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {t(locale, "nav.pinHint")}
+                {t("projectNav.pinHint")}
               </p>
               {hydrated &&
                 EXTRA.map((v) => {
@@ -212,7 +279,7 @@ export function ProjectNav({ slug, projectId }: Props) {
                         className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-2 text-foreground/90"
                       >
                         <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                        <span className="truncate">{v.name}</span>
+                        <span className="truncate">{viewName(v)}</span>
                         {isActive(v) && <Check className="ml-auto h-3.5 w-3.5 text-primary" />}
                       </Link>
                       <button
@@ -220,7 +287,7 @@ export function ProjectNav({ slug, projectId }: Props) {
                           e.preventDefault();
                           togglePin(v.key);
                         }}
-                        title={isPinned ? t(locale, "nav.unpin") : t(locale, "nav.pin")}
+                        title={isPinned ? t("projectNav.unpin") : t("projectNav.pin")}
                         className={cn(
                           "mr-1 grid h-7 w-7 shrink-0 place-items-center rounded-md transition-colors",
                           isPinned

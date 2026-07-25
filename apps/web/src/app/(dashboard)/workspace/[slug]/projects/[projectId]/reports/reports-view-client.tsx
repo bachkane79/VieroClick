@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations, useFormatter } from "next-intl";
 import { Button, Input, Textarea } from "@vieroc/ui";
 import { toast } from "sonner";
 import { TrendingUp, Plus, CheckCircle, FileText } from "lucide-react";
 import { approveReportAction, createReportAction } from "@/modules/report/report.actions";
+import { useActionError } from "@/i18n/use-action-error";
 
 interface ReportRow {
   id: string;
@@ -48,6 +50,9 @@ export function ReportsViewClient({
   currentDeviations,
 }: Props) {
   const router = useRouter();
+  const t = useTranslations();
+  const format = useFormatter();
+  const actionError = useActionError();
   const [submitting, setSubmitting] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
 
@@ -93,11 +98,11 @@ export function ReportsViewClient({
     setSubmitting(false);
 
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
 
-    toast.success("Status report compiled successfully");
+    toast.success(t("reports.toast.compiled"));
     setIsCompiling(false);
     setProgressSummary("");
     setRiskSummary("");
@@ -117,39 +122,39 @@ export function ReportsViewClient({
     setSubmitting(false);
 
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
 
-    toast.success("Report approved and finalized");
+    toast.success(t("reports.toast.approved"));
     router.refresh();
   }
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
       {/* Reports List */}
-      <div className="xl:col-span-2 space-y-6">
-        <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <TrendingUp className="w-4 h-4 text-primary" />
-              Project Status Reports ({initialReports.length})
+      <div className="space-y-6 xl:col-span-2">
+        <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-center justify-between border-b border-neutral-100 pb-3 dark:border-neutral-800">
+            <h3 className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              {t("reports.listTitle", { count: initialReports.length })}
             </h3>
             {!isCompiling && (
               <Button size="sm" onClick={() => setIsCompiling(true)} className="gap-1.5 text-xs">
-                <Plus className="w-3.5 h-3.5" /> Compile Report
+                <Plus className="h-3.5 w-3.5" /> {t("reports.compile")}
               </Button>
             )}
           </div>
 
           {initialReports.length === 0 ? (
-            <div className="p-12 text-center text-muted-foreground border border-dashed rounded-xl">
-              <FileText className="w-8 h-8 mx-auto mb-3 opacity-40 text-primary" />
-              <p className="text-sm font-semibold">No status reports compiled</p>
-              <p className="text-xs mt-0.5">Generate daily or weekly reports to summarize execution progress.</p>
+            <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground">
+              <FileText className="mx-auto mb-3 h-8 w-8 text-primary opacity-40" />
+              <p className="text-sm font-semibold">{t("reports.empty.title")}</p>
+              <p className="mt-0.5 text-xs">{t("reports.empty.description")}</p>
             </div>
           ) : (
-            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
+            <div className="max-h-[600px] space-y-4 overflow-y-auto pr-1">
               {initialReports.map((rep) => {
                 const approvedBy = rep.approvedByMemberId
                   ? memberNameMap.get(rep.approvedByMemberId)
@@ -158,38 +163,40 @@ export function ReportsViewClient({
                 return (
                   <div
                     key={rep.id}
-                    className="p-4 border border-border rounded-card bg-card space-y-4 shadow-sm hover:border-neutral-300 transition-all"
+                    className="space-y-4 rounded-card border border-border bg-card p-4 shadow-sm transition-all hover:border-neutral-300"
                   >
-                    <div className="flex items-start justify-between gap-3 border-b pb-2 border-neutral-100 dark:border-neutral-800">
+                    <div className="flex items-start justify-between gap-3 border-b border-neutral-100 pb-2 dark:border-neutral-800">
                       <div>
-                        <span className="font-bold text-xs text-foreground block">
-                          Report Date: {rep.reportDate}
+                        <span className="block text-xs font-bold text-foreground">
+                          {t("reports.reportDateLabel", { date: rep.reportDate })}
                         </span>
-                        <span className="text-[10px] text-muted-foreground mt-0.5 block">
-                          Compiled: {new Date(rep.createdAt).toLocaleDateString()}
-                          {rep.generatedByAgent && " · AI-Assisted"}
+                        <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                          {t("reports.compiledOn", {
+                            date: format.dateTime(new Date(rep.createdAt), "short"),
+                          })}
+                          {rep.generatedByAgent && ` · ${t("reports.aiAssisted")}`}
                         </span>
                       </div>
 
                       <div className="flex items-center gap-2">
                         {rep.approvedAt ? (
-                          <span className="px-2 py-0.5 bg-green-500/10 text-green-500 font-bold text-[9px] border border-green-500/20 rounded-full flex items-center gap-1">
-                            <CheckCircle className="w-2.5 h-2.5" /> Finalized
+                          <span className="flex items-center gap-1 rounded-full border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-[9px] font-bold text-green-500">
+                            <CheckCircle className="h-2.5 w-2.5" /> {t("reports.status.finalized")}
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 bg-amber-500/10 text-amber-500 font-bold text-[9px] border border-amber-500/20 rounded-full flex items-center gap-1">
-                            Pending Review
+                          <span className="flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[9px] font-bold text-amber-500">
+                            {t("reports.status.pendingReview")}
                           </span>
                         )}
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-normal">
+                    <div className="grid grid-cols-1 gap-4 text-xs font-normal md:grid-cols-2">
                       <div className="space-y-1">
-                        <span className="font-bold text-[10px] text-muted-foreground block">
-                          Progress Summary:
+                        <span className="block text-[10px] font-bold text-muted-foreground">
+                          {t("reports.field.progressSummary")}
                         </span>
-                        <p className="text-foreground whitespace-pre-wrap leading-relaxed">
+                        <p className="whitespace-pre-wrap leading-relaxed text-foreground">
                           {rep.progressSummary}
                         </p>
                       </div>
@@ -197,10 +204,10 @@ export function ReportsViewClient({
                       <div className="space-y-3">
                         {rep.blockerSummary && (
                           <div className="space-y-0.5">
-                            <span className="font-bold text-[10px] text-muted-foreground block">
-                              Blocker Summary:
+                            <span className="block text-[10px] font-bold text-muted-foreground">
+                              {t("reports.field.blockerSummary")}
                             </span>
-                            <p className="text-foreground whitespace-pre-wrap leading-relaxed">
+                            <p className="whitespace-pre-wrap leading-relaxed text-foreground">
                               {rep.blockerSummary}
                             </p>
                           </div>
@@ -208,10 +215,10 @@ export function ReportsViewClient({
 
                         {rep.riskSummary && (
                           <div className="space-y-0.5">
-                            <span className="font-bold text-[10px] text-muted-foreground block">
-                              Risk Summary:
+                            <span className="block text-[10px] font-bold text-muted-foreground">
+                              {t("reports.field.riskSummary")}
                             </span>
-                            <p className="text-foreground whitespace-pre-wrap leading-relaxed">
+                            <p className="whitespace-pre-wrap leading-relaxed text-foreground">
                               {rep.riskSummary}
                             </p>
                           </div>
@@ -220,15 +227,18 @@ export function ReportsViewClient({
                     </div>
 
                     {rep.planDeviations && rep.planDeviations.length > 0 && (
-                      <div className="bg-amber-500/5 border border-amber-200/35 rounded-xl p-3 text-xs">
-                        <span className="font-bold text-[10px] text-amber-500 block mb-1">
-                          Timeline Deviations & Conflicts:
+                      <div className="rounded-xl border border-amber-200/35 bg-amber-500/5 p-3 text-xs">
+                        <span className="mb-1 block text-[10px] font-bold text-amber-500">
+                          {t("reports.field.deviations")}
                         </span>
-                        <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
+                        <ul className="list-disc space-y-1 pl-4 text-muted-foreground">
                           {rep.planDeviations.map((d: any, idx: number) => (
                             <li key={idx}>
                               <strong className="capitalize text-foreground">
-                                {String(d.type ?? d.taskTitle ?? "Deviation").replace(/_/g, " ")}:{" "}
+                                {String(
+                                  d.type ?? d.taskTitle ?? t("reports.deviationFallback")
+                                ).replace(/_/g, " ")}
+                                :{" "}
                               </strong>
                               {d.reason ?? d.deviation ?? d.description ?? ""}
                             </li>
@@ -239,10 +249,10 @@ export function ReportsViewClient({
 
                     {rep.recommendedActions && rep.recommendedActions.length > 0 && (
                       <div className="space-y-1">
-                        <span className="font-bold text-[10px] text-muted-foreground block">
-                          Recommended Actions:
+                        <span className="block text-[10px] font-bold text-muted-foreground">
+                          {t("reports.field.recommendedActions")}
                         </span>
-                        <ul className="list-decimal pl-4 text-xs text-foreground space-y-1 font-normal leading-relaxed">
+                        <ul className="list-decimal space-y-1 pl-4 text-xs font-normal leading-relaxed text-foreground">
                           {rep.recommendedActions.map((act, idx) => (
                             <li key={idx}>{act}</li>
                           ))}
@@ -250,26 +260,29 @@ export function ReportsViewClient({
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between pt-3 border-t border-neutral-100 dark:border-neutral-800 text-[10px] text-muted-foreground">
+                    <div className="flex items-center justify-between border-t border-neutral-100 pt-3 text-[10px] text-muted-foreground dark:border-neutral-800">
                       <div>
                         {rep.approvedAt ? (
                           <span>
-                            Approved by: <strong className="text-foreground">{approvedBy}</strong> on{" "}
-                            {new Date(rep.approvedAt).toLocaleDateString()}
+                            {t.rich("reports.approvedByOn", {
+                              name: approvedBy ?? t("reports.unknownApprover"),
+                              date: format.dateTime(new Date(rep.approvedAt), "short"),
+                              strong: (c) => <strong className="text-foreground">{c}</strong>,
+                            })}
                           </span>
                         ) : (
-                          <span>Awaiting leader review and finalization approval.</span>
+                          <span>{t("reports.awaitingReview")}</span>
                         )}
                       </div>
 
                       {!rep.approvedAt && isManager && (
                         <Button
                           size="sm"
-                          className="h-8 text-[10px] font-bold bg-green-600 hover:bg-green-700 text-white gap-1"
+                          className="h-8 gap-1 bg-green-600 text-[10px] font-bold text-white hover:bg-green-700"
                           disabled={submitting}
                           onClick={() => handleApprove(rep.id)}
                         >
-                          <CheckCircle className="w-3.5 h-3.5" /> Approve & Broadcast
+                          <CheckCircle className="h-3.5 w-3.5" /> {t("reports.approveBroadcast")}
                         </Button>
                       )}
                     </div>
@@ -284,17 +297,17 @@ export function ReportsViewClient({
       {/* Side Compile Form */}
       <div className="space-y-4">
         {isCompiling && (
-          <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4 animate-in fade-in duration-200">
-            <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
-              <h3 className="text-sm font-semibold text-foreground">Compile Status Report</h3>
+          <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm duration-200 animate-in fade-in">
+            <div className="flex items-center justify-between border-b border-neutral-100 pb-3 dark:border-neutral-800">
+              <h3 className="text-sm font-semibold text-foreground">{t("reports.compileTitle")}</h3>
               <Button variant="ghost" size="sm" onClick={() => setIsCompiling(false)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
             </div>
 
             <form onSubmit={handleCompile} className="space-y-4 text-xs font-semibold">
               <div className="space-y-1.5">
-                <label className="text-muted-foreground">Report Date</label>
+                <label className="text-muted-foreground">{t("reports.form.reportDate")}</label>
                 <Input
                   type="date"
                   required
@@ -304,10 +317,10 @@ export function ReportsViewClient({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-muted-foreground">Progress Summary</label>
+                <label className="text-muted-foreground">{t("reports.form.progressSummary")}</label>
                 <Textarea
                   required
-                  placeholder="Key milestones completed, deliverables, sprint goals achievements..."
+                  placeholder={t("reports.form.progressPlaceholder")}
                   value={progressSummary}
                   onChange={(e) => setProgressSummary(e.target.value)}
                   className="min-h-24"
@@ -315,9 +328,9 @@ export function ReportsViewClient({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-muted-foreground">Blocker Summary</label>
+                <label className="text-muted-foreground">{t("reports.form.blockerSummary")}</label>
                 <Textarea
-                  placeholder="Summary of active blockers, resolution delays..."
+                  placeholder={t("reports.form.blockerPlaceholder")}
                   value={blockerSummary}
                   onChange={(e) => setBlockerSummary(e.target.value)}
                   className="min-h-16"
@@ -325,9 +338,9 @@ export function ReportsViewClient({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-muted-foreground">Risk Summary</label>
+                <label className="text-muted-foreground">{t("reports.form.riskSummary")}</label>
                 <Textarea
-                  placeholder="Active threats to target deadlines, mitigations status..."
+                  placeholder={t("reports.form.riskPlaceholder")}
                   value={riskSummary}
                   onChange={(e) => setRiskSummary(e.target.value)}
                   className="min-h-16"
@@ -335,9 +348,11 @@ export function ReportsViewClient({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-muted-foreground">Recommended Actions (One per line)</label>
+                <label className="text-muted-foreground">
+                  {t("reports.form.recommendedActions")}
+                </label>
                 <Textarea
-                  placeholder="e.g. Schedule database audit&#10;Allocate extra hours on API logins"
+                  placeholder={t("reports.form.recommendedPlaceholder")}
                   value={recommendedText}
                   onChange={(e) => setRecommendedText(e.target.value)}
                   className="min-h-16"
@@ -345,18 +360,18 @@ export function ReportsViewClient({
               </div>
 
               {currentDeviations.length > 0 && (
-                <div className="p-3 border rounded-lg bg-amber-500/5 text-[10px] space-y-1">
-                  <span className="font-bold text-amber-500 block">
-                    Auto-Attached Deviations ({currentDeviations.length}):
+                <div className="space-y-1 rounded-lg border bg-amber-500/5 p-3 text-[10px]">
+                  <span className="block font-bold text-amber-500">
+                    {t("reports.form.autoAttached", { count: currentDeviations.length })}
                   </span>
-                  <p className="text-muted-foreground leading-normal">
-                    This status report will automatically include the {currentDeviations.length} currently active schedule deviation warning(s) for stakeholder review.
+                  <p className="leading-normal text-muted-foreground">
+                    {t("reports.form.autoAttachedDesc", { count: currentDeviations.length })}
                   </p>
                 </div>
               )}
 
               <Button type="submit" disabled={submitting} className="w-full text-xs">
-                {submitting ? "Compiling..." : "Compile Status Report"}
+                {submitting ? t("reports.form.compiling") : t("reports.form.submit")}
               </Button>
             </form>
           </div>

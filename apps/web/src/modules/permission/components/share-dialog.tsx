@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import * as Dialog from "@radix-ui/react-dialog";
 import { toast } from "sonner";
 import { Share2, Trash2, X } from "lucide-react";
@@ -12,18 +13,14 @@ import {
   listResourceGrantsAction,
   listTeamsWithMembersAction,
 } from "@/modules/permission/permission.actions";
+import { useActionError } from "@/i18n/use-action-error";
 
 type Member = { id: string; fullName: string; email: string };
 type Team = { id: string; name: string; memberIds: string[] };
 type Grant = { subjectType: "member" | "team"; subjectId: string; level: PermissionLevel };
 type ResourceType = "project" | "task" | "doc";
 
-const LEVELS: { value: PermissionLevel; label: string }[] = [
-  { value: "view", label: "View only — chỉ xem" },
-  { value: "comment", label: "Comment — bình luận" },
-  { value: "edit", label: "Edit — chỉnh sửa" },
-  { value: "full", label: "Full — toàn quyền" },
-];
+const LEVELS: PermissionLevel[] = ["view", "comment", "edit", "full"];
 
 const LEVEL_BADGE: Record<PermissionLevel, string> = {
   view: "bg-secondary text-muted-foreground",
@@ -55,6 +52,8 @@ export function ShareDialog({
   const [subjectType, setSubjectType] = useState<"member" | "team">("member");
   const [subjectId, setSubjectId] = useState("");
   const [level, setLevel] = useState<PermissionLevel>("view");
+  const t = useTranslations();
+  const actionError = useActionError();
 
   async function refresh() {
     setLoading(true);
@@ -89,10 +88,10 @@ export function ShareDialog({
     });
     setBusy(false);
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
-    toast.success("Đã cấp quyền");
+    toast.success(t("share.toast.granted"));
     setSubjectId("");
     refresh();
   }
@@ -110,7 +109,7 @@ export function ShareDialog({
     });
     setBusy(false);
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
     refresh();
@@ -118,13 +117,15 @@ export function ShareDialog({
 
   const nameFor = (gr: Grant) =>
     gr.subjectType === "member"
-      ? (members.find((m) => m.id === gr.subjectId)?.fullName ?? "Thành viên")
-      : `${teams.find((t) => t.id === gr.subjectId)?.name ?? "Team"} · team`;
+      ? (members.find((m) => m.id === gr.subjectId)?.fullName ?? t("share.memberFallback"))
+      : t("share.teamSuffix", {
+          name: teams.find((tm) => tm.id === gr.subjectId)?.name ?? t("share.teamFallback"),
+        });
 
   const options =
     subjectType === "member"
       ? members.map((m) => ({ id: m.id, label: `${m.fullName} (${m.email})` }))
-      : teams.map((t) => ({ id: t.id, label: t.name }));
+      : teams.map((tm) => ({ id: tm.id, label: tm.name }));
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -137,7 +138,7 @@ export function ShareDialog({
           )}
         >
           <Share2 className="h-4 w-4" />
-          Chia sẻ
+          {t("share.trigger")}
         </button>
       </Dialog.Trigger>
       <Dialog.Portal>
@@ -147,7 +148,7 @@ export function ShareDialog({
             <div>
               <Dialog.Title className="flex items-center gap-2 text-base font-semibold">
                 <Share2 className="h-4 w-4 text-primary" />
-                Chia sẻ quyền
+                {t("share.title")}
               </Dialog.Title>
               <Dialog.Description className="mt-0.5 truncate text-sm text-muted-foreground">
                 {resourceName}
@@ -161,22 +162,22 @@ export function ShareDialog({
           {/* Add grant */}
           <div className="space-y-2 rounded-lg border border-border p-3">
             <div className="flex gap-1.5">
-              {(["member", "team"] as const).map((t) => (
+              {(["member", "team"] as const).map((st) => (
                 <button
-                  key={t}
+                  key={st}
                   type="button"
                   onClick={() => {
-                    setSubjectType(t);
+                    setSubjectType(st);
                     setSubjectId("");
                   }}
                   className={cn(
                     "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                    subjectType === t
+                    subjectType === st
                       ? "bg-primary/15 text-primary"
                       : "text-muted-foreground hover:bg-accent"
                   )}
                 >
-                  {t === "member" ? "Thành viên" : "Team"}
+                  {st === "member" ? t("share.subject.member") : t("share.subject.team")}
                 </button>
               ))}
             </div>
@@ -186,7 +187,7 @@ export function ShareDialog({
               className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
             >
               <option value="">
-                {subjectType === "member" ? "Chọn thành viên…" : "Chọn team…"}
+                {subjectType === "member" ? t("share.selectMember") : t("share.selectTeam")}
               </option>
               {options.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -200,9 +201,9 @@ export function ShareDialog({
                 onChange={(e) => setLevel(e.target.value as PermissionLevel)}
                 className="flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
               >
-                {LEVELS.map((l) => (
-                  <option key={l.value} value={l.value}>
-                    {l.label}
+                {LEVELS.map((lv) => (
+                  <option key={lv} value={lv}>
+                    {t(`roles.level.${lv}.label`)}
                   </option>
                 ))}
               </select>
@@ -212,7 +213,7 @@ export function ShareDialog({
                 disabled={busy || !subjectId}
                 className="rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
               >
-                Cấp quyền
+                {t("share.grant")}
               </button>
             </div>
           </div>
@@ -220,14 +221,12 @@ export function ShareDialog({
           {/* Current grants */}
           <div className="mt-4">
             <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Đã chia sẻ với
+              {t("share.sharedWith")}
             </p>
             {loading ? (
-              <p className="py-2 text-sm text-muted-foreground">Đang tải…</p>
+              <p className="py-2 text-sm text-muted-foreground">{t("common.loading")}</p>
             ) : grants.length === 0 ? (
-              <p className="py-2 text-sm text-muted-foreground">
-                Chưa chia sẻ riêng cho ai — quyền theo vai trò mặc định.
-              </p>
+              <p className="py-2 text-sm text-muted-foreground">{t("share.empty")}</p>
             ) : (
               <ul className="space-y-1.5">
                 {grants.map((gr) => (
@@ -243,14 +242,14 @@ export function ShareDialog({
                           LEVEL_BADGE[gr.level]
                         )}
                       >
-                        {gr.level}
+                        {t(`roles.level.${gr.level}.label`)}
                       </span>
                       <button
                         type="button"
                         onClick={() => revoke(gr)}
                         disabled={busy}
                         className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
-                        title="Thu hồi"
+                        title={t("share.revoke")}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

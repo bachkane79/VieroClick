@@ -47,16 +47,21 @@ async function getTaskInProject(taskId: string, projectId: string) {
 /** WP-D6: single validation gate for file metadata, used by every write path
  *  (upload with real bytes, or register-by-reference) so neither can bypass
  *  the size/MIME rules the other one enforces. */
-export function assertUploadableMeta(meta: { sizeBytes: number | null | undefined; mimeType: string | null | undefined }) {
-  if (!meta.sizeBytes || meta.sizeBytes <= 0) throw new ValidationError("Choose a file to upload");
-  if (meta.sizeBytes > MAX_FILE_SIZE_BYTES) throw new ValidationError("File must be 25 MB or smaller");
+export function assertUploadableMeta(meta: {
+  sizeBytes: number | null | undefined;
+  mimeType: string | null | undefined;
+}) {
+  if (!meta.sizeBytes || meta.sizeBytes <= 0)
+    throw new ValidationError("Choose a file to upload", "fileRequired");
+  if (meta.sizeBytes > MAX_FILE_SIZE_BYTES)
+    throw new ValidationError("File must be 25 MB or smaller", "fileTooLarge");
   if (!meta.mimeType || !ALLOWED_MIME_TYPES.has(meta.mimeType)) {
     throw new ValidationError(`File type "${meta.mimeType ?? "unknown"}" is not allowed`);
   }
 }
 
 function assertUploadableFile(file: File) {
-  if (!file.name) throw new ValidationError("Choose a file to upload");
+  if (!file.name) throw new ValidationError("Choose a file to upload", "fileRequired");
   assertUploadableMeta({ sizeBytes: file.size, mimeType: file.type });
 }
 
@@ -72,7 +77,7 @@ export async function assertWithinWorkspaceQuota(workspaceId: string, incomingBy
   const quota = getWorkspaceQuotaBytes();
   const used = await repo.sumSizeByWorkspace(workspaceId);
   if (used + incomingBytes > quota) {
-    throw new ValidationError("Workspace storage quota exceeded");
+    throw new ValidationError("Workspace storage quota exceeded", "storageQuotaExceeded");
   }
 }
 

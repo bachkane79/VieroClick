@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@vieroc/ui";
+import { useTranslations } from "next-intl";
 import { Bot, CheckCircle2, ChevronDown, ChevronUp, Loader2, XCircle } from "lucide-react";
 
 type StepStatus = "waiting" | "active" | "done" | "failed";
@@ -40,11 +41,11 @@ const emptyActivity: ActivityState = {
   steps: [],
 };
 
-function statusLabel(status: StepStatus) {
-  if (status === "active") return "Running";
-  if (status === "done") return "Done";
-  if (status === "failed") return "Failed";
-  return "Waiting";
+function statusLabelKey(status: StepStatus) {
+  if (status === "active") return "project.tray.running";
+  if (status === "done") return "project.tray.done";
+  if (status === "failed") return "project.tray.failed";
+  return "project.tray.waiting";
 }
 
 function StatusIcon({ status }: { status: StepStatus }) {
@@ -56,6 +57,7 @@ function StatusIcon({ status }: { status: StepStatus }) {
 
 export function AgentActivityTray({ projectId }: { projectId: string }) {
   const router = useRouter();
+  const t = useTranslations();
   const [activity, setActivity] = useState<ActivityState>(emptyActivity);
   const [collapsed, setCollapsed] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -119,7 +121,11 @@ export function AgentActivityTray({ projectId }: { projectId: string }) {
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{activity.summary}</p>
             <p className="truncate text-xs text-muted-foreground">
-              {activity.counts.tasks} tasks · {activity.counts.wbs} WBS · {activity.counts.risks} risks
+              {t("project.tray.countsSummary", {
+                tasks: activity.counts.tasks,
+                wbs: activity.counts.wbs,
+                risks: activity.counts.risks,
+              })}
             </p>
           </div>
         </div>
@@ -128,7 +134,7 @@ export function AgentActivityTray({ projectId }: { projectId: string }) {
             type="button"
             className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             onClick={() => setCollapsed((value) => !value)}
-            aria-label={collapsed ? "Expand agent activity" : "Collapse agent activity"}
+            aria-label={collapsed ? t("project.tray.expand") : t("project.tray.collapse")}
           >
             {collapsed ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </button>
@@ -137,7 +143,7 @@ export function AgentActivityTray({ projectId }: { projectId: string }) {
               type="button"
               className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               onClick={() => setDismissed(true)}
-              aria-label="Dismiss agent activity"
+              aria-label={t("project.tray.dismiss")}
             >
               <XCircle className="h-4 w-4" />
             </button>
@@ -165,7 +171,7 @@ export function AgentActivityTray({ projectId }: { projectId: string }) {
                   step.status === "waiting" && "bg-muted text-muted-foreground"
                 )}
               >
-                {statusLabel(step.status)}
+                {t(statusLabelKey(step.status) as Parameters<typeof t>[0])}
               </span>
               <span className="truncate text-muted-foreground">{step.detail}</span>
             </div>

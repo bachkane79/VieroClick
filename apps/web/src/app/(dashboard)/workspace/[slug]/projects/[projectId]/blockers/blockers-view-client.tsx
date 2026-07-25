@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations, useFormatter } from "next-intl";
 import { Button, Input, Textarea } from "@vieroc/ui";
 import { toast } from "sonner";
 import { AlertOctagon, Plus, CheckCircle, User, AlertTriangle } from "lucide-react";
 import { reportBlockerAction, updateBlockerAction } from "@/modules/blocker/blocker.actions";
+import { useActionError } from "@/i18n/use-action-error";
 
 interface BlockerRow {
   id: string;
@@ -52,6 +54,9 @@ export function BlockersViewClient({
   tasks,
 }: Props) {
   const router = useRouter();
+  const t = useTranslations();
+  const format = useFormatter();
+  const actionError = useActionError();
   const [submitting, setSubmitting] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
 
@@ -108,7 +113,7 @@ export function BlockersViewClient({
       updatedAt: new Date(),
     };
     setBlockers((current) => [newBlocker, ...current]);
-    toast.success("Blocker reported");
+    toast.success(t("blockers.toast.reported"));
 
     setSubmitting(true);
     const res = await reportBlockerAction({
@@ -126,7 +131,7 @@ export function BlockersViewClient({
     setSubmitting(false);
 
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       // rollback
       setBlockers((current) => current.filter((b) => b.id !== tempId));
     } else {
@@ -148,7 +153,7 @@ export function BlockersViewClient({
           : b
       )
     );
-    toast.success("Blocker resolved");
+    toast.success(t("blockers.toast.resolved"));
 
     setSubmitting(true);
     const res = await updateBlockerAction({
@@ -163,7 +168,7 @@ export function BlockersViewClient({
     setSubmitting(false);
 
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       // rollback
       setBlockers(previousBlockers);
     } else {
@@ -176,7 +181,7 @@ export function BlockersViewClient({
     setBlockers((current) =>
       current.map((b) => (b.id === blockerId ? { ...b, ownerMemberId: newOwnerId || null } : b))
     );
-    toast.success("Blocker owner updated");
+    toast.success(t("blockers.toast.ownerUpdated"));
 
     setSubmitting(true);
     const res = await updateBlockerAction({
@@ -191,7 +196,7 @@ export function BlockersViewClient({
     setSubmitting(false);
 
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       // rollback
       setBlockers(previousBlockers);
     } else {
@@ -213,58 +218,64 @@ export function BlockersViewClient({
   };
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
       {/* Blocker list/board */}
-      <div className="xl:col-span-2 space-y-6">
+      <div className="space-y-6 xl:col-span-2">
         {/* Open Blockers */}
-        <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-red-500 flex items-center gap-1.5">
-              <AlertOctagon className="w-4 h-4" />
-              Active Project Blockers ({openBlockers.length})
+        <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-center justify-between border-b border-neutral-100 pb-3 dark:border-neutral-800">
+            <h3 className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wider text-red-500">
+              <AlertOctagon className="h-4 w-4" />
+              {t("blockers.activeTitle")} ({openBlockers.length})
             </h3>
             {!isAdding && (
               <Button size="sm" onClick={() => setIsAdding(true)} className="gap-1.5 text-xs">
-                <Plus className="w-3.5 h-3.5" /> File Blocker
+                <Plus className="h-3.5 w-3.5" /> {t("blockers.fileBlocker")}
               </Button>
             )}
           </div>
 
           {openBlockers.length === 0 ? (
-            <div className="p-12 text-center text-muted-foreground border border-dashed rounded-xl">
-              <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2 opacity-80" />
-              <p className="text-sm font-semibold">No active blockers</p>
-              <p className="text-xs mt-0.5">The project is running smoothly with no blocked tasks.</p>
+            <div className="rounded-xl border border-dashed p-12 text-center text-muted-foreground">
+              <CheckCircle className="mx-auto mb-2 h-8 w-8 text-green-500 opacity-80" />
+              <p className="text-sm font-semibold">{t("blockers.empty.activeTitle")}</p>
+              <p className="mt-0.5 text-xs">{t("blockers.empty.activeDescription")}</p>
             </div>
           ) : (
-            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+            <div className="max-h-[400px] space-y-3 overflow-y-auto pr-1">
               {openBlockers.map((b) => {
-                const reporterName = memberNameMap.get(b.reportedByMemberId ?? "") ?? "Workspace member";
+                const reporterName =
+                  memberNameMap.get(b.reportedByMemberId ?? "") ?? t("blockers.workspaceMember");
                 const linkedTaskTitle = b.taskId ? taskTitleMap.get(b.taskId) : null;
 
                 return (
                   <div
                     key={b.id}
-                    className="p-4 border border-neutral-200/40 dark:border-neutral-800/40 rounded-xl bg-card space-y-3 hover:border-neutral-300 transition-all shadow-sm"
+                    className="space-y-3 rounded-xl border border-neutral-200/40 bg-card p-4 shadow-sm transition-all hover:border-neutral-300 dark:border-neutral-800/40"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
-                        <span className="font-bold text-xs text-foreground block">{b.title}</span>
+                        <span className="block text-xs font-bold text-foreground">{b.title}</span>
                         {b.description && (
-                          <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                          <p className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
                             {b.description}
                           </p>
                         )}
-                        <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground mt-2">
-                          <span>Reported by: <strong className="text-foreground">{reporterName}</strong></span>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+                          <span>
+                            {t("blockers.reportedBy")}{" "}
+                            <strong className="text-foreground">{reporterName}</strong>
+                          </span>
                           <span>·</span>
-                          <span>Filed: {new Date(b.createdAt).toLocaleDateString()}</span>
+                          <span>
+                            {t("blockers.filed")} {format.dateTime(new Date(b.createdAt), "short")}
+                          </span>
                           {linkedTaskTitle && (
                             <>
                               <span>·</span>
                               <span className="flex items-center gap-1">
-                                Linked Task:{" "}
-                                <strong className="text-primary hover:underline cursor-pointer">
+                                {t("blockers.linkedTask")}{" "}
+                                <strong className="cursor-pointer text-primary hover:underline">
                                   {linkedTaskTitle}
                                 </strong>
                               </span>
@@ -273,39 +284,39 @@ export function BlockersViewClient({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex shrink-0 items-center gap-2">
                         <span
-                          className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${getSeverityColor(
+                          className={`rounded px-2 py-0.5 text-[9px] font-bold uppercase ${getSeverityColor(
                             b.severity
                           )}`}
                         >
-                          {b.severity}
+                          {t(`task.priority.${b.severity}`)}
                         </span>
 
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="h-8 gap-1 text-[10px] font-bold text-green-600 hover:text-green-700 hover:bg-green-50"
+                          className="h-8 gap-1 text-[10px] font-bold text-green-600 hover:bg-green-50 hover:text-green-700"
                           disabled={submitting}
                           onClick={() => handleResolve(b.id)}
                         >
-                          <CheckCircle className="w-3.5 h-3.5" /> Resolve
+                          <CheckCircle className="h-3.5 w-3.5" /> {t("blockers.resolve")}
                         </Button>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2.5 border-t border-neutral-100 dark:border-neutral-800">
+                    <div className="flex items-center justify-between border-t border-neutral-100 pt-2.5 dark:border-neutral-800">
                       <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                        <User className="w-3.5 h-3.5" />
-                        <span>Owner:</span>
+                        <User className="h-3.5 w-3.5" />
+                        <span>{t("blockers.owner")}</span>
                         <select
                           value={b.ownerMemberId ?? ""}
                           onChange={(e) => handleReassign(b.id, e.target.value)}
                           disabled={submitting}
-                          className="bg-transparent font-bold focus:outline-none text-foreground border border-neutral-200/40 dark:border-neutral-800/40 rounded px-1.5 py-0.5 ml-1"
+                          className="ml-1 rounded border border-neutral-200/40 bg-transparent px-1.5 py-0.5 font-bold text-foreground focus:outline-none dark:border-neutral-800/40"
                         >
-                          <option value="">Assign Owner...</option>
+                          <option value="">{t("blockers.assignOwnerPlaceholder")}</option>
                           {members.map((m) => (
                             <option key={m.id} value={m.id}>
                               {m.fullName}
@@ -322,31 +333,35 @@ export function BlockersViewClient({
         </div>
 
         {/* Resolved Blockers */}
-        <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground border-b pb-3 border-neutral-100 dark:border-neutral-800">
-            Resolved Blockers ({resolvedBlockers.length})
+        <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <h3 className="border-b border-neutral-100 pb-3 text-sm font-bold uppercase tracking-wider text-muted-foreground dark:border-neutral-800">
+            {t("blockers.resolvedTitle")} ({resolvedBlockers.length})
           </h3>
 
           {resolvedBlockers.length === 0 ? (
-            <p className="text-xs text-muted-foreground p-4 text-center">No resolved blockers listed.</p>
+            <p className="p-4 text-center text-xs text-muted-foreground">
+              {t("blockers.empty.resolved")}
+            </p>
           ) : (
-            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 divide-y divide-neutral-200/20">
+            <div className="max-h-[300px] space-y-2 divide-y divide-neutral-200/20 overflow-y-auto pr-1">
               {resolvedBlockers.map((b) => (
-                <div key={b.id} className="py-3 flex items-center justify-between gap-3 text-xs">
+                <div key={b.id} className="flex items-center justify-between gap-3 py-3 text-xs">
                   <div className="min-w-0">
-                    <span className="font-semibold text-foreground truncate block line-through">
+                    <span className="block truncate font-semibold text-foreground line-through">
                       {b.title}
                     </span>
-                    <span className="text-[10px] text-muted-foreground block mt-0.5">
-                      Resolved by:{" "}
+                    <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                      {t("blockers.resolvedBy")}{" "}
                       <strong>
-                        {memberNameMap.get(b.resolvedByMemberId ?? "") ?? "Workspace member"}
+                        {memberNameMap.get(b.resolvedByMemberId ?? "") ??
+                          t("blockers.workspaceMember")}
                       </strong>{" "}
-                      on {b.resolvedAt ? new Date(b.resolvedAt).toLocaleDateString() : ""}
+                      {t("blockers.on")}{" "}
+                      {b.resolvedAt ? format.dateTime(new Date(b.resolvedAt), "short") : ""}
                     </span>
                   </div>
-                  <span className="shrink-0 px-2 py-0.5 bg-green-500/10 text-green-500 rounded text-[9px] font-bold border border-green-500/20">
-                    Resolved
+                  <span className="shrink-0 rounded border border-green-500/20 bg-green-500/10 px-2 py-0.5 text-[9px] font-bold text-green-500">
+                    {t("blockers.statusResolved")}
                   </span>
                 </div>
               ))}
@@ -358,29 +373,29 @@ export function BlockersViewClient({
       {/* Side Form */}
       <div className="space-y-4">
         {isAdding && (
-          <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4 animate-in fade-in slide-in-from-right-3 duration-250">
-            <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
-              <h3 className="text-sm font-semibold text-foreground">File Blocker Report</h3>
+          <div className="duration-250 space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm animate-in fade-in slide-in-from-right-3">
+            <div className="flex items-center justify-between border-b border-neutral-100 pb-3 dark:border-neutral-800">
+              <h3 className="text-sm font-semibold text-foreground">{t("blockers.formTitle")}</h3>
               <Button variant="ghost" size="sm" onClick={() => setIsAdding(false)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
             </div>
 
             <form onSubmit={handleReport} className="space-y-4 text-xs font-semibold">
               <div className="space-y-1.5">
-                <label className="text-muted-foreground">Blocker Title</label>
+                <label className="text-muted-foreground">{t("blockers.form.title")}</label>
                 <Input
                   required
-                  placeholder="e.g. API Gateway response timing out"
+                  placeholder={t("blockers.form.titlePlaceholder")}
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-muted-foreground">Description</label>
+                <label className="text-muted-foreground">{t("blockers.form.description")}</label>
                 <Textarea
-                  placeholder="Provide logs or details regarding what is blocking development..."
+                  placeholder={t("blockers.form.descriptionPlaceholder")}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   className="min-h-20"
@@ -388,13 +403,13 @@ export function BlockersViewClient({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-muted-foreground">Link Blocker to Project Task</label>
+                <label className="text-muted-foreground">{t("blockers.form.linkTask")}</label>
                 <select
                   value={taskId}
                   onChange={(e) => setTaskId(e.target.value)}
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                 >
-                  <option value="">Unlinked</option>
+                  <option value="">{t("blockers.form.unlinked")}</option>
                   {tasks.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.title}
@@ -405,27 +420,27 @@ export function BlockersViewClient({
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-muted-foreground">Severity</label>
+                  <label className="text-muted-foreground">{t("blockers.form.severity")}</label>
                   <select
                     value={severity}
                     onChange={(e) => setSeverity(e.target.value as typeof severity)}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                   >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="urgent">Urgent</option>
+                    <option value="low">{t("task.priority.low")}</option>
+                    <option value="medium">{t("task.priority.medium")}</option>
+                    <option value="high">{t("task.priority.high")}</option>
+                    <option value="urgent">{t("task.priority.urgent")}</option>
                   </select>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-muted-foreground">Assign Owner</label>
+                  <label className="text-muted-foreground">{t("blockers.form.assignOwner")}</label>
                   <select
                     value={ownerMemberId}
                     onChange={(e) => setOwnerMemberId(e.target.value)}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                   >
-                    <option value="">Unassigned</option>
+                    <option value="">{t("task.unassigned")}</option>
                     {members.map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.fullName}
@@ -436,19 +451,21 @@ export function BlockersViewClient({
               </div>
 
               <Button type="submit" disabled={submitting} className="w-full text-xs">
-                {submitting ? "Submitting..." : "Report Blocker"}
+                {submitting ? t("blockers.submitting") : t("blockers.reportBlocker")}
               </Button>
             </form>
           </div>
         )}
 
-        <div className="p-5 border border-border rounded-2xl bg-card shadow-sm text-xs space-y-3">
-          <h4 className="font-semibold text-foreground flex items-center gap-1">
-            <AlertTriangle className="w-4 h-4 text-amber-500" />
-            Blocker Escalations
+        <div className="space-y-3 rounded-2xl border border-border bg-card p-5 text-xs shadow-sm">
+          <h4 className="flex items-center gap-1 font-semibold text-foreground">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            {t("blockers.escalations.title")}
           </h4>
-          <p className="text-muted-foreground leading-relaxed">
-            Reported blockers automatically update linked task statuses to <strong>Blocked</strong>, alerting project leads and preventing dependent tasks from being started.
+          <p className="leading-relaxed text-muted-foreground">
+            {t.rich("blockers.escalations.description", {
+              b: (chunks) => <strong>{chunks}</strong>,
+            })}
           </p>
         </div>
       </div>

@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Button, cn, Input } from "@vieroc/ui";
 import { CheckSquare, ChevronDown, ChevronRight, Flag, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { useActionError } from "@/i18n/use-action-error";
 import { createTaskAction } from "../task.actions";
 import {
   checklistProgress,
@@ -52,6 +54,7 @@ export function TaskList({
   attachments,
   phases,
 }: Props) {
+  const t = useTranslations();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -129,7 +132,7 @@ export function TaskList({
           <ViewControls api={api} statuses={statuses} members={members} />
           <Button type="button" className="h-8 gap-2" onClick={() => openTask(null)}>
             <Plus className="h-4 w-4" />
-            New task
+            {t("task.list.newTask")}
           </Button>
         </div>
 
@@ -156,7 +159,7 @@ export function TaskList({
           ))}
           {groups.length === 0 && (
             <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-              No tasks match the current view.
+              {t("task.list.noTasksMatch")}
             </div>
           )}
         </div>
@@ -208,6 +211,8 @@ function GroupSection({
   onOptimistic: (taskId: string, patch: Partial<TaskView> | null) => void;
   inlineAddStatusId?: string;
 }) {
+  const t = useTranslations();
+  const actionError = useActionError();
   const colors = group.statusType ? statusColor(group.statusType) : null;
   const [adding, setAdding] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -225,7 +230,7 @@ function GroupSection({
     });
     setSaving(false);
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(actionError(result));
       return;
     }
     setNewTitle("");
@@ -237,7 +242,11 @@ function GroupSection({
         <button
           type="button"
           onClick={onToggle}
-          aria-label={collapsed ? `Expand ${group.label}` : `Collapse ${group.label}`}
+          aria-label={
+            collapsed
+              ? t("task.list.expandGroup", { label: group.label })
+              : t("task.list.collapseGroup", { label: group.label })
+          }
           className="text-muted-foreground transition-colors hover:text-foreground"
         >
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -257,7 +266,7 @@ function GroupSection({
             onClick={() => setAdding(true)}
             className="ml-1 rounded px-1.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            + Add Task
+            {t("task.list.addTask")}
           </button>
         )}
       </div>
@@ -265,10 +274,10 @@ function GroupSection({
       {!collapsed && (
         <div className="overflow-x-auto rounded-card border border-border bg-card shadow-sm">
           <div className="grid min-w-[780px] grid-cols-[minmax(260px,1fr)_150px_130px_90px_40px] border-b bg-muted/40 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            <span>Task</span>
-            <span>Assignee</span>
-            <span>Due</span>
-            <span>Priority</span>
+            <span>{t("task.list.columns.task")}</span>
+            <span>{t("task.list.columns.assignee")}</span>
+            <span>{t("task.list.columns.due")}</span>
+            <span>{t("task.priority.label")}</span>
             <span />
           </div>
           <div className="divide-y">
@@ -351,7 +360,7 @@ function GroupSection({
                         </span>
                       </>
                     ) : (
-                      <span className="text-xs">Unassigned</span>
+                      <span className="text-xs">{t("task.unassigned")}</span>
                     )}
                   </span>
                   <span className="text-xs text-muted-foreground">{task.dueDate ?? "—"}</span>
@@ -361,7 +370,9 @@ function GroupSection({
                         "h-3.5 w-3.5",
                         PRIORITY_FLAG_COLORS[task.priority] ?? "text-neutral-400"
                       )}
-                      aria-label={`Priority: ${task.priority}`}
+                      aria-label={t("task.list.priorityAria", {
+                        priority: t(`task.priority.${task.priority}`),
+                      })}
                     />
                   </span>
                   <span className="flex justify-end">
@@ -380,7 +391,7 @@ function GroupSection({
             })}
             {group.tasks.length === 0 && !adding && (
               <div className="px-4 py-4 text-center text-xs text-muted-foreground">
-                No tasks here.
+                {t("task.list.noTasksHere")}
               </div>
             )}
             {inlineAddStatusId &&
@@ -389,7 +400,7 @@ function GroupSection({
                   <Input
                     autoFocus
                     value={newTitle}
-                    placeholder="Task name — Enter to save, Esc to cancel"
+                    placeholder={t("task.list.inlineTaskPlaceholder")}
                     onChange={(e) => setNewTitle(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
@@ -410,7 +421,7 @@ function GroupSection({
                     disabled={saving || !newTitle.trim()}
                     onClick={() => void submitInlineTask()}
                   >
-                    {saving ? "Adding..." : "Add"}
+                    {saving ? t("task.list.adding") : t("common.add")}
                   </Button>
                 </div>
               ) : (
@@ -419,7 +430,7 @@ function GroupSection({
                   onClick={() => setAdding(true)}
                   className="w-full px-4 py-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
                 >
-                  + Add Task
+                  {t("task.list.addTask")}
                 </button>
               ))}
           </div>

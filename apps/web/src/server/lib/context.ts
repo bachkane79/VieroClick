@@ -1,6 +1,14 @@
 import "server-only";
 import { and, eq } from "drizzle-orm";
-import { db, withActor, workspaceMembers, projectMembers, projects, type Executor, type Transaction } from "@vieroc/db";
+import {
+  db,
+  withActor,
+  workspaceMembers,
+  projectMembers,
+  projects,
+  type Executor,
+  type Transaction,
+} from "@vieroc/db";
 import type { WorkspaceRole, ProjectRole } from "@vieroc/types";
 import { auth } from "@/server/auth";
 import { UnauthorizedError, ForbiddenError } from "./errors";
@@ -57,7 +65,7 @@ export async function getUserId(): Promise<string> {
           // try next salt
         }
       }
-      
+
       const resolvedUserId = decoded?.userId || decoded?.sub;
       if (resolvedUserId) {
         return resolvedUserId as string;
@@ -101,7 +109,7 @@ async function resolveActorContext(
     .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.userId, userId)))
     .limit(1);
 
-  if (!member) throw new ForbiddenError("Not a member of this workspace");
+  if (!member) throw new ForbiddenError("Not a member of this workspace", "notWorkspaceMember");
 
   let projectRole: ProjectRole | null = null;
   if (projectId) {
@@ -111,7 +119,11 @@ async function resolveActorContext(
       .where(and(eq(projects.id, projectId), eq(projects.workspaceId, workspaceId)))
       .limit(1);
 
-    if (!project) throw new ForbiddenError("Project does not belong to this workspace");
+    if (!project)
+      throw new ForbiddenError(
+        "Project does not belong to this workspace",
+        "projectWorkspaceMismatch"
+      );
 
     const [pm] = await exec
       .select({ role: projectMembers.role })
@@ -128,7 +140,7 @@ async function resolveActorContext(
     const workspaceCanSeeAllProjects =
       member.role === "owner" || member.role === "admin" || member.role === "leader";
     if (!projectRole && !workspaceCanSeeAllProjects) {
-      throw new ForbiddenError("Not a member of this project");
+      throw new ForbiddenError("Not a member of this project", "notProjectMember");
     }
   }
 
@@ -150,11 +162,9 @@ export async function requireActor(workspaceId: string, projectId?: string): Pro
   // mechanism (see workspace.service.ts); this TTL is just a safety net.
   const ACTOR_CACHE_TTL_SECONDS = 45;
 
-  return getOrSetCache(
-    cacheKey,
-    () => resolveActorContext(db, userId, workspaceId, projectId),
-    { ttlSeconds: ACTOR_CACHE_TTL_SECONDS }
-  );
+  return getOrSetCache(cacheKey, () => resolveActorContext(db, userId, workspaceId, projectId), {
+    ttlSeconds: ACTOR_CACHE_TTL_SECONDS,
+  });
 }
 
 /**

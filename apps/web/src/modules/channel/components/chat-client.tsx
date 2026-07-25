@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@vieroc/ui";
-import { useLocale } from "@/lib/i18n/client";
-import { t } from "@/lib/i18n/dict";
+import { useFormatter, useTranslations } from "next-intl";
 import { Hash, MessagesSquare, Plus, SendHorizonal, Trash2, UserCircle } from "lucide-react";
 import { Button } from "@vieroc/ui";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
@@ -19,6 +18,7 @@ import {
   openDmAction,
   sendChannelMessageAction,
 } from "../channel.actions";
+import { useActionError } from "@/i18n/use-action-error";
 
 export interface ChatMessage {
   id: string;
@@ -34,7 +34,12 @@ interface Props {
   slug: string;
   channel: { id: string; type: string; displayName: string; topic: string | null };
   channels: Array<{ id: string; name: string; unreadCount?: number }>;
-  dms: Array<{ id: string; otherName: string; otherAvatarUrl: string | null; unreadCount?: number }>;
+  dms: Array<{
+    id: string;
+    otherName: string;
+    otherAvatarUrl: string | null;
+    unreadCount?: number;
+  }>;
   members: Array<{ memberId: string; name: string; avatarUrl: string | null }>;
   myMemberId: string;
   canPost: boolean;
@@ -49,12 +54,15 @@ const UNREAD_REFRESH_MS = 20_000;
 // cadence used while the stream is down (Redis outage, network blip, etc).
 const FALLBACK_POLL_MS = 30_000;
 
+// Groups messages into calendar-day buckets. This is a stable comparison key
+// (geometry), NOT rendered text — the displayed day label is produced with the
+// next-intl formatter inside the component.
 function dayKey(iso: string) {
-  return new Date(iso).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
-
-function timeLabel(iso: string) {
-  return new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
 /**
@@ -75,7 +83,9 @@ export function ChatClient({
   initialMessages,
 }: Props) {
   const router = useRouter();
-  const locale = useLocale();
+  const t = useTranslations();
+  const format = useFormatter();
+  const actionError = useActionError();
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -92,10 +102,10 @@ export function ChatClient({
   async function handleDeleteChannel() {
     const result = await deleteChannelAction({ workspaceId, channelId: channel.id, slug });
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(actionError(result));
       return;
     }
-    toast.success("Channel deleted");
+    toast.success(t("chat.channelDeleted"));
     router.push(`/workspace/${slug}/chat`);
     router.refresh();
   }
@@ -234,10 +244,14 @@ export function ChatClient({
     const body = draft.trim();
     if (!body || sending) return;
     setSending(true);
-    const res = await sendChannelMessageAction({ workspaceId, channelId: channel.id, data: { body } });
+    const res = await sendChannelMessageAction({
+      workspaceId,
+      channelId: channel.id,
+      data: { body },
+    });
     setSending(false);
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
     setDraft("");
@@ -249,7 +263,7 @@ export function ChatClient({
     if (!name) return;
     const res = await createChannelAction({ workspaceId, slug, data: { name } });
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
     setNewChannelName("");
@@ -260,7 +274,7 @@ export function ChatClient({
   async function openDm(targetMemberId: string) {
     const res = await openDmAction({ workspaceId, slug, data: { targetMemberId } });
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
     router.push(`/workspace/${slug}/chat/${res.data.id}`);
@@ -280,7 +294,11 @@ export function ChatClient({
     let prev: ChatMessage | null = null;
     for (const m of messages) {
       if (!prev || dayKey(prev.createdAt) !== dayKey(m.createdAt)) {
-        items.push({ kind: "day", key: `day-${m.id}`, label: dayKey(m.createdAt) });
+        items.push({
+          kind: "day",
+          key: `day-${m.id}`,
+          label: format.dateTime(new Date(m.createdAt), "short"),
+        });
         prev = null;
       }
       const withHeader =
@@ -291,7 +309,7 @@ export function ChatClient({
       prev = m;
     }
     return items;
-  }, [messages]);
+  }, [messages, format]);
 
   return (
     <div className="flex h-full min-h-0">
@@ -299,18 +317,18 @@ export function ChatClient({
       <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-card">
         <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
           <MessagesSquare className="h-4 w-4 text-primary" />
-          <span className="text-sm font-bold">Chat</span>
+          <span className="text-sm font-bold">{t("chat.title")}</span>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
           <div className="flex items-center justify-between px-2 pb-1 pt-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              {t(locale, "chat.channels")}
+              {t("chat.channels")}
             </p>
             {canPost && (
               <button
                 type="button"
                 onClick={() => setCreatingChannel((v) => !v)}
-                title={t(locale, "chat.addChannel")}
+                title={t("chat.addChannel")}
                 className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
                 <Plus className="h-3.5 w-3.5" />
@@ -327,7 +345,7 @@ export function ChatClient({
                   if (e.key === "Enter") void createChannel();
                   if (e.key === "Escape") setCreatingChannel(false);
                 }}
-                placeholder={t(locale, "chat.channelNamePlaceholder")}
+                placeholder={t("chat.channelNamePlaceholder")}
                 className="w-full rounded-md border border-border bg-background px-2 py-1 text-[13px] outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
@@ -352,7 +370,7 @@ export function ChatClient({
           </div>
 
           <p className="px-2 pb-1 pt-4 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            {t(locale, "chat.dms")}
+            {t("chat.dms")}
           </p>
           <div className="space-y-px">
             {dms.map((d) => (
@@ -377,7 +395,7 @@ export function ChatClient({
                 type="button"
                 onClick={() => openDm(m.memberId)}
                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                title={t(locale, "chat.startDm", { name: m.name })}
+                title={t("chat.startDm", { name: m.name })}
               >
                 <Avatar name={m.name} url={m.avatarUrl} />
                 <span className="truncate">{m.name}</span>
@@ -385,7 +403,7 @@ export function ChatClient({
               </button>
             ))}
             {dms.length === 0 && newDmTargets.length === 0 && (
-              <p className="px-2 py-1.5 text-xs text-muted-foreground">{t(locale, "chat.noMembers")}</p>
+              <p className="px-2 py-1.5 text-xs text-muted-foreground">{t("chat.noMembers")}</p>
             )}
           </div>
         </div>
@@ -410,7 +428,7 @@ export function ChatClient({
               type="button"
               variant="ghost"
               size="icon"
-              aria-label="Delete channel"
+              aria-label={t("chat.deleteChannel")}
               className="ml-auto h-7 w-7 text-muted-foreground hover:text-destructive"
               onClick={() => setConfirmDeleteChannel(true)}
             >
@@ -421,10 +439,10 @@ export function ChatClient({
         <ConfirmationDialog
           isOpen={confirmDeleteChannel}
           onOpenChange={setConfirmDeleteChannel}
-          title="Delete channel"
-          description={`Delete #${channel.displayName}? Messages cannot be recovered.`}
+          title={t("chat.deleteChannel")}
+          description={t("chat.deleteChannelConfirm", { channel: channel.displayName })}
           variant="destructive"
-          confirmLabel="Delete"
+          confirmLabel={t("common.delete")}
           onConfirm={handleDeleteChannel}
         />
 
@@ -432,8 +450,8 @@ export function ChatClient({
           {timeline.length === 0 && (
             <div className="flex h-full flex-col items-center justify-center text-center text-muted-foreground">
               <MessagesSquare className="mb-2 h-8 w-8 opacity-40" />
-              <p className="text-sm font-semibold">{t(locale, "chat.emptyTitle")}</p>
-              <p className="mt-1 text-xs">{t(locale, "chat.emptySub")}</p>
+              <p className="text-sm font-semibold">{t("chat.emptyTitle")}</p>
+              <p className="mt-1 text-xs">{t("chat.emptySub")}</p>
             </div>
           )}
           {timeline.map((item) =>
@@ -452,7 +470,11 @@ export function ChatClient({
               >
                 <div className="w-8 shrink-0 pt-0.5">
                   {item.withHeader && (
-                    <Avatar name={item.message.authorName} url={item.message.authorAvatarUrl} size={32} />
+                    <Avatar
+                      name={item.message.authorName}
+                      url={item.message.authorAvatarUrl}
+                      size={32}
+                    />
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -461,13 +483,15 @@ export function ChatClient({
                       <span
                         className={cn(
                           "text-[13px] font-bold",
-                          item.message.authorMemberId === myMemberId ? "text-primary" : "text-foreground"
+                          item.message.authorMemberId === myMemberId
+                            ? "text-primary"
+                            : "text-foreground"
                         )}
                       >
                         {item.message.authorName}
                       </span>
                       <span className="text-[10.5px] text-muted-foreground">
-                        {timeLabel(item.message.createdAt)}
+                        {format.dateTime(new Date(item.message.createdAt), "time")}
                       </span>
                     </p>
                   )}
@@ -493,23 +517,23 @@ export function ChatClient({
                   }
                 }}
                 rows={Math.min(6, Math.max(1, draft.split("\n").length))}
-                placeholder={t(locale, "chat.composerPlaceholder", { channel: channel.displayName })}
+                placeholder={t("chat.composerPlaceholder", { channel: channel.displayName })}
                 className="max-h-40 min-h-[24px] flex-1 resize-none bg-transparent text-[13.5px] leading-6 outline-none placeholder:text-muted-foreground"
               />
               <button
                 type="button"
                 onClick={() => void send()}
                 disabled={!draft.trim() || sending}
-                title={t(locale, "chat.send")}
+                title={t("chat.send")}
                 className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground transition-opacity disabled:opacity-40"
               >
                 <SendHorizonal className="h-4 w-4" />
               </button>
             </div>
           ) : (
-            <p className="px-1 text-center text-xs text-muted-foreground">{t(locale, "chat.readOnly")}</p>
+            <p className="px-1 text-center text-xs text-muted-foreground">{t("chat.readOnly")}</p>
           )}
-          <p className="mt-1 px-1 text-[10.5px] text-muted-foreground">{t(locale, "chat.hint")}</p>
+          <p className="mt-1 px-1 text-[10.5px] text-muted-foreground">{t("chat.hint")}</p>
         </footer>
       </section>
     </div>

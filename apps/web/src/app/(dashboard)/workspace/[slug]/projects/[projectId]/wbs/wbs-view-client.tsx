@@ -2,14 +2,24 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Button, Input, Textarea } from "@vieroc/ui";
-import { Plus, Trash2, Link as LinkIcon, Folder, Box, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Link as LinkIcon,
+  Folder,
+  Box,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   createWbsNodeAction,
   deleteWbsNodeAction,
   updateWbsNodeAction,
 } from "@/modules/wbs/wbs.actions";
+import { useActionError } from "@/i18n/use-action-error";
 
 interface NodeRow {
   id: string;
@@ -38,6 +48,8 @@ export function WbsViewClient({
   tasks,
 }: Props) {
   const router = useRouter();
+  const t = useTranslations();
+  const actionError = useActionError();
   const [submitting, setSubmitting] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
 
@@ -66,7 +78,10 @@ export function WbsViewClient({
 
   // Sort child lists by position
   for (const [key, val] of childrenMap.entries()) {
-    childrenMap.set(key, val.sort((a, b) => a.position - b.position));
+    childrenMap.set(
+      key,
+      val.sort((a, b) => a.position - b.position)
+    );
   }
   const sortedRootNodes = rootNodes.sort((a, b) => a.position - b.position);
 
@@ -91,11 +106,11 @@ export function WbsViewClient({
     setSubmitting(false);
 
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
 
-    toast.success("WBS Node created");
+    toast.success(t("project.wbs.nodeCreated"));
     setIsAdding(false);
     setNewTitle("");
     setNewDescription("");
@@ -105,7 +120,7 @@ export function WbsViewClient({
   }
 
   async function deleteNode(nodeId: string) {
-    if (!confirm("Are you sure you want to delete this WBS node?")) return;
+    if (!confirm(t("project.wbs.deleteConfirm"))) return;
 
     setSubmitting(true);
     const res = await deleteWbsNodeAction({
@@ -117,11 +132,11 @@ export function WbsViewClient({
     setSubmitting(false);
 
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
 
-    toast.success("WBS Node deleted");
+    toast.success(t("project.wbs.nodeDeleted"));
     router.refresh();
   }
 
@@ -139,11 +154,11 @@ export function WbsViewClient({
     setSubmitting(false);
 
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
 
-    toast.success("Task link updated");
+    toast.success(t("project.wbs.taskLinkUpdated"));
     router.refresh();
   }
 
@@ -157,45 +172,49 @@ export function WbsViewClient({
       <div key={node.id} className="space-y-1">
         <div
           style={{ paddingLeft: `${depth * 1.5 + 0.75}rem` }}
-          className="flex flex-wrap items-center justify-between gap-4 py-2.5 px-4 rounded-xl border border-neutral-200/40 dark:border-neutral-800/40 bg-card hover:bg-muted/30 transition-colors shadow-sm"
+          className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-neutral-200/40 bg-card px-4 py-2.5 shadow-sm transition-colors hover:bg-muted/30 dark:border-neutral-800/40"
         >
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <button
               onClick={() => toggleExpand(node.id)}
-              className={`w-5 h-5 flex items-center justify-center rounded hover:bg-muted text-muted-foreground shrink-0 ${
-                !hasChildren && "opacity-0 cursor-default"
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted ${
+                !hasChildren && "cursor-default opacity-0"
               }`}
             >
-              {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+              {isExpanded ? (
+                <ChevronDown className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5" />
+              )}
             </button>
 
             {node.nodeType === "deliverable" ? (
-              <Folder className="w-4 h-4 text-primary shrink-0" />
+              <Folder className="h-4 w-4 shrink-0 text-primary" />
             ) : (
-              <Box className="w-4 h-4 text-primary shrink-0" />
+              <Box className="h-4 w-4 shrink-0 text-primary" />
             )}
 
             <div className="min-w-0 flex-1">
-              <span className="text-xs font-bold text-foreground block truncate">{node.title}</span>
+              <span className="block truncate text-xs font-bold text-foreground">{node.title}</span>
               {node.description && (
-                <span className="text-[10px] text-muted-foreground block truncate mt-0.5">
+                <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">
                   {node.description}
                 </span>
               )}
             </div>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex shrink-0 items-center gap-3">
             {/* Task Link Selector */}
-            <div className="flex items-center gap-1.5 bg-muted/40 rounded-lg px-2 py-1 border border-neutral-200/40 dark:border-neutral-800/40 text-[10px]">
-              <LinkIcon className="w-3 h-3 text-muted-foreground" />
+            <div className="flex items-center gap-1.5 rounded-lg border border-neutral-200/40 bg-muted/40 px-2 py-1 text-[10px] dark:border-neutral-800/40">
+              <LinkIcon className="h-3 w-3 text-muted-foreground" />
               <select
                 value={node.linkedTaskId ?? ""}
                 onChange={(e) => handleLinkTask(node.id, e.target.value)}
                 disabled={submitting}
-                className="bg-transparent font-semibold focus:outline-none max-w-40 text-ellipsis text-foreground"
+                className="max-w-40 text-ellipsis bg-transparent font-semibold text-foreground focus:outline-none"
               >
-                <option value="">Link Task...</option>
+                <option value="">{t("project.wbs.linkTaskPlaceholder")}</option>
                 {tasks.map((task) => (
                   <option key={task.id} value={task.id}>
                     {task.title}
@@ -209,17 +228,17 @@ export function WbsViewClient({
               type="button"
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-500/10 shrink-0"
+              className="h-7 w-7 shrink-0 text-red-500 hover:bg-red-500/10 hover:text-red-600"
               disabled={submitting}
               onClick={() => deleteNode(node.id)}
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
 
         {hasChildren && isExpanded && (
-          <div className="space-y-1 mt-1">
+          <div className="mt-1 space-y-1">
             {children.map((child) => renderNode(child, depth + 1))}
           </div>
         )}
@@ -228,34 +247,32 @@ export function WbsViewClient({
   };
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
       {/* Tree View Panel */}
-      <div className="xl:col-span-2 space-y-4">
-        <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
+      <div className="space-y-4 xl:col-span-2">
+        <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-center justify-between border-b border-neutral-100 pb-3 dark:border-neutral-800">
             <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              Work Breakdown structure Tree
+              {t("project.wbs.treeTitle")}
             </h3>
             {!isAdding && (
               <Button size="sm" onClick={() => setIsAdding(true)} className="gap-1.5 text-xs">
-                <Plus className="w-3.5 h-3.5" /> Add WBS Node
+                <Plus className="h-3.5 w-3.5" /> {t("project.wbs.addNode")}
               </Button>
             )}
           </div>
 
           {initialNodes.length === 0 ? (
-            <div className="p-12 text-center text-muted-foreground rounded-xl border border-dashed border-input">
-              <Folder className="w-8 h-8 mx-auto mb-3 opacity-40 text-primary" />
-              <p className="text-sm font-semibold">No WBS nodes defined</p>
-              <p className="text-xs mt-0.5">
-                Decompose project objectives into deliverables and work packages to organize implementation.
-              </p>
+            <div className="rounded-xl border border-dashed border-input p-12 text-center text-muted-foreground">
+              <Folder className="mx-auto mb-3 h-8 w-8 text-primary opacity-40" />
+              <p className="text-sm font-semibold">{t("project.wbs.emptyTitle")}</p>
+              <p className="mt-0.5 text-xs">{t("project.wbs.emptyDescription")}</p>
               <Button size="sm" onClick={() => setIsAdding(true)} className="mt-4 gap-1.5 text-xs">
-                <Plus className="w-3.5 h-3.5" /> Create First Node
+                <Plus className="h-3.5 w-3.5" /> {t("project.wbs.createFirst")}
               </Button>
             </div>
           ) : (
-            <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+            <div className="max-h-[500px] space-y-2 overflow-y-auto pr-1">
               {sortedRootNodes.map((n) => renderNode(n))}
             </div>
           )}
@@ -265,29 +282,31 @@ export function WbsViewClient({
       {/* Creation / Sidebar Form Panel */}
       <div className="space-y-4">
         {isAdding && (
-          <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b pb-3 border-neutral-100 dark:border-neutral-800">
-              <h3 className="text-sm font-semibold text-foreground">Create WBS Node</h3>
+          <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <div className="flex items-center justify-between border-b border-neutral-100 pb-3 dark:border-neutral-800">
+              <h3 className="text-sm font-semibold text-foreground">
+                {t("project.wbs.createTitle")}
+              </h3>
               <Button variant="ghost" size="sm" onClick={() => setIsAdding(false)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
             </div>
 
             <form onSubmit={submitNode} className="space-y-4 text-xs font-semibold">
               <div className="space-y-1.5">
-                <label className="text-muted-foreground">Title</label>
+                <label className="text-muted-foreground">{t("project.wbs.titleLabel")}</label>
                 <Input
                   required
-                  placeholder="e.g. Core Features Package"
+                  placeholder={t("project.wbs.titlePlaceholder")}
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-muted-foreground">Description</label>
+                <label className="text-muted-foreground">{t("project.wbs.descriptionLabel")}</label>
                 <Textarea
-                  placeholder="Node scope and details..."
+                  placeholder={t("project.wbs.descriptionPlaceholder")}
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}
                   className="min-h-16"
@@ -296,25 +315,25 @@ export function WbsViewClient({
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-muted-foreground">Type</label>
+                  <label className="text-muted-foreground">{t("project.wbs.typeLabel")}</label>
                   <select
                     value={newType}
                     onChange={(e) => setNewType(e.target.value)}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                   >
-                    <option value="deliverable">Deliverable (Folder)</option>
-                    <option value="work_package">Work Package (Box)</option>
+                    <option value="deliverable">{t("project.wbs.typeDeliverable")}</option>
+                    <option value="work_package">{t("project.wbs.typeWorkPackage")}</option>
                   </select>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-muted-foreground">Parent Node</label>
+                  <label className="text-muted-foreground">{t("project.wbs.parentLabel")}</label>
                   <select
                     value={newParentId}
                     onChange={(e) => setNewParentId(e.target.value)}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                   >
-                    <option value="">None (Root)</option>
+                    <option value="">{t("project.wbs.parentNone")}</option>
                     {initialNodes
                       .filter((n) => n.nodeType === "deliverable")
                       .map((n) => (
@@ -327,13 +346,13 @@ export function WbsViewClient({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-muted-foreground">Link Project Task</label>
+                <label className="text-muted-foreground">{t("project.wbs.linkTaskLabel")}</label>
                 <select
                   value={newLinkedTaskId}
                   onChange={(e) => setNewLinkedTaskId(e.target.value)}
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                 >
-                  <option value="">Unlinked</option>
+                  <option value="">{t("project.wbs.unlinked")}</option>
                   {tasks.map((task) => (
                     <option key={task.id} value={task.id}>
                       {task.title}
@@ -343,20 +362,20 @@ export function WbsViewClient({
               </div>
 
               <Button type="submit" disabled={submitting} className="w-full text-xs">
-                {submitting ? "Saving..." : "Save WBS Node"}
+                {submitting ? t("project.wbs.saving") : t("project.wbs.saveNode")}
               </Button>
             </form>
           </div>
         )}
 
-        <div className="p-5 border border-border rounded-2xl bg-card shadow-sm text-xs space-y-3">
-          <h4 className="font-semibold text-foreground">WBS Integration Info</h4>
-          <p className="text-muted-foreground leading-relaxed">
-            A Work Breakdown Structure (WBS) is a hierarchical decomposition of the total scope of work to be carried out by the project team.
+        <div className="space-y-3 rounded-2xl border border-border bg-card p-5 text-xs shadow-sm">
+          <h4 className="font-semibold text-foreground">{t("project.wbs.infoTitle")}</h4>
+          <p className="leading-relaxed text-muted-foreground">
+            {t("project.wbs.infoDescription")}
           </p>
-          <ul className="space-y-1.5 text-muted-foreground list-disc pl-4 leading-normal">
-            <li><strong>Deliverables</strong> act as summary tasks or category groupings.</li>
-            <li><strong>Work Packages</strong> represent specific deliverable work units that can be mapped 1-to-1 to execution tasks.</li>
+          <ul className="list-disc space-y-1.5 pl-4 leading-normal text-muted-foreground">
+            <li>{t.rich("project.wbs.infoDeliverables", { b: (c) => <strong>{c}</strong> })}</li>
+            <li>{t.rich("project.wbs.infoWorkPackages", { b: (c) => <strong>{c}</strong> })}</li>
           </ul>
         </div>
       </div>

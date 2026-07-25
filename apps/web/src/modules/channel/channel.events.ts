@@ -19,7 +19,7 @@ export async function channelCreated(
     ...actorFields(ctx),
     entityType: "channel",
     entityId: channel.id,
-    eventType: "channel created",
+    eventType: "channel.created",
     after: { name: channel.name, type: channel.type },
   });
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { cn } from "@vieroc/ui";
 import { ChevronDown, ChevronRight, Flag } from "lucide-react";
 import {
@@ -32,14 +33,18 @@ interface Props {
   phases: PhaseNode[];
 }
 
-const COLUMNS: { key: SortField | "assignee" | "estimate" | "labels"; label: string; sortable: boolean }[] = [
-  { key: "title", label: "Task", sortable: true },
-  { key: "status", label: "Status", sortable: true },
-  { key: "assignee", label: "Assignee", sortable: false },
-  { key: "priority", label: "Priority", sortable: true },
-  { key: "dueDate", label: "Due", sortable: true },
-  { key: "estimate", label: "Est (h)", sortable: false },
-  { key: "labels", label: "Labels", sortable: false },
+const COLUMNS: {
+  key: SortField | "assignee" | "estimate" | "labels";
+  labelKey: string;
+  sortable: boolean;
+}[] = [
+  { key: "title", labelKey: "task.table.columnTask", sortable: true },
+  { key: "status", labelKey: "task.table.columnStatus", sortable: true },
+  { key: "assignee", labelKey: "task.table.columnAssignee", sortable: false },
+  { key: "priority", labelKey: "task.priority.label", sortable: true },
+  { key: "dueDate", labelKey: "task.table.columnDue", sortable: true },
+  { key: "estimate", labelKey: "task.table.columnEstimate", sortable: false },
+  { key: "labels", labelKey: "task.table.columnLabels", sortable: false },
 ];
 
 const GRID = "grid-cols-[minmax(240px,1fr)_130px_150px_90px_110px_70px_minmax(120px,180px)_40px]";
@@ -55,6 +60,7 @@ export function TableViewClient({
   attachments,
   phases,
 }: Props) {
+  const t = useTranslations();
   const { effectiveTasks, applyOptimistic } = useOptimisticTasks(tasks);
   const api = useViewPrefs(projectId, "none");
   const { prefs } = api;
@@ -111,7 +117,7 @@ export function TableViewClient({
                   col.sortable && "hover:text-foreground"
                 )}
               >
-                {col.label}
+                {t(col.labelKey as Parameters<typeof t>[0])}
                 {col.sortable && prefs.sortField === col.key && (
                   <span>{prefs.sortDir === "asc" ? "↑" : "↓"}</span>
                 )}
@@ -128,9 +134,7 @@ export function TableViewClient({
                 {prefs.groupBy !== "none" && (
                   <button
                     type="button"
-                    onClick={() =>
-                      setCollapsed((c) => ({ ...c, [group.key]: !c[group.key] }))
-                    }
+                    onClick={() => setCollapsed((c) => ({ ...c, [group.key]: !c[group.key] }))}
                     className="flex w-full min-w-[900px] items-center gap-2 border-b bg-muted/20 px-4 py-1.5 text-left"
                   >
                     {isCollapsed ? (
@@ -217,7 +221,7 @@ export function TableViewClient({
                               PRIORITY_FLAG_COLORS[task.priority] ?? "text-neutral-400"
                             )}
                           />
-                          <span className="text-xs">{task.priority}</span>
+                          <span className="text-xs">{t(`task.priority.${task.priority}`)}</span>
                         </span>
                         <span className="text-xs text-muted-foreground">{task.dueDate ?? "—"}</span>
                         <span className="text-xs text-muted-foreground">
@@ -261,7 +265,7 @@ export function TableViewClient({
 
           {groups.every((g) => g.tasks.length === 0) && (
             <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-              No tasks match the current view.
+              {t("task.table.emptyState")}
             </div>
           )}
         </div>

@@ -28,6 +28,10 @@ export type TemplateDef = {
   tone: string;
   name: string;
   description: string;
+  /** i18n catalog key for the picker-facing name (namespace `templates`). */
+  nameKey: string;
+  /** i18n catalog key for the picker-facing description (namespace `templates`). */
+  descKey: string;
   /** Default project name (pre-filled, editable). */
   projectName: string;
   seed: SeedPhase[];
@@ -40,6 +44,8 @@ export const TEMPLATES: Record<Exclude<OnboardingTemplate, "ai-generated">, Temp
     tone: "emerald",
     name: "Kế hoạch cá nhân",
     description: "Việc đời sống, mục tiêu và thói quen.",
+    nameKey: "templates.personal.name",
+    descKey: "templates.personal.desc",
     projectName: "Kế hoạch của tôi",
     seed: [
       {
@@ -65,6 +71,8 @@ export const TEMPLATES: Record<Exclude<OnboardingTemplate, "ai-generated">, Temp
     tone: "sky",
     name: "Học tập",
     description: "Deadline, môn học và dự án nhóm.",
+    nameKey: "templates.study.name",
+    descKey: "templates.study.desc",
     projectName: "Học kỳ này",
     seed: [
       {
@@ -89,6 +97,8 @@ export const TEMPLATES: Record<Exclude<OnboardingTemplate, "ai-generated">, Temp
     tone: "amber",
     name: "Freelance / khách hàng",
     description: "Chạy một job từ brief tới thanh toán.",
+    nameKey: "templates.freelance.name",
+    descKey: "templates.freelance.desc",
     projectName: "Dự án khách hàng",
     seed: [
       {
@@ -120,6 +130,8 @@ export const TEMPLATES: Record<Exclude<OnboardingTemplate, "ai-generated">, Temp
     tone: "rose",
     name: "Dự án nhóm nhỏ",
     description: "Dựng chỗ làm việc chung cho nhóm.",
+    nameKey: "templates.smallTeam.name",
+    descKey: "templates.smallTeam.desc",
     projectName: "Dự án nhóm",
     seed: [
       {
@@ -152,6 +164,8 @@ export const TEMPLATES: Record<Exclude<OnboardingTemplate, "ai-generated">, Temp
     tone: "violet",
     name: "Bắt đầu trống",
     description: "Một dự án trống với 1 việc mở đầu.",
+    nameKey: "templates.blank.name",
+    descKey: "templates.blank.desc",
     projectName: "Dự án của tôi",
     seed: [
       {
@@ -169,6 +183,8 @@ export const AI_TEMPLATE = {
   tone: "violet",
   name: "Để AI dựng giúp",
   description: "Tả dự án bằng một câu — AI phác kế hoạch cho bạn duyệt.",
+  nameKey: "templates.ai.name",
+  descKey: "templates.ai.desc",
   projectName: "Dự án mới",
 };
 

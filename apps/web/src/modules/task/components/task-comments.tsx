@@ -1,9 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import { Button, cn, Textarea } from "@vieroc/ui";
-import { Check, CheckCircle2, CornerDownRight, MessageSquare, Send, Trash2, UserPlus, X } from "lucide-react";
+import {
+  Check,
+  CheckCircle2,
+  CornerDownRight,
+  MessageSquare,
+  Send,
+  Trash2,
+  UserPlus,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
+import { useActionError } from "@/i18n/use-action-error";
 import {
   addCommentAction,
   deleteCommentAction,
@@ -22,16 +33,10 @@ interface Props {
   members: MemberOptionView[];
 }
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("en", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
-
 export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, members }: Props) {
+  const t = useTranslations();
+  const format = useFormatter();
+  const actionError = useActionError();
   const [comments, setComments] = useState<CommentView[]>([]);
   const [loading, setLoading] = useState(false);
   const [body, setBody] = useState("");
@@ -74,9 +79,7 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
     if (mentionQuery === null) return [];
     const q = mentionQuery.toLowerCase();
     return members
-      .filter(
-        (m) => m.fullName.toLowerCase().includes(q) || m.email.toLowerCase().includes(q)
-      )
+      .filter((m) => m.fullName.toLowerCase().includes(q) || m.email.toLowerCase().includes(q))
       .slice(0, 6);
   }, [mentionQuery, members]);
 
@@ -164,7 +167,7 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
     });
     setSubmitting(false);
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(actionError(result));
       return;
     }
     setBody("");
@@ -172,7 +175,7 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
     setAssignedMemberId("");
     setMentionQuery(null);
     await refresh();
-    toast.success(replyTo ? "Reply posted" : "Comment posted");
+    toast.success(replyTo ? t("task.comments.replyPosted") : t("task.comments.commentPosted"));
   }
 
   async function toggleResolved(comment: CommentView) {
@@ -191,7 +194,7 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
       setComments((cur) =>
         cur.map((c) => (c.id === comment.id ? { ...c, resolved: comment.resolved } : c))
       );
-      toast.error(result.error);
+      toast.error(actionError(result));
     }
   }
 
@@ -203,11 +206,11 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
       commentId,
     });
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(actionError(result));
       return;
     }
     setComments((cur) => cur.filter((c) => c.id !== commentId));
-    toast.success("Comment deleted");
+    toast.success(t("task.comments.commentDeleted"));
   }
 
   // Build threaded rows: top-level comments each followed by their replies.
@@ -260,17 +263,17 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
       <div className="flex items-center justify-between gap-3">
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <MessageSquare className="h-4 w-4" />
-          Comments
+          {t("task.comments.title")}
         </h3>
         <span className="text-xs text-muted-foreground">{comments.length}</span>
       </div>
 
       <div className="space-y-2">
         {loading ? (
-          <p className="text-xs text-muted-foreground">Loading comments…</p>
+          <p className="text-xs text-muted-foreground">{t("task.comments.loading")}</p>
         ) : rows.length === 0 ? (
           <div className="rounded-md border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-            No comments yet. Start the conversation.
+            {t("task.comments.empty")}
           </div>
         ) : (
           rows.map(({ comment, depth }) => {
@@ -298,17 +301,19 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
                     </span>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium leading-4">
-                        {author?.fullName ?? "Workspace member"}
+                        {author?.fullName ?? t("task.comments.workspaceMember")}
                       </p>
                       <p className="text-[11px] text-muted-foreground">
-                        {formatDateTime(comment.createdAt)}
+                        {format.dateTime(new Date(comment.createdAt), "dayMonthTime")}
                       </p>
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                     <button
                       type="button"
-                      aria-label={comment.resolved ? "Reopen comment" : "Resolve comment"}
+                      aria-label={
+                        comment.resolved ? t("task.comments.reopen") : t("task.comments.resolve")
+                      }
                       onClick={() => toggleResolved(comment)}
                       className={cn(
                         "inline-flex h-6 w-6 items-center justify-center rounded hover:bg-accent",
@@ -319,7 +324,7 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
                     </button>
                     <button
                       type="button"
-                      aria-label="Delete comment"
+                      aria-label={t("task.comments.deleteComment")}
                       onClick={() => remove(comment.id)}
                       className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-red-500"
                     >
@@ -328,7 +333,9 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
                   </div>
                 </div>
 
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-6">{renderBody(comment.body)}</p>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6">
+                  {renderBody(comment.body)}
+                </p>
 
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {assigned && (
@@ -340,7 +347,7 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
                   {comment.resolved && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:text-green-400">
                       <Check className="h-3 w-3" />
-                      Resolved
+                      {t("task.comments.resolved")}
                     </span>
                   )}
                   {depth === 0 && (
@@ -352,7 +359,7 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
                       }}
                       className="text-[11px] font-semibold text-primary hover:underline"
                     >
-                      Reply
+                      {t("task.comments.reply")}
                     </button>
                   )}
                 </div>
@@ -367,11 +374,15 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
         {replyTo && (
           <div className="flex items-center justify-between rounded bg-primary/5 px-2 py-1 text-[11px] text-primary">
             <span className="truncate">
-              Replying to {memberById.get(replyTo.authorMemberId)?.fullName ?? "comment"}
+              {t("task.comments.replyingTo", {
+                name:
+                  memberById.get(replyTo.authorMemberId)?.fullName ??
+                  t("task.comments.commentFallback"),
+              })}
             </span>
             <button
               type="button"
-              aria-label="Cancel reply"
+              aria-label={t("task.comments.cancelReply")}
               onClick={() => setReplyTo(null)}
               className="hover:underline"
             >
@@ -387,7 +398,7 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
             onChange={onBodyChange}
             onKeyDown={onKeyDown}
             placeholder={
-              replyTo ? "Write a reply… @ to mention" : "Add a comment… @ to mention, ⌘/Ctrl+Enter to post"
+              replyTo ? t("task.comments.replyPlaceholder") : t("task.comments.composerPlaceholder")
             }
             className="min-h-20 bg-background"
           />
@@ -425,7 +436,7 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
               onChange={(e) => setAssignedMemberId(e.target.value)}
               className="h-8 rounded-md border border-input bg-background px-2 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             >
-              <option value="">Assign to…</option>
+              <option value="">{t("task.comments.assignTo")}</option>
               {members.map((member) => (
                 <option key={member.id} value={member.id}>
                   {member.fullName}
@@ -441,7 +452,11 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
             onClick={() => void submit()}
           >
             <Send className="h-3.5 w-3.5" />
-            {submitting ? "Posting…" : replyTo ? "Reply" : "Post"}
+            {submitting
+              ? t("task.comments.posting")
+              : replyTo
+                ? t("task.comments.reply")
+                : t("task.comments.post")}
           </Button>
         </div>
       </div>

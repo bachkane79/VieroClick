@@ -1,15 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Check, ChevronRight, Circle, Flag, MoreHorizontal, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@vieroc/ui";
-import {
-  assignTaskAction,
-  changeTaskStatusAction,
-  updateTaskAction,
-} from "../task.actions";
+import { useActionError } from "@/i18n/use-action-error";
+import { assignTaskAction, changeTaskStatusAction, updateTaskAction } from "../task.actions";
 import { PRIORITY_FLAG_COLORS, PRIORITY_ORDER, statusColor } from "../status-colors";
 import type { MemberOptionView, TaskStatusView, TaskView } from "../task.view";
 
@@ -40,6 +38,8 @@ export function TaskQuickActions({
   onOptimistic,
   className,
 }: Props) {
+  const t = useTranslations();
+  const actionError = useActionError();
   const [open, setOpen] = useState(false);
 
   async function changeStatus(statusId: string) {
@@ -54,7 +54,7 @@ export function TaskQuickActions({
     });
     if (!result.ok) {
       onOptimistic(task.id, null);
-      toast.error(result.error);
+      toast.error(actionError(result));
     }
   }
 
@@ -70,7 +70,7 @@ export function TaskQuickActions({
     });
     if (!result.ok) {
       onOptimistic(task.id, null);
-      toast.error(result.error);
+      toast.error(actionError(result));
     }
   }
 
@@ -87,9 +87,9 @@ export function TaskQuickActions({
     if (!result.ok) {
       onOptimistic(task.id, null);
       if (result.code === "conflict") {
-        toast.error("This task was updated by someone else — please reload.");
+        toast.error(t("task.quickActions.conflictError"));
       } else {
-        toast.error(result.error);
+        toast.error(actionError(result));
       }
     }
   }
@@ -99,7 +99,7 @@ export function TaskQuickActions({
       <DropdownMenu.Trigger asChild>
         <button
           type="button"
-          aria-label="Task quick actions"
+          aria-label={t("task.quickActions.label")}
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
           className={cn(
@@ -120,7 +120,7 @@ export function TaskQuickActions({
           <DropdownMenu.Sub>
             <DropdownMenu.SubTrigger className={menuItemClass}>
               <Circle className="h-3.5 w-3.5" />
-              Status
+              {t("task.quickActions.status")}
               <ChevronRight className="ml-auto h-3.5 w-3.5" />
             </DropdownMenu.SubTrigger>
             <DropdownMenu.Portal>
@@ -143,16 +143,13 @@ export function TaskQuickActions({
           <DropdownMenu.Sub>
             <DropdownMenu.SubTrigger className={menuItemClass}>
               <UserRound className="h-3.5 w-3.5" />
-              Assignee
+              {t("task.quickActions.assignee")}
               <ChevronRight className="ml-auto h-3.5 w-3.5" />
             </DropdownMenu.SubTrigger>
             <DropdownMenu.Portal>
               <DropdownMenu.SubContent sideOffset={6} className={menuContentClass}>
-                <DropdownMenu.Item
-                  className={menuItemClass}
-                  onSelect={() => changeAssignee(null)}
-                >
-                  <span className="text-muted-foreground">Unassigned</span>
+                <DropdownMenu.Item className={menuItemClass} onSelect={() => changeAssignee(null)}>
+                  <span className="text-muted-foreground">{t("task.unassigned")}</span>
                   {!task.assigneeMemberId && <Check className="ml-auto h-3.5 w-3.5" />}
                 </DropdownMenu.Item>
                 {members.map((member) => (
@@ -174,7 +171,7 @@ export function TaskQuickActions({
           <DropdownMenu.Sub>
             <DropdownMenu.SubTrigger className={menuItemClass}>
               <Flag className="h-3.5 w-3.5" />
-              Priority
+              {t("task.priority.label")}
               <ChevronRight className="ml-auto h-3.5 w-3.5" />
             </DropdownMenu.SubTrigger>
             <DropdownMenu.Portal>
@@ -186,7 +183,7 @@ export function TaskQuickActions({
                     onSelect={() => changePriority(priority)}
                   >
                     <Flag className={cn("h-3.5 w-3.5", PRIORITY_FLAG_COLORS[priority])} />
-                    <span className="capitalize">{priority}</span>
+                    <span className="capitalize">{t(`task.priority.${priority}`)}</span>
                     {priority === task.priority && <Check className="ml-auto h-3.5 w-3.5" />}
                   </DropdownMenu.Item>
                 ))}

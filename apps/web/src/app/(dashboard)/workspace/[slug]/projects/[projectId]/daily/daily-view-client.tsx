@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations, useFormatter } from "next-intl";
 import { Button, Input, Textarea } from "@vieroc/ui";
 import { toast } from "sonner";
 import { ClipboardList, Smile, MessageSquare, AlertCircle } from "lucide-react";
 import { submitDailyUpdateAction } from "@/modules/daily-update/daily-update.actions";
+import { useActionError } from "@/i18n/use-action-error";
 
 interface UpdateRow {
   id: string;
@@ -45,6 +47,9 @@ export function DailyViewClient({
   projectMembers,
 }: Props) {
   const router = useRouter();
+  const t = useTranslations();
+  const format = useFormatter();
+  const actionError = useActionError();
   const [submitting, setSubmitting] = useState(false);
 
   // Form states
@@ -67,9 +72,7 @@ export function DailyViewClient({
   // Calculate missing updates for today
   const todayStr = new Date().toISOString().split("T")[0];
   const submittedTodayMemberIds = new Set(
-    updates
-      .filter((u) => u.workDate === todayStr)
-      .map((u) => u.memberId)
+    updates.filter((u) => u.workDate === todayStr).map((u) => u.memberId)
   );
   const missingMembers = projectMembers
     .map((pm) => members.find((m) => m.id === pm.workspaceMemberId))
@@ -108,7 +111,7 @@ export function DailyViewClient({
       submittedAt: new Date(),
     };
     setUpdates((current) => [newUpdate, ...current]);
-    toast.success("Daily update submitted");
+    toast.success(t("project.daily.submitted"));
 
     setSubmitting(true);
     const res = await submitDailyUpdateAction({
@@ -128,7 +131,7 @@ export function DailyViewClient({
     setSubmitting(false);
 
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       // rollback
       setUpdates((current) => current.filter((u) => u.id !== tempId));
     } else {
@@ -144,21 +147,21 @@ export function DailyViewClient({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       {/* Submit Update Panel */}
-      <div className="lg:col-span-2 space-y-6">
-        <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
-          <div className="flex items-center gap-2 border-b pb-3 border-neutral-100 dark:border-neutral-800">
-            <ClipboardList className="w-5 h-5 text-primary" />
+      <div className="space-y-6 lg:col-span-2">
+        <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <div className="flex items-center gap-2 border-b border-neutral-100 pb-3 dark:border-neutral-800">
+            <ClipboardList className="h-5 w-5 text-primary" />
             <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              Submit Daily Standup Update
+              {t("project.daily.submitTitle")}
             </h3>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4 text-xs font-semibold">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-muted-foreground">Work Date</label>
+                <label className="text-muted-foreground">{t("project.daily.workDate")}</label>
                 <Input
                   type="date"
                   required
@@ -168,17 +171,19 @@ export function DailyViewClient({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-muted-foreground">Confidence Level (1-5)</label>
-                <div className="flex items-center gap-1.5 h-9">
+                <label className="text-muted-foreground">
+                  {t("project.daily.confidenceLevel")}
+                </label>
+                <div className="flex h-9 items-center gap-1.5">
                   {[1, 2, 3, 4, 5].map((lvl) => (
                     <button
                       key={lvl}
                       type="button"
                       onClick={() => setConfidenceLevel(lvl)}
-                      className={`w-8 h-8 rounded-lg border flex items-center justify-center font-bold transition-all text-xs ${
+                      className={`flex h-8 w-8 items-center justify-center rounded-lg border text-xs font-bold transition-all ${
                         confidenceLevel === lvl
-                          ? "bg-primary text-white border-primary"
-                          : "bg-background hover:bg-muted text-muted-foreground"
+                          ? "border-primary bg-primary text-white"
+                          : "bg-background text-muted-foreground hover:bg-muted"
                       }`}
                     >
                       {lvl}
@@ -189,9 +194,9 @@ export function DailyViewClient({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-muted-foreground">Completed Today</label>
+              <label className="text-muted-foreground">{t("project.daily.completedToday")}</label>
               <Textarea
-                placeholder="What tasks or items did you complete?"
+                placeholder={t("project.daily.completedPlaceholder")}
                 required
                 value={completedText}
                 onChange={(e) => setCompletedText(e.target.value)}
@@ -200,20 +205,20 @@ export function DailyViewClient({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-muted-foreground">In Progress / Focus for Tomorrow</label>
+              <label className="text-muted-foreground">{t("project.daily.inProgress")}</label>
               <Textarea
-                placeholder="What are you currently focusing on?"
+                placeholder={t("project.daily.inProgressPlaceholder")}
                 value={inProgressText}
                 onChange={(e) => setInProgressText(e.target.value)}
                 className="min-h-16"
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-1.5">
-                <label className="text-muted-foreground">Blockers (If Any)</label>
+                <label className="text-muted-foreground">{t("project.daily.blockers")}</label>
                 <Textarea
-                  placeholder="Any technical issues or blockers?"
+                  placeholder={t("project.daily.blockersPlaceholder")}
                   value={blockersText}
                   onChange={(e) => setBlockersText(e.target.value)}
                   className="min-h-16 border-amber-200 focus-visible:ring-amber-500"
@@ -221,9 +226,9 @@ export function DailyViewClient({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-muted-foreground">Support Needed / Concerns</label>
+                <label className="text-muted-foreground">{t("project.daily.supportNeeded")}</label>
                 <Textarea
-                  placeholder="What support do you require?"
+                  placeholder={t("project.daily.supportPlaceholder")}
                   value={supportNeeded}
                   onChange={(e) => setSupportNeeded(e.target.value)}
                   className="min-h-16"
@@ -231,75 +236,91 @@ export function DailyViewClient({
               </div>
             </div>
 
-            <Button type="submit" disabled={submitting} className="w-full text-xs py-2">
-              {submitting ? "Submitting..." : "Submit Daily Update"}
+            <Button type="submit" disabled={submitting} className="w-full py-2 text-xs">
+              {submitting ? t("project.daily.submitting") : t("project.daily.submit")}
             </Button>
           </form>
         </div>
 
         {/* History / Feed list */}
-        <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground border-b pb-3 border-neutral-100 dark:border-neutral-800">
-            Daily Updates History Feed
+        <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <h3 className="border-b border-neutral-100 pb-3 text-sm font-bold uppercase tracking-wider text-muted-foreground dark:border-neutral-800">
+            {t("project.daily.historyTitle")}
           </h3>
 
           {updates.length === 0 ? (
             <div className="p-12 text-center text-muted-foreground">
-              <MessageSquare className="w-8 h-8 mx-auto mb-3 opacity-40 text-primary" />
-              <p className="text-sm font-semibold">No daily updates posted yet</p>
-              <p className="text-xs mt-0.5">Be the first to share your daily standup progress!</p>
+              <MessageSquare className="mx-auto mb-3 h-8 w-8 text-primary opacity-40" />
+              <p className="text-sm font-semibold">{t("project.daily.emptyTitle")}</p>
+              <p className="mt-0.5 text-xs">{t("project.daily.emptyHint")}</p>
             </div>
           ) : (
-            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
+            <div className="max-h-[500px] space-y-4 overflow-y-auto pr-1">
               {updates.map((u) => {
-                const authorName = u.memberId === "me" ? "You" : (memberNameMap.get(u.memberId) ?? "Workspace member");
+                const authorName =
+                  u.memberId === "me"
+                    ? t("project.daily.you")
+                    : (memberNameMap.get(u.memberId) ?? t("project.daily.workspaceMember"));
                 return (
                   <div
                     key={u.id}
-                    className="p-4 border border-neutral-200/30 dark:border-neutral-800/30 rounded-xl bg-card space-y-3"
+                    className="space-y-3 rounded-xl border border-neutral-200/30 bg-card p-4 dark:border-neutral-800/30"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <span className="font-bold text-xs text-foreground block">{authorName}</span>
-                        <span className="text-[10px] text-muted-foreground mt-0.5 block">
-                          For Work Date: <strong className="text-foreground">{u.workDate}</strong> · Posted{" "}
-                          {new Date(u.submittedAt).toLocaleTimeString()}
+                        <span className="block text-xs font-bold text-foreground">
+                          {authorName}
+                        </span>
+                        <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                          {t.rich("project.daily.feedMeta", {
+                            date: u.workDate,
+                            time: format.dateTime(new Date(u.submittedAt), "time"),
+                            b: (c) => <strong className="text-foreground">{c}</strong>,
+                          })}
                         </span>
                       </div>
                       {u.confidenceLevel && (
                         <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold ${getConfidenceColor(
+                          className={`rounded px-2 py-0.5 text-[10px] font-bold ${getConfidenceColor(
                             u.confidenceLevel
                           )}`}
                         >
-                          Confidence: {u.confidenceLevel}/5
+                          {t("project.daily.confidenceBadge", { level: u.confidenceLevel })}
                         </span>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs leading-normal">
+                    <div className="grid grid-cols-1 gap-3 text-xs leading-normal md:grid-cols-2">
                       {u.completedText && (
                         <div className="space-y-0.5">
-                          <span className="text-muted-foreground font-bold">Completed:</span>
-                          <p className="text-foreground whitespace-pre-wrap">{u.completedText}</p>
+                          <span className="font-bold text-muted-foreground">
+                            {t("project.daily.completedLabel")}
+                          </span>
+                          <p className="whitespace-pre-wrap text-foreground">{u.completedText}</p>
                         </div>
                       )}
                       {u.inProgressText && (
                         <div className="space-y-0.5">
-                          <span className="text-muted-foreground font-bold">In Progress:</span>
-                          <p className="text-foreground whitespace-pre-wrap">{u.inProgressText}</p>
+                          <span className="font-bold text-muted-foreground">
+                            {t("project.daily.inProgressLabel")}
+                          </span>
+                          <p className="whitespace-pre-wrap text-foreground">{u.inProgressText}</p>
                         </div>
                       )}
                       {u.blockersText && (
-                        <div className="space-y-0.5 md:col-span-2 rounded border border-amber-200 bg-amber-500/5 p-2">
-                          <span className="text-amber-500 font-bold block mb-1">Blocker:</span>
-                          <p className="text-foreground whitespace-pre-wrap">{u.blockersText}</p>
+                        <div className="space-y-0.5 rounded border border-amber-200 bg-amber-500/5 p-2 md:col-span-2">
+                          <span className="mb-1 block font-bold text-amber-500">
+                            {t("project.daily.blockerLabel")}
+                          </span>
+                          <p className="whitespace-pre-wrap text-foreground">{u.blockersText}</p>
                         </div>
                       )}
                       {u.supportNeeded && (
                         <div className="space-y-0.5">
-                          <span className="text-muted-foreground font-bold">Support Needed:</span>
-                          <p className="text-foreground whitespace-pre-wrap">{u.supportNeeded}</p>
+                          <span className="font-bold text-muted-foreground">
+                            {t("project.daily.supportLabel")}
+                          </span>
+                          <p className="whitespace-pre-wrap text-foreground">{u.supportNeeded}</p>
                         </div>
                       )}
                     </div>
@@ -313,28 +334,32 @@ export function DailyViewClient({
 
       {/* Missing Updates Panel */}
       <div className="space-y-4">
-        <div className="p-5 border border-border rounded-2xl bg-card shadow-sm space-y-4">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 border-b pb-3 border-neutral-100 dark:border-neutral-800">
-            <AlertCircle className="w-4 h-4 text-amber-500" />
-            Missing Today&apos;s Update
+        <div className="space-y-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <h3 className="flex items-center gap-1.5 border-b border-neutral-100 pb-3 text-sm font-bold uppercase tracking-wider text-muted-foreground dark:border-neutral-800">
+            <AlertCircle className="h-4 w-4 text-amber-500" />
+            {t("project.daily.missingTitle")}
           </h3>
 
           {missingMembers.length === 0 ? (
-            <div className="p-6 text-center text-muted-foreground border border-dashed rounded-xl">
-              <Smile className="w-8 h-8 text-green-500 mx-auto mb-2 opacity-80" />
-              <p className="text-xs font-semibold">100% Submission Completed!</p>
-              <p className="text-[10px] mt-0.5">All active project members submitted today.</p>
+            <div className="rounded-xl border border-dashed p-6 text-center text-muted-foreground">
+              <Smile className="mx-auto mb-2 h-8 w-8 text-green-500 opacity-80" />
+              <p className="text-xs font-semibold">{t("project.daily.allSubmittedTitle")}</p>
+              <p className="mt-0.5 text-[10px]">{t("project.daily.allSubmittedHint")}</p>
             </div>
           ) : (
             <div className="divide-y divide-neutral-200/40 dark:divide-neutral-800/40">
               {missingMembers.map((m) => (
-                <div key={m.id} className="py-2.5 flex items-center justify-between gap-3">
+                <div key={m.id} className="flex items-center justify-between gap-3 py-2.5">
                   <div className="min-w-0">
-                    <span className="font-bold text-xs text-foreground block truncate">{m.fullName}</span>
-                    <span className="text-[9px] text-muted-foreground truncate block">{m.email}</span>
+                    <span className="block truncate text-xs font-bold text-foreground">
+                      {m.fullName}
+                    </span>
+                    <span className="block truncate text-[9px] text-muted-foreground">
+                      {m.email}
+                    </span>
                   </div>
-                  <span className="shrink-0 px-2 py-0.5 bg-amber-500/10 text-amber-500 font-bold text-[9px] border border-amber-500/20 rounded">
-                    Missing
+                  <span className="shrink-0 rounded border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[9px] font-bold text-amber-500">
+                    {t("project.daily.missingBadge")}
                   </span>
                 </div>
               ))}

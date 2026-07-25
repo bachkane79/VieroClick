@@ -85,12 +85,15 @@ export async function listOrganizationWorkspaces(slug: string) {
 export async function attachWorkspaceToOrg(p: { workspaceId: string; organizationId: string }) {
   const ctx = await requireActor(p.workspaceId);
   if (!["owner", "admin"].includes(ctx.workspaceRole)) {
-    throw new ValidationError("Only a workspace owner/admin can move it into an organization");
+    throw new ValidationError(
+      "Only a workspace owner/admin can move it into an organization",
+      "orgMoveRequiresAdmin"
+    );
   }
 
   const userId = await getUserId();
   if (!userId || !(await repo.isMember(p.organizationId, userId))) {
-    throw new ValidationError("You must belong to the target organization");
+    throw new ValidationError("You must belong to the target organization", "notTargetOrgMember");
   }
 
   const result = await db.transaction(async (tx) => {

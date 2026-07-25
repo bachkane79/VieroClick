@@ -14,6 +14,5 @@ export default async function OnboardingPage() {
 
   if (await hasAnyWorkspace()) redirect("/dashboard");
 
-  const displayName = session.user.name ?? session.user.email?.split("@")[0] ?? "bạn";
-  return <OnboardingWizard displayName={displayName} />;
+  return <OnboardingWizard />;
 }
