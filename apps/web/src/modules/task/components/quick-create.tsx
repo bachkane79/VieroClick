@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CalendarClock, Flag, Loader2, Plus, User } from "lucide-react";
 import { cn } from "@vieroc/ui";
-import { useLocale } from "@/lib/i18n/client";
-import { t } from "@/lib/i18n/dict";
+import { useFormatter, useTranslations } from "next-intl";
+import { useActionError } from "@/i18n/use-action-error";
 import { quickCreateTaskAction } from "../task.actions";
 
 /**
@@ -38,7 +38,11 @@ const DAY_WORDS: Record<string, number> = {
   tomorrow: 1,
 };
 
-function parseQuick(raw: string): Parsed {
+function parseQuick(
+  raw: string,
+  dueLabels: { today: string; tomorrow: string },
+  format: ReturnType<typeof useFormatter>
+): Parsed {
   let title = raw;
   const out: Parsed = { title: raw };
 
@@ -104,7 +108,11 @@ function parseQuick(raw: string): Parsed {
     dd.setHours(0, 0, 0, 0);
     const diff = Math.round((dd.getTime() - today.getTime()) / 86400000);
     out.dueLabel =
-      diff === 0 ? "Hôm nay" : diff === 1 ? "Ngày mai" : `${dd.getDate()}/${dd.getMonth() + 1}`;
+      diff === 0
+        ? dueLabels.today
+        : diff === 1
+          ? dueLabels.tomorrow
+          : format.dateTime(dd, "dayMonth");
   }
 
   out.title = title.replace(/\s+/g, " ").trim();
@@ -121,19 +129,25 @@ export function QuickCreate({
   projects: QuickCreateProject[];
 }) {
   const router = useRouter();
-  const locale = useLocale();
+  const t = useTranslations();
+  const format = useFormatter();
+  const actionError = useActionError();
   const inputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState("");
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
   const [submitting, setSubmitting] = useState(false);
 
-  const parsed = useMemo(() => parseQuick(value), [value]);
-  const showChips = value.trim().length > 0 && (parsed.assigneeQuery || parsed.due || parsed.priority);
+  const parsed = useMemo(
+    () => parseQuick(value, { today: t("due.today"), tomorrow: t("due.tomorrow") }, format),
+    [value, t, format]
+  );
+  const showChips =
+    value.trim().length > 0 && (parsed.assigneeQuery || parsed.due || parsed.priority);
 
   if (projects.length === 0) return null;
 
   async function submit() {
-    const p = parseQuick(value);
+    const p = parseQuick(value, { today: t("due.today"), tomorrow: t("due.tomorrow") }, format);
     const title = p.title || value.trim();
     if (!title || !projectId || submitting) return;
     setSubmitting(true);
@@ -150,14 +164,14 @@ export function QuickCreate({
     if (res.ok) {
       toast.success(
         res.data.assigneeName
-          ? t(locale, "qc.createdFor", { who: res.data.assigneeName })
-          : t(locale, "qc.created")
+          ? t("quickCreate.createdFor", { who: res.data.assigneeName })
+          : t("quickCreate.created")
       );
       setValue("");
       router.refresh();
       requestAnimationFrame(() => inputRef.current?.focus());
     } else {
-      toast.error(res.error ?? t(locale, "qc.failed"));
+      toast.error(actionError(res, t("quickCreate.failed")));
     }
   }
 
@@ -180,7 +194,7 @@ export function QuickCreate({
             }
           }}
           disabled={submitting}
-          placeholder={t(locale, "qc.placeholder")}
+          placeholder={t("quickCreate.placeholder")}
           className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
         {projects.length > 1 && (
@@ -214,13 +228,13 @@ export function QuickCreate({
           {parsed.priority === "high" && (
             <Chip className="bg-coral-soft text-coral">
               <Flag className="h-3 w-3" />
-              {t(locale, "qc.prio.high")}
+              {t("quickCreate.prio.high")}
             </Chip>
           )}
           {parsed.priority === "low" && (
             <Chip className="bg-sky-soft text-sky">
               <Flag className="h-3 w-3" />
-              {t(locale, "qc.prio.low")}
+              {t("quickCreate.prio.low")}
             </Chip>
           )}
         </div>

@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useFormatter, useTranslations } from "next-intl";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Button, cn, Input, Textarea } from "@vieroc/ui";
 import { Check, ChevronDown, Download, FileUp, Paperclip, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { useActionError } from "@/i18n/use-action-error";
 import { uploadTaskAttachmentAction } from "@/modules/file/file.actions";
 import type { TaskAttachmentView } from "@/modules/file/file.view";
 import {
@@ -62,11 +64,11 @@ function splitLabels(value: string) {
     .filter(Boolean);
 }
 
-function formatFileSize(sizeBytes: number | null) {
+function formatFileSize(sizeBytes: number | null, format: ReturnType<typeof useFormatter>) {
   if (sizeBytes == null) return "";
   if (sizeBytes < 1024) return `${sizeBytes} B`;
-  if (sizeBytes < 1024 * 1024) return `${(sizeBytes / 1024).toFixed(1)} KB`;
-  return `${(sizeBytes / 1024 / 1024).toFixed(1)} MB`;
+  if (sizeBytes < 1024 * 1024) return `${format.number(sizeBytes / 1024, "decimal1")} KB`;
+  return `${format.number(sizeBytes / 1024 / 1024, "decimal1")} MB`;
 }
 
 export function TaskDetailDrawer({
@@ -83,6 +85,9 @@ export function TaskDetailDrawer({
   dependencies,
   attachments,
 }: Props) {
+  const t = useTranslations();
+  const format = useFormatter();
+  const actionError = useActionError();
   const router = useRouter();
   const defaultStatusId = initialStatusId ?? statuses[0]?.id ?? "";
   const [submitting, setSubmitting] = useState(false);
@@ -143,7 +148,7 @@ export function TaskDetailDrawer({
   async function handleReview(decision: "approve" | "rework") {
     if (!task) return;
     if (decision === "rework" && !reviewFeedback.trim()) {
-      toast.error("Add feedback so the assignee knows what to change.");
+      toast.error(t("task.detail.reviewFeedbackRequired"));
       return;
     }
     setReviewSubmitting(true);
@@ -161,10 +166,12 @@ export function TaskDetailDrawer({
     });
     setReviewSubmitting(false);
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(actionError(result));
       return;
     }
-    toast.success(decision === "approve" ? "Task approved and closed" : "Sent back for rework");
+    toast.success(
+      decision === "approve" ? t("task.detail.toast.approved") : t("task.detail.toast.reworkSent")
+    );
     onOpenChange(false);
     router.refresh();
   }
@@ -214,11 +221,11 @@ export function TaskDetailDrawer({
     if (!result.ok) {
       setSubmitting(false);
       if (result.code === "conflict") {
-        toast.error("This task was updated by someone else — refreshing with the latest data.");
+        toast.error(t("task.detail.toast.conflict"));
         router.refresh();
         return;
       }
-      toast.error(result.error);
+      toast.error(actionError(result));
       return;
     }
 
@@ -236,7 +243,7 @@ export function TaskDetailDrawer({
     }
 
     setSubmitting(false);
-    toast.success(task ? "Task updated" : "Task created");
+    toast.success(task ? t("task.detail.toast.updated") : t("task.detail.toast.created"));
     onOpenChange(false);
     router.refresh();
   }
@@ -253,11 +260,11 @@ export function TaskDetailDrawer({
     setSubmitting(false);
 
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(actionError(result));
       return;
     }
 
-    toast.success("Task deleted");
+    toast.success(t("task.detail.toast.deleted"));
     onOpenChange(false);
     router.refresh();
   }
@@ -273,11 +280,11 @@ export function TaskDetailDrawer({
     });
 
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(actionError(result));
       return;
     }
 
-    toast.success("Dependency added");
+    toast.success(t("task.detail.toast.dependencyAdded"));
     setDependencyCandidate("");
     router.refresh();
   }
@@ -291,11 +298,11 @@ export function TaskDetailDrawer({
     });
 
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(actionError(result));
       return;
     }
 
-    toast.success("Dependency removed");
+    toast.success(t("task.detail.toast.dependencyRemoved"));
     router.refresh();
   }
 
@@ -315,11 +322,11 @@ export function TaskDetailDrawer({
     setUploadSubmitting(false);
 
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(actionError(result));
       return;
     }
 
-    toast.success("Attachment uploaded");
+    toast.success(t("task.detail.toast.attachmentUploaded"));
     setSelectedFile(null);
     router.refresh();
   }
@@ -332,14 +339,14 @@ export function TaskDetailDrawer({
           <div className="flex items-start justify-between gap-4 border-b px-5 py-4">
             <div>
               <Dialog.Title className="text-lg font-semibold">
-                {task ? "Task detail" : "New task"}
+                {task ? t("task.detail.title") : t("task.detail.newTask")}
               </Dialog.Title>
               <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-                {selectedStatus?.name ?? "No status selected"}
+                {selectedStatus?.name ?? t("task.detail.noStatusSelected")}
               </Dialog.Description>
             </div>
             <Dialog.Close asChild>
-              <Button type="button" variant="ghost" size="icon" aria-label="Close">
+              <Button type="button" variant="ghost" size="icon" aria-label={t("common.close")}>
                 <X className="h-4 w-4" />
               </Button>
             </Dialog.Close>
@@ -350,7 +357,7 @@ export function TaskDetailDrawer({
               <section className="grid gap-4">
                 <div className="grid gap-2">
                   <label htmlFor="task-title" className="text-sm font-medium">
-                    Title
+                    {t("common.title")}
                   </label>
                   <Input
                     id="task-title"
@@ -363,7 +370,7 @@ export function TaskDetailDrawer({
 
                 <div className="grid gap-2">
                   <label htmlFor="task-description" className="text-sm font-medium">
-                    Description
+                    {t("common.description")}
                   </label>
                   <Textarea
                     id="task-description"
@@ -375,7 +382,7 @@ export function TaskDetailDrawer({
               </section>
 
               <section className="grid gap-4 md:grid-cols-2">
-                <Field label="Status" htmlFor="task-status">
+                <Field label={t("task.detail.status")} htmlFor="task-status">
                   <select
                     id="task-status"
                     value={statusId}
@@ -390,22 +397,22 @@ export function TaskDetailDrawer({
                   </select>
                 </Field>
 
-                <Field label="Priority" htmlFor="task-priority">
+                <Field label={t("task.priority.label")} htmlFor="task-priority">
                   <select
                     id="task-priority"
                     value={priority}
                     onChange={(e) => setPriority(e.target.value as typeof priority)}
                     className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="urgent">Urgent</option>
+                    <option value="low">{t("task.priority.low")}</option>
+                    <option value="medium">{t("task.priority.medium")}</option>
+                    <option value="high">{t("task.priority.high")}</option>
+                    <option value="urgent">{t("task.priority.urgent")}</option>
                   </select>
                 </Field>
 
                 <div className="grid gap-2">
-                  <span className="text-sm font-medium">Assignees</span>
+                  <span className="text-sm font-medium">{t("task.assignees")}</span>
                   <AssigneeMultiSelect
                     members={members}
                     selected={assigneeMemberIds}
@@ -417,14 +424,14 @@ export function TaskDetailDrawer({
                   />
                 </div>
 
-                <Field label="Parent task" htmlFor="task-parent">
+                <Field label={t("task.detail.parentTask")} htmlFor="task-parent">
                   <select
                     id="task-parent"
                     value={parentTaskId}
                     onChange={(e) => setParentTaskId(e.target.value)}
                     className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
-                    <option value="">None</option>
+                    <option value="">{t("common.none")}</option>
                     {tasks
                       .filter((item) => item.id !== task?.id)
                       .map((item) => (
@@ -435,7 +442,7 @@ export function TaskDetailDrawer({
                   </select>
                 </Field>
 
-                <Field label="Start date" htmlFor="task-start">
+                <Field label={t("task.detail.startDate")} htmlFor="task-start">
                   <Input
                     id="task-start"
                     type="date"
@@ -444,7 +451,7 @@ export function TaskDetailDrawer({
                   />
                 </Field>
 
-                <Field label="Due date" htmlFor="task-due">
+                <Field label={t("task.dueDate")} htmlFor="task-due">
                   <Input
                     id="task-due"
                     type="date"
@@ -453,7 +460,7 @@ export function TaskDetailDrawer({
                   />
                 </Field>
 
-                <Field label="Estimate (h)" htmlFor="task-estimate">
+                <Field label={t("task.detail.estimateHours")} htmlFor="task-estimate">
                   <Input
                     id="task-estimate"
                     type="number"
@@ -464,13 +471,13 @@ export function TaskDetailDrawer({
                   />
                 </Field>
 
-                <Field label="Actual (h)" htmlFor="task-actual">
+                <Field label={t("task.detail.actualHours")} htmlFor="task-actual">
                   <Input
                     id="task-actual"
                     type="number"
                     min="0"
                     step="0.25"
-                    placeholder="Log real time"
+                    placeholder={t("task.detail.logRealTime")}
                     value={actualHours}
                     onChange={(e) => setActualHours(e.target.value)}
                   />
@@ -483,14 +490,14 @@ export function TaskDetailDrawer({
                     onChange={(e) => setIsMilestone(e.target.checked)}
                     className="h-4 w-4 rounded border-input"
                   />
-                  Milestone
+                  {t("task.detail.milestone")}
                 </label>
               </section>
 
               {selectedStatus?.type === "blocked" && (
                 <section className="grid gap-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-950">
                   <label htmlFor="task-blocker-reason" className="text-sm font-medium">
-                    Blocker reason
+                    {t("task.detail.blockerReason")}
                   </label>
                   <Textarea
                     id="task-blocker-reason"
@@ -503,15 +510,12 @@ export function TaskDetailDrawer({
 
               {task && selectedStatus?.type === "in_review" && (
                 <section className="grid gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
-                  <div className="text-sm font-semibold">Review</div>
-                  <p className="text-xs text-muted-foreground">
-                    Approve to close the task, or request changes with feedback. Only a reviewer or lead
-                    can decide.
-                  </p>
+                  <div className="text-sm font-semibold">{t("task.detail.review")}</div>
+                  <p className="text-xs text-muted-foreground">{t("task.detail.reviewHint")}</p>
                   <Textarea
                     value={reviewFeedback}
                     onChange={(e) => setReviewFeedback(e.target.value)}
-                    placeholder="Feedback for the assignee (required to request changes)"
+                    placeholder={t("task.detail.reviewFeedbackPlaceholder")}
                     className="min-h-[64px] text-sm"
                   />
                   <div className="flex items-center gap-2">
@@ -521,7 +525,7 @@ export function TaskDetailDrawer({
                       disabled={reviewSubmitting}
                       className="bg-green-600 text-white hover:bg-green-700"
                     >
-                      Approve &amp; close
+                      {t("task.detail.approveAndClose")}
                     </Button>
                     <Button
                       type="button"
@@ -529,7 +533,7 @@ export function TaskDetailDrawer({
                       onClick={() => handleReview("rework")}
                       disabled={reviewSubmitting}
                     >
-                      Request changes
+                      {t("task.detail.requestChanges")}
                     </Button>
                   </div>
                 </section>
@@ -537,15 +541,19 @@ export function TaskDetailDrawer({
 
               <section className="grid gap-2">
                 <label htmlFor="task-labels" className="text-sm font-medium">
-                  Labels
+                  {t("task.detail.labels")}
                 </label>
-                <Input id="task-labels" value={labels} onChange={(e) => setLabels(e.target.value)} />
+                <Input
+                  id="task-labels"
+                  value={labels}
+                  onChange={(e) => setLabels(e.target.value)}
+                />
               </section>
 
               <section className="grid gap-3">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="flex items-center gap-2 text-sm font-semibold">
-                    Acceptance criteria
+                    {t("task.detail.acceptanceCriteria")}
                     {criteria.length > 0 && (
                       <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
                         {criteria.filter((c) => c.checked).length}/{criteria.length}
@@ -560,7 +568,7 @@ export function TaskDetailDrawer({
                     onClick={() => setCriteria((current) => [...current, newCriterion()])}
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    Add
+                    {t("common.add")}
                   </Button>
                 </div>
                 {criteria.length > 0 && (
@@ -604,7 +612,7 @@ export function TaskDetailDrawer({
                                 )
                               }
                             />
-                            Required
+                            {t("task.detail.required")}
                           </label>
                           <label className="flex items-center gap-2">
                             <input
@@ -620,14 +628,14 @@ export function TaskDetailDrawer({
                                 )
                               }
                             />
-                            Checked
+                            {t("task.detail.checked")}
                           </label>
                         </div>
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          aria-label="Remove criterion"
+                          aria-label={t("task.detail.removeCriterion")}
                           onClick={() =>
                             setCriteria((current) => current.filter((_, i) => i !== index))
                           }
@@ -642,7 +650,7 @@ export function TaskDetailDrawer({
 
               {task && (
                 <section className="grid gap-3">
-                  <h3 className="text-sm font-semibold">Dependencies</h3>
+                  <h3 className="text-sm font-semibold">{t("task.detail.dependencies")}</h3>
                   <div className="space-y-2">
                     {blockerDependencies.map((dependency) => (
                       <div
@@ -650,13 +658,14 @@ export function TaskDetailDrawer({
                         className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
                       >
                         <span className="truncate text-sm">
-                          {taskById.get(dependency.blockerTaskId)?.title ?? "Task"}
+                          {taskById.get(dependency.blockerTaskId)?.title ??
+                            t("task.detail.taskFallback")}
                         </span>
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          aria-label="Remove dependency"
+                          aria-label={t("task.detail.removeDependency")}
                           onClick={() => removeDependency(dependency.id)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -670,7 +679,7 @@ export function TaskDetailDrawer({
                       onChange={(e) => setDependencyCandidate(e.target.value)}
                       className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     >
-                      <option value="">Select blocker</option>
+                      <option value="">{t("task.detail.selectBlocker")}</option>
                       {availableBlockers.map((item) => (
                         <option key={item.id} value={item.id}>
                           {item.title}
@@ -678,7 +687,7 @@ export function TaskDetailDrawer({
                       ))}
                     </select>
                     <Button type="button" variant="outline" onClick={addDependency}>
-                      Add
+                      {t("common.add")}
                     </Button>
                   </div>
                 </section>
@@ -699,7 +708,7 @@ export function TaskDetailDrawer({
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="flex items-center gap-2 text-sm font-semibold">
                       <Paperclip className="h-4 w-4" />
-                      Attachments
+                      {t("task.detail.attachments")}
                     </h3>
                     <span className="text-xs text-muted-foreground">{taskAttachments.length}</span>
                   </div>
@@ -719,7 +728,7 @@ export function TaskDetailDrawer({
                       onClick={uploadAttachment}
                     >
                       <FileUp className="h-4 w-4" />
-                      {uploadSubmitting ? "Uploading..." : "Upload"}
+                      {uploadSubmitting ? t("task.detail.uploading") : t("task.detail.upload")}
                     </Button>
                   </div>
 
@@ -732,13 +741,13 @@ export function TaskDetailDrawer({
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium">{attachment.fileName}</p>
                           <p className="text-xs text-muted-foreground">
-                            {formatFileSize(attachment.sizeBytes)}
+                            {formatFileSize(attachment.sizeBytes, format)}
                           </p>
                         </div>
                         <a
                           href={`/api/files/${attachment.fileId}?projectId=${projectId}`}
                           className="inline-flex h-9 w-9 items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2"
-                          aria-label="Download attachment"
+                          aria-label={t("task.detail.downloadAttachment")}
                         >
                           <Download className="h-4 w-4" />
                         </a>
@@ -746,7 +755,7 @@ export function TaskDetailDrawer({
                     ))}
                     {taskAttachments.length === 0 && (
                       <div className="rounded-md border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-                        No attachments yet.
+                        {t("task.detail.noAttachments")}
                       </div>
                     )}
                   </div>
@@ -760,7 +769,7 @@ export function TaskDetailDrawer({
                   onChange={(e) => setAllowBlockedOverride(e.target.checked)}
                   className="h-4 w-4 rounded border-input"
                 />
-                Override blocker dependency
+                {t("task.detail.overrideBlocker")}
               </label>
             </div>
 
@@ -773,18 +782,18 @@ export function TaskDetailDrawer({
                     onClick={() => setConfirmDeleteOpen(true)}
                     disabled={submitting}
                   >
-                    Delete
+                    {t("common.delete")}
                   </Button>
                 )}
               </div>
               <div className="flex gap-2">
                 <Dialog.Close asChild>
                   <Button type="button" variant="outline">
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                 </Dialog.Close>
                 <Button type="submit" disabled={submitting || !title.trim()}>
-                  {submitting ? "Saving..." : "Save"}
+                  {submitting ? t("common.saving") : t("common.save")}
                 </Button>
               </div>
             </div>
@@ -794,10 +803,10 @@ export function TaskDetailDrawer({
       <ConfirmationDialog
         isOpen={confirmDeleteOpen}
         onOpenChange={setConfirmDeleteOpen}
-        title="Delete task"
-        description={task ? `Delete "${task.title}"? This can be restored later from the Deleted tasks panel.` : ""}
+        title={t("task.detail.deleteTitle")}
+        description={task ? t("task.detail.deleteConfirm", { title: task.title }) : ""}
         variant="destructive"
-        confirmLabel="Delete"
+        confirmLabel={t("common.delete")}
         onConfirm={deleteTask}
       />
     </Dialog.Root>
@@ -832,6 +841,7 @@ function AssigneeMultiSelect({
   selected: string[];
   onToggle: (id: string) => void;
 }) {
+  const t = useTranslations();
   const byId = new Map(members.map((m) => [m.id, m]));
   return (
     <DropdownMenu.Root>
@@ -841,7 +851,9 @@ function AssigneeMultiSelect({
           className="flex min-h-9 items-center justify-between gap-2 rounded-md border border-input bg-background px-2 py-1 text-left text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
           <span className="flex min-w-0 flex-wrap gap-1">
-            {selected.length === 0 && <span className="text-muted-foreground">Unassigned</span>}
+            {selected.length === 0 && (
+              <span className="text-muted-foreground">{t("task.unassigned")}</span>
+            )}
             {selected.map((id) => {
               const m = byId.get(id);
               if (!m) return null;
@@ -868,7 +880,9 @@ function AssigneeMultiSelect({
           className="z-[60] max-h-64 min-w-[240px] overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
         >
           {members.length === 0 && (
-            <p className="px-2 py-1.5 text-xs text-muted-foreground">No project members.</p>
+            <p className="px-2 py-1.5 text-xs text-muted-foreground">
+              {t("task.detail.noProjectMembers")}
+            </p>
           )}
           {members.map((m) => {
             const on = selected.includes(m.id);

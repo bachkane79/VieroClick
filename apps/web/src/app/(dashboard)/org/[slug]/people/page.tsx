@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { Building2, FolderKanban } from "lucide-react";
 import {
   getOrganization,
@@ -21,6 +22,7 @@ const ROLE_BADGE: Record<string, string> = {
 
 export default async function OrgPeoplePage({ params }: Props) {
   const { slug } = await params;
+  const t = await getTranslations();
 
   let org;
   let members;
@@ -45,7 +47,7 @@ export default async function OrgPeoplePage({ params }: Props) {
         <div>
           <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary">
             <Building2 className="h-3.5 w-3.5" />
-            Organization
+            {t("organization.label")}
           </p>
           <h1 className="text-2xl font-bold tracking-tight">{org.name}</h1>
         </div>
@@ -55,8 +57,10 @@ export default async function OrgPeoplePage({ params }: Props) {
         {/* People directory */}
         <section className="rounded-lg border bg-card shadow-sm">
           <div className="flex items-center justify-between border-b px-4 py-3">
-            <h2 className="text-base font-semibold">People</h2>
-            <span className="text-xs text-muted-foreground">{members.length} thành viên</span>
+            <h2 className="text-base font-semibold">{t("organization.people")}</h2>
+            <span className="text-xs text-muted-foreground">
+              {t("organization.memberCount", { count: members.length })}
+            </span>
           </div>
           <div className="divide-y">
             {members.map((m) => (
@@ -79,7 +83,7 @@ export default async function OrgPeoplePage({ params }: Props) {
             ))}
             {members.length === 0 && (
               <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-                Chưa có thành viên. Đưa một team vào tổ chức để chia sẻ danh bạ.
+                {t("organization.emptyMembers")}
               </p>
             )}
           </div>
@@ -88,7 +92,7 @@ export default async function OrgPeoplePage({ params }: Props) {
         {/* Teams in this org */}
         <aside className="rounded-lg border bg-card shadow-sm">
           <div className="border-b px-4 py-3">
-            <h2 className="text-base font-semibold">Teams</h2>
+            <h2 className="text-base font-semibold">{t("organization.teams")}</h2>
           </div>
           <div className="divide-y">
             {workspaces.map((w) => (
@@ -103,7 +107,7 @@ export default async function OrgPeoplePage({ params }: Props) {
             ))}
             {workspaces.length === 0 && (
               <p className="px-4 py-8 text-center text-xs text-muted-foreground">
-                Chưa có team nào trong tổ chức. Vào một team và chọn “Đưa team này vào” ở switcher.
+                {t("organization.emptyTeams")}
               </p>
             )}
           </div>

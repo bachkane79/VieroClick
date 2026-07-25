@@ -28,7 +28,10 @@ async function loadResourceInWorkspace(
   const meta = await repo.getResourceMeta(resourceType, resourceId);
   if (!meta) throw new NotFoundError("Resource");
   if (meta.workspaceId !== workspaceId) {
-    throw new ValidationError("Resource does not belong to this workspace");
+    throw new ValidationError(
+      "Resource does not belong to this workspace",
+      "resourceWorkspaceMismatch"
+    );
   }
   return meta;
 }
@@ -53,19 +56,22 @@ export async function shareResource(p: { workspaceId: string; input: unknown }) 
     "edit"
   );
   if (LEVEL_RANK[grant.level] > LEVEL_RANK[ownLevel]) {
-    throw new ValidationError("You can only grant a level equal to or below your own");
+    throw new ValidationError(
+      "You can only grant a level equal to or below your own",
+      "grantTooHigh"
+    );
   }
 
   // The subject must belong to this workspace.
   if (grant.subjectType === "member") {
     const members = await workspaceRepo.listMembers(p.workspaceId);
     if (!members.some((m) => m.id === grant.subjectId)) {
-      throw new ValidationError("Target member is not in this workspace");
+      throw new ValidationError("Target member is not in this workspace", "memberNotInWorkspace");
     }
   } else {
     const team = await repo.findTeamById(grant.subjectId);
     if (!team || team.workspaceId !== p.workspaceId) {
-      throw new ValidationError("Target team is not in this workspace");
+      throw new ValidationError("Target team is not in this workspace", "teamNotInWorkspace");
     }
   }
 
@@ -189,7 +195,7 @@ export async function setTeamMember(p: { workspaceId: string; input: unknown; ad
   if (!team || team.workspaceId !== p.workspaceId) throw new NotFoundError("Team");
   const members = await workspaceRepo.listMembers(p.workspaceId);
   if (!members.some((m) => m.id === data.workspaceMemberId)) {
-    throw new ValidationError("Member is not in this workspace");
+    throw new ValidationError("Member is not in this workspace", "memberNotInWorkspace");
   }
 
   return db.transaction(async (tx) => {

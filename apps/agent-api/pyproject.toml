@@ -23,9 +23,12 @@ dependencies = [
     "structlog>=24.4.0",
     "tenacity>=9.0.0",
     # Converts intake uploads (pdf/docx/xlsx/pptx/images/…) to markdown before
-    # they reach the planning + intake_review LLMs. [all] pulls image/OCR extras;
-    # image captioning uses the DeepSeek flash model (see doc_preprocess.py).
-    "markitdown[all]>=0.1.6",
+    # they reach the planning + intake_review LLMs. We pin the concrete office/pdf
+    # extras rather than [all]: [all] drags in az-content-understanding, whose only
+    # release is a pre-release (azure-ai-contentunderstanding>=1.2.0b1) that uv
+    # refuses by default and which this app never uses — image captioning goes
+    # through the DeepSeek flash model instead (see doc_preprocess.py).
+    "markitdown[pdf,docx,pptx,xlsx,xls]>=0.1.6",
 ]
 
 [project.optional-dependencies]

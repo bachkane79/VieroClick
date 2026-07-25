@@ -9,9 +9,8 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { cn } from "@vieroc/ui";
 import { CreateWorkspaceDialog } from "@/modules/workspace/components/create-workspace-dialog";
 import { CreateOrganizationDialog } from "@/modules/organization/components/create-organization-dialog";
-import { useLocale } from "@/lib/i18n/client";
-import { t } from "@/lib/i18n/dict";
-import { setLocaleAction } from "@/lib/i18n/actions";
+import { useLocale, useTranslations } from "next-intl";
+import { setLocaleAction } from "@/i18n/actions";
 import {
   Bell,
   Building2,
@@ -42,6 +41,7 @@ interface Props {
 export function TopBar({ user, workspaces, organizations }: Props) {
   const params = useParams() as { slug?: string; projectId?: string };
   const router = useRouter();
+  const t = useTranslations();
   const locale = useLocale();
   const [wsDialog, setWsDialog] = useState(false);
   const [orgDialog, setOrgDialog] = useState(false);
@@ -81,7 +81,7 @@ export function TopBar({ user, workspaces, organizations }: Props) {
                 </span>
               )}
               <span className="block truncate text-sm font-semibold leading-tight text-foreground">
-                {activeWorkspace ? activeWorkspace.name : t(locale, "tb.selectWs")}
+                {activeWorkspace ? activeWorkspace.name : t("topbar.selectWs")}
               </span>
             </span>
             <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-text-secondary" />
@@ -94,7 +94,7 @@ export function TopBar({ user, workspaces, organizations }: Props) {
             className="z-50 w-64 rounded-lg border border-border bg-popover p-1.5 shadow-elevated focus:outline-none"
           >
             <DropdownMenu.Label className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              {t(locale, "tb.workspaces")}
+              {t("topbar.workspaces")}
             </DropdownMenu.Label>
             {workspaces.map((w) => (
               <DropdownMenu.Item asChild key={w.id}>
@@ -123,7 +123,7 @@ export function TopBar({ user, workspaces, organizations }: Props) {
               className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 focus:bg-primary/10 focus:outline-none"
             >
               <Plus className="h-4 w-4" />
-              {t(locale, "tb.createWs")}
+              {t("topbar.createWs")}
             </DropdownMenu.Item>
             <DropdownMenu.Item
               onSelect={(e) => {
@@ -133,7 +133,7 @@ export function TopBar({ user, workspaces, organizations }: Props) {
               className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
             >
               <Building2 className="h-4 w-4 text-muted-foreground" />
-              {t(locale, "tb.createOrg")}
+              {t("topbar.createOrg")}
             </DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
@@ -148,19 +148,27 @@ export function TopBar({ user, workspaces, organizations }: Props) {
           className="group flex h-9 w-40 items-center gap-2 rounded-full border border-border bg-surface px-3.5 text-left text-text-secondary shadow-xs transition-colors hover:border-border-strong hover:bg-surface-hover sm:w-56"
         >
           <Search className="h-4 w-4 shrink-0" />
-          <span className="min-w-0 flex-1 truncate text-xs">{t(locale, "tb.search")}</span>
+          <span className="min-w-0 flex-1 truncate text-xs">{t("topbar.search")}</span>
           <kbd className="hidden shrink-0 rounded-full border border-border bg-canvas px-1.5 py-0.5 text-[10px] font-medium text-text-secondary sm:inline">
             {isMac ? "⌘" : "Ctrl"} K
           </kbd>
         </button>
 
         {/* Settings */}
-        <Link href={ws ? `${wsBase}/settings` : "/settings"} title={t(locale, "sb.settings")} className={circle}>
+        <Link
+          href={ws ? `${wsBase}/settings` : "/settings"}
+          title={t("sidebar.settings")}
+          className={circle}
+        >
           <Settings className="h-4 w-4" strokeWidth={1.75} />
         </Link>
 
         {/* Notifications */}
-        <Link href={ws ? `${wsBase}/inbox` : "/dashboard"} title={t(locale, "sb.inbox")} className={circle}>
+        <Link
+          href={ws ? `${wsBase}/inbox` : "/dashboard"}
+          title={t("sidebar.inbox")}
+          className={circle}
+        >
           <Bell className="h-4 w-4" strokeWidth={1.75} />
         </Link>
 
@@ -170,7 +178,7 @@ export function TopBar({ user, workspaces, organizations }: Props) {
             <DropdownMenu.Trigger asChild>
               <button className="inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-xs transition-colors hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring">
                 <Plus className="h-4 w-4" />
-                {t(locale, "tb.create")}
+                {t("topbar.create")}
               </button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
@@ -185,7 +193,7 @@ export function TopBar({ user, workspaces, organizations }: Props) {
                     className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
                   >
                     <FolderPlus className="h-4 w-4 text-muted-foreground" />
-                    {t(locale, "tb.newProject")}
+                    {t("topbar.newProject")}
                   </Link>
                 </DropdownMenu.Item>
                 <DropdownMenu.Item asChild>
@@ -194,7 +202,7 @@ export function TopBar({ user, workspaces, organizations }: Props) {
                     className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
                   >
                     <FileText className="h-4 w-4 text-muted-foreground" />
-                    {t(locale, "tb.newDoc")}
+                    {t("topbar.newDoc")}
                   </Link>
                 </DropdownMenu.Item>
               </DropdownMenu.Content>
@@ -211,7 +219,11 @@ export function TopBar({ user, workspaces, organizations }: Props) {
             >
               {user.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={user.image} alt="" className="h-9 w-9 rounded-full border border-border object-cover" />
+                <img
+                  src={user.image}
+                  alt=""
+                  className="h-9 w-9 rounded-full border border-border object-cover"
+                />
               ) : (
                 <span className="grid h-9 w-9 place-items-center rounded-full bg-primary/10 text-[13px] font-bold uppercase text-primary">
                   {(user.name ?? user.email ?? "?").charAt(0)}
@@ -237,7 +249,7 @@ export function TopBar({ user, workspaces, organizations }: Props) {
                   className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
                 >
                   <UserCircle className="h-4 w-4 text-muted-foreground" />
-                  {t(locale, "sb.profile")}
+                  {t("sidebar.profile")}
                 </Link>
               </DropdownMenu.Item>
               {ws && (
@@ -247,7 +259,7 @@ export function TopBar({ user, workspaces, organizations }: Props) {
                     className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
                   >
                     <Settings className="h-4 w-4 text-muted-foreground" />
-                    {locale === "vi" ? "Cài đặt workspace" : "Workspace settings"}
+                    {t("topbar.workspaceSettings")}
                   </Link>
                 </DropdownMenu.Item>
               )}
@@ -257,7 +269,7 @@ export function TopBar({ user, workspaces, organizations }: Props) {
                   className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
                 >
                   <UserCog className="h-4 w-4 text-muted-foreground" />
-                  {locale === "vi" ? "Cài đặt cá nhân" : "Personal settings"}
+                  {t("topbar.personalSettings")}
                 </Link>
               </DropdownMenu.Item>
               <DropdownMenu.Item
@@ -268,7 +280,7 @@ export function TopBar({ user, workspaces, organizations }: Props) {
                 className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
               >
                 <Globe className="h-4 w-4 text-muted-foreground" />
-                <span className="flex-1">{t(locale, "sb.language")}</span>
+                <span className="flex-1">{t("sidebar.language")}</span>
                 <span className="rounded border border-border px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
                   {locale === "vi" ? "EN" : "VI"}
                 </span>
@@ -279,7 +291,7 @@ export function TopBar({ user, workspaces, organizations }: Props) {
                 className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 focus:bg-destructive/10 focus:outline-none"
               >
                 <LogOut className="h-4 w-4" />
-                {t(locale, "sb.signOut")}
+                {t("sidebar.signOut")}
               </DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>

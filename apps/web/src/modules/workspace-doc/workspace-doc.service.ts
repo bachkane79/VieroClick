@@ -35,7 +35,11 @@ export async function listWorkspaceDocs(workspaceId: string) {
 export async function createWorkspaceDoc(p: { workspaceId: string; input: unknown }) {
   const data = createDocSchema.parse(p.input);
   const ctx = await requireActor(p.workspaceId);
-  requirePermission(canContribute(ctx), "You do not have permission to create documents");
+  requirePermission(
+    canContribute(ctx),
+    "You do not have permission to create documents",
+    "contributorOnly"
+  );
 
   return db.transaction(async (tx) => {
     const doc = await repo.create(
@@ -61,7 +65,11 @@ export async function updateWorkspaceDoc(p: {
 }) {
   const data = updateDocSchema.parse(p.input);
   const ctx = await requireActor(p.workspaceId);
-  requirePermission(canContribute(ctx), "You do not have permission to edit documents");
+  requirePermission(
+    canContribute(ctx),
+    "You do not have permission to edit documents",
+    "contributorOnly"
+  );
 
   const existing = await repo.findById(p.docId);
   if (!existing || existing.workspaceId !== p.workspaceId) throw new NotFoundError("Document");

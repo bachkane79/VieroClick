@@ -166,53 +166,10 @@ export type UpdateAutomationInput = z.infer<typeof updateAutomationSchema>;
 export type AutomationConditionInput = z.infer<typeof conditionSchema>;
 export type AutomationActionInput = z.infer<typeof actionSchema>;
 
-export const AUTOMATION_TRIGGER_LABELS: Record<string, string> = {
-  "task.created": "Task được tạo",
-  "task.updated": "Task được cập nhật",
-  "task.status_changed": "Trạng thái task đổi",
-  "task.assigned": "Task được giao",
-  "task.deleted": "Task bị xoá",
-  "task.restored": "Task được khôi phục",
-  "task.submitted_for_review": "Task gửi duyệt",
-  "task.approved": "Task được duyệt",
-  "task.rework_requested": "Task bị yêu cầu sửa lại",
-  "task.comment_added": "Có bình luận mới trên task",
-  "task.dependency_added": "Thêm phụ thuộc task",
-  "task.dependency_removed": "Gỡ phụ thuộc task",
-  "blocker.created": "Blocker được tạo",
-  "blocker.updated": "Blocker được cập nhật",
-  "blocker.resolved": "Blocker được giải quyết",
-  "risk.created": "Rủi ro được tạo",
-  "risk.updated": "Rủi ro được cập nhật",
-  "milestone.created": "Milestone được tạo",
-  "milestone.updated": "Milestone được cập nhật",
-  "daily_update.submitted": "Daily update được gửi",
-};
-
-export const AUTOMATION_ACTION_LABELS: Record<string, string> = {
-  update_status: "Đổi trạng thái",
-  update_priority: "Đổi mức ưu tiên",
-  update_assignee: "Đổi người phụ trách",
-  update_task_title: "Đổi tên task",
-  update_start_date: "Đổi ngày bắt đầu",
-  update_due_date: "Đổi hạn chót",
-  create_task: "Tạo task mới",
-  delete_task: "Xoá task",
-  add_dependency: "Thêm phụ thuộc",
-  remove_dependency: "Gỡ phụ thuộc",
-  add_comment: "Thêm bình luận",
-  create_risk: "Tạo rủi ro mới",
-  escalate_blocker: "Nâng cấp độ blocker",
-  reassign_blocker_owner: "Đổi người phụ trách blocker",
-  update_risk_status: "Đổi trạng thái rủi ro",
-  reassign_risk_owner: "Đổi người phụ trách rủi ro",
-  update_milestone_status: "Đổi trạng thái milestone",
-  update_milestone_date: "Đổi ngày mục tiêu milestone",
-  notify_lead: "Thông báo cho lead",
-  notify_member: "Thông báo cho thành viên",
-  send_channel_message: "Gửi tin nhắn vào channel",
-  trigger_replan: "Yêu cầu AI lập lại kế hoạch",
-};
+// Trigger and action display labels are NOT held here — they live in the
+// message catalog (`automations.trigger.*` / `automations.action.*`) and are
+// resolved through `automation.labels.ts#automationLabel`, which camelizes the
+// dotted/snake_case code into a catalog leaf.
 
 // ─── Guided-form metadata (client-safe — no server-only imports) ────────────
 // Drives the action/condition editors so users pick from real project data
@@ -231,74 +188,73 @@ export type ActionFieldType =
 
 export type ActionFieldSpec = {
   key: string;
-  label: string;
+  /** Catalog leaf under `automations.field` — resolved at render time. */
+  labelKey: string;
   type: ActionFieldType;
   required?: boolean;
 };
 
 export const ACTION_FIELD_SPECS: Record<string, ActionFieldSpec[]> = {
-  update_status: [{ key: "statusId", label: "Trạng thái mới", type: "select-status", required: true }],
-  update_priority: [{ key: "priority", label: "Mức ưu tiên", type: "select-priority", required: true }],
-  update_assignee: [{ key: "memberId", label: "Giao cho", type: "select-member", required: true }],
-  update_task_title: [{ key: "title", label: "Tên task mới", type: "text", required: true }],
-  update_start_date: [{ key: "startDate", label: "Ngày bắt đầu mới", type: "date", required: true }],
-  update_due_date: [{ key: "dueDate", label: "Hạn chót mới", type: "date", required: true }],
+  update_status: [{ key: "statusId", labelKey: "newStatus", type: "select-status", required: true }],
+  update_priority: [{ key: "priority", labelKey: "priority", type: "select-priority", required: true }],
+  update_assignee: [{ key: "memberId", labelKey: "assignTo", type: "select-member", required: true }],
+  update_task_title: [{ key: "title", labelKey: "newTaskTitle", type: "text", required: true }],
+  update_start_date: [{ key: "startDate", labelKey: "startDate", type: "date", required: true }],
+  update_due_date: [{ key: "dueDate", labelKey: "dueDate", type: "date", required: true }],
   create_task: [
-    { key: "title", label: "Tiêu đề task mới", type: "text", required: true },
-    { key: "priority", label: "Mức ưu tiên", type: "select-priority" },
-    { key: "assigneeMemberId", label: "Giao cho", type: "select-member" },
-    { key: "dueDate", label: "Hạn chót", type: "date" },
+    { key: "title", labelKey: "newTaskTitle", type: "text", required: true },
+    { key: "priority", labelKey: "priority", type: "select-priority" },
+    { key: "assigneeMemberId", labelKey: "assignTo", type: "select-member" },
+    { key: "dueDate", labelKey: "dueDate", type: "date" },
   ],
-  delete_task: [{ key: "taskId", label: "Task cần xoá (để trống = task hiện tại)", type: "select-task" }],
+  delete_task: [{ key: "taskId", labelKey: "taskToDelete", type: "select-task" }],
   add_dependency: [
-    { key: "blockerTaskId", label: "Task chặn (blocker)", type: "select-task", required: true },
-    { key: "dependencyType", label: "Loại phụ thuộc", type: "text" },
+    { key: "blockerTaskId", labelKey: "blockerTask", type: "select-task", required: true },
+    { key: "dependencyType", labelKey: "dependencyType", type: "text" },
   ],
-  remove_dependency: [
-    { key: "dependencyId", label: "ID phụ thuộc cần gỡ", type: "text", required: true },
-  ],
-  add_comment: [{ key: "body", label: "Nội dung bình luận", type: "textarea", required: true }],
+  remove_dependency: [{ key: "dependencyId", labelKey: "dependencyId", type: "text", required: true }],
+  add_comment: [{ key: "body", labelKey: "commentText", type: "textarea", required: true }],
   create_risk: [
-    { key: "title", label: "Tiêu đề rủi ro", type: "text", required: true },
-    { key: "description", label: "Mô tả", type: "textarea" },
-    { key: "probability", label: "Xác suất (1-5)", type: "number" },
-    { key: "impact", label: "Mức ảnh hưởng (1-5)", type: "number" },
+    { key: "title", labelKey: "riskTitle", type: "text", required: true },
+    { key: "description", labelKey: "description", type: "textarea" },
+    { key: "probability", labelKey: "probability", type: "number" },
+    { key: "impact", labelKey: "impact", type: "number" },
   ],
-  escalate_blocker: [{ key: "blockerId", label: "Blocker", type: "select-blocker", required: true }],
+  escalate_blocker: [{ key: "blockerId", labelKey: "blocker", type: "select-blocker", required: true }],
   reassign_blocker_owner: [
-    { key: "blockerId", label: "Blocker", type: "select-blocker", required: true },
-    { key: "memberId", label: "Người phụ trách mới", type: "select-member", required: true },
+    { key: "blockerId", labelKey: "blocker", type: "select-blocker", required: true },
+    { key: "memberId", labelKey: "newOwner", type: "select-member", required: true },
   ],
   update_risk_status: [
-    { key: "riskId", label: "ID rủi ro", type: "text", required: true },
-    { key: "status", label: "Trạng thái mới", type: "text", required: true },
+    { key: "riskId", labelKey: "riskId", type: "text", required: true },
+    { key: "status", labelKey: "newRiskStatus", type: "text", required: true },
   ],
   reassign_risk_owner: [
-    { key: "riskId", label: "ID rủi ro", type: "text", required: true },
-    { key: "memberId", label: "Người phụ trách mới", type: "select-member", required: true },
+    { key: "riskId", labelKey: "riskId", type: "text", required: true },
+    { key: "memberId", labelKey: "newOwner", type: "select-member", required: true },
   ],
   update_milestone_status: [
-    { key: "milestoneId", label: "ID milestone", type: "text", required: true },
-    { key: "status", label: "Trạng thái mới", type: "text", required: true },
+    { key: "milestoneId", labelKey: "milestoneId", type: "text", required: true },
+    { key: "status", labelKey: "newMilestoneStatus", type: "text", required: true },
   ],
   update_milestone_date: [
-    { key: "milestoneId", label: "ID milestone", type: "text", required: true },
-    { key: "targetDate", label: "Ngày mục tiêu mới", type: "date", required: true },
+    { key: "milestoneId", labelKey: "milestoneId", type: "text", required: true },
+    { key: "targetDate", labelKey: "newTargetDate", type: "date", required: true },
   ],
   notify_lead: [
-    { key: "title", label: "Tiêu đề thông báo", type: "text", required: true },
-    { key: "body", label: "Nội dung", type: "textarea" },
+    { key: "title", labelKey: "notificationTitle", type: "text", required: true },
+    { key: "body", labelKey: "notificationBody", type: "textarea" },
   ],
   notify_member: [
-    { key: "memberId", label: "Người nhận", type: "select-member", required: true },
-    { key: "title", label: "Tiêu đề thông báo", type: "text", required: true },
-    { key: "body", label: "Nội dung", type: "textarea" },
+    { key: "memberId", labelKey: "recipient", type: "select-member", required: true },
+    { key: "title", labelKey: "notificationTitle", type: "text", required: true },
+    { key: "body", labelKey: "notificationBody", type: "textarea" },
   ],
   send_channel_message: [
-    { key: "title", label: "Tiêu đề", type: "text", required: true },
-    { key: "body", label: "Nội dung", type: "textarea" },
+    { key: "title", labelKey: "notificationTitle", type: "text", required: true },
+    { key: "body", labelKey: "notificationBody", type: "textarea" },
   ],
-  trigger_replan: [{ key: "reason", label: "Lý do (tuỳ chọn)", type: "textarea" }],
+  trigger_replan: [{ key: "reason", labelKey: "replanReason", type: "textarea" }],
 };
 
 /** Action types that need one specific project's data (a statusId/blockerId/
@@ -349,124 +305,125 @@ export const PROJECT_ROLE_TYPES = [
 
 export type ConditionFieldSpec = {
   field: string;
-  label: string;
+  /** Catalog leaf under `automations.field` — resolved at render time. */
+  labelKey: string;
   /** Omitted = free-text value input (no guided picker yet — still whitelisted
    * for this trigger, just not upgraded to a picker). */
   valueKind?: ConditionValueKind;
 };
 
 /** Whitelist of condition fields per trigger — doubles as the UI dropdown
- * source AND the server-side enforcement list (see checkTriggerScoping
+ * source AND the server-side enforcement list (see assertTriggerScoping
  * above). Every trigger below now has an entry; see
  * docs_local/automation-trigger-condition-action-catalog.md for the source
  * catalog this was built from. */
 export const CONDITION_FIELDS_BY_TRIGGER: Record<string, ConditionFieldSpec[]> = {
   "task.created": [
-    { field: "after.priority", label: "Mức ưu tiên", valueKind: "priority" },
-    { field: "after.assigneeMemberId", label: "Người được giao", valueKind: "member" },
-    { field: "after.reporterMemberId", label: "Người báo cáo", valueKind: "member" },
-    { field: "after.dueDate", label: "Hạn chót", valueKind: "date" },
-    { field: "after.startDate", label: "Ngày bắt đầu", valueKind: "date" },
-    { field: "after.isMilestone", label: "Là milestone?", valueKind: "boolean" },
-    { field: "after.milestoneId", label: "Thuộc milestone (ID)" },
-    { field: "after.labels", label: "Nhãn (labels)" },
+    { field: "after.priority", labelKey: "priority", valueKind: "priority" },
+    { field: "after.assigneeMemberId", labelKey: "assignee", valueKind: "member" },
+    { field: "after.reporterMemberId", labelKey: "reporter", valueKind: "member" },
+    { field: "after.dueDate", labelKey: "dueDate", valueKind: "date" },
+    { field: "after.startDate", labelKey: "startDate", valueKind: "date" },
+    { field: "after.isMilestone", labelKey: "isMilestone", valueKind: "boolean" },
+    { field: "after.milestoneId", labelKey: "milestoneId" },
+    { field: "after.labels", labelKey: "taskLabels" },
   ],
   "task.updated": [
-    { field: "after.assigneeMemberId", label: "Người được giao", valueKind: "member" },
-    { field: "after.reporterMemberId", label: "Người báo cáo", valueKind: "member" },
-    { field: "after.priority", label: "Mức ưu tiên", valueKind: "priority" },
-    { field: "after.dueDate", label: "Hạn chót", valueKind: "date" },
-    { field: "after.startDate", label: "Ngày bắt đầu", valueKind: "date" },
-    { field: "after.labels", label: "Nhãn (labels)" },
-    { field: "after.milestoneId", label: "Thuộc milestone (ID)" },
+    { field: "after.assigneeMemberId", labelKey: "assignee", valueKind: "member" },
+    { field: "after.reporterMemberId", labelKey: "reporter", valueKind: "member" },
+    { field: "after.priority", labelKey: "priority", valueKind: "priority" },
+    { field: "after.dueDate", labelKey: "dueDate", valueKind: "date" },
+    { field: "after.startDate", labelKey: "startDate", valueKind: "date" },
+    { field: "after.labels", labelKey: "taskLabels" },
+    { field: "after.milestoneId", labelKey: "milestoneId" },
   ],
   "task.status_changed": [
-    { field: "after.statusType", label: "Trạng thái mới", valueKind: "status-type" },
-    { field: "before.statusType", label: "Trạng thái trước đó", valueKind: "status-type" },
-    { field: "after.assigneeMemberId", label: "Người được giao", valueKind: "member" },
-    { field: "after.priority", label: "Mức ưu tiên", valueKind: "priority" },
-    { field: "after.dueDate", label: "Hạn chót", valueKind: "date" },
+    { field: "after.statusType", labelKey: "newStatus", valueKind: "status-type" },
+    { field: "before.statusType", labelKey: "previousStatus", valueKind: "status-type" },
+    { field: "after.assigneeMemberId", labelKey: "assignee", valueKind: "member" },
+    { field: "after.priority", labelKey: "priority", valueKind: "priority" },
+    { field: "after.dueDate", labelKey: "dueDate", valueKind: "date" },
   ],
   "task.assigned": [
-    { field: "after.assigneeMemberId", label: "Người được giao", valueKind: "member" },
-    { field: "before.assigneeMemberId", label: "Người được giao trước đó", valueKind: "member" },
-    { field: "after.priority", label: "Mức ưu tiên", valueKind: "priority" },
-    { field: "after.dueDate", label: "Hạn chót", valueKind: "date" },
-    { field: "after.assigneeProjectRole", label: "Vai trò của người được giao", valueKind: "project-role" },
+    { field: "after.assigneeMemberId", labelKey: "assignee", valueKind: "member" },
+    { field: "before.assigneeMemberId", labelKey: "previousAssignee", valueKind: "member" },
+    { field: "after.priority", labelKey: "priority", valueKind: "priority" },
+    { field: "after.dueDate", labelKey: "dueDate", valueKind: "date" },
+    { field: "after.assigneeProjectRole", labelKey: "assigneeRole", valueKind: "project-role" },
   ],
   "task.deleted": [
-    { field: "before.priority", label: "Mức ưu tiên", valueKind: "priority" },
-    { field: "before.assigneeMemberId", label: "Người được giao", valueKind: "member" },
-    { field: "before.isMilestone", label: "Là milestone?", valueKind: "boolean" },
+    { field: "before.priority", labelKey: "priority", valueKind: "priority" },
+    { field: "before.assigneeMemberId", labelKey: "assignee", valueKind: "member" },
+    { field: "before.isMilestone", labelKey: "isMilestone", valueKind: "boolean" },
   ],
   "task.restored": [
-    { field: "after.priority", label: "Mức ưu tiên", valueKind: "priority" },
-    { field: "after.assigneeMemberId", label: "Người được giao", valueKind: "member" },
+    { field: "after.priority", labelKey: "priority", valueKind: "priority" },
+    { field: "after.assigneeMemberId", labelKey: "assignee", valueKind: "member" },
   ],
   "task.submitted_for_review": [
-    { field: "after.assigneeMemberId", label: "Người được giao", valueKind: "member" },
-    { field: "after.priority", label: "Mức ưu tiên", valueKind: "priority" },
-    { field: "after.reworkCount", label: "Số lần rework", valueKind: "number" },
+    { field: "after.assigneeMemberId", labelKey: "assignee", valueKind: "member" },
+    { field: "after.priority", labelKey: "priority", valueKind: "priority" },
+    { field: "after.reworkCount", labelKey: "reworkCount", valueKind: "number" },
   ],
   "task.approved": [
-    { field: "after.assigneeMemberId", label: "Người được giao", valueKind: "member" },
-    { field: "after.priority", label: "Mức ưu tiên", valueKind: "priority" },
-    { field: "after.milestoneId", label: "Thuộc milestone (ID)" },
+    { field: "after.assigneeMemberId", labelKey: "assignee", valueKind: "member" },
+    { field: "after.priority", labelKey: "priority", valueKind: "priority" },
+    { field: "after.milestoneId", labelKey: "milestoneId" },
   ],
   "task.rework_requested": [
-    { field: "after.assigneeMemberId", label: "Người được giao", valueKind: "member" },
-    { field: "after.reworkCount", label: "Số lần rework", valueKind: "number" },
-    { field: "after.priority", label: "Mức ưu tiên", valueKind: "priority" },
+    { field: "after.assigneeMemberId", labelKey: "assignee", valueKind: "member" },
+    { field: "after.reworkCount", labelKey: "reworkCount", valueKind: "number" },
+    { field: "after.priority", labelKey: "priority", valueKind: "priority" },
   ],
   "task.comment_added": [
-    { field: "after.body", label: "Nội dung bình luận (chứa từ khoá)" },
-    { field: "after.authorMemberId", label: "Người bình luận", valueKind: "member" },
+    { field: "after.body", labelKey: "commentBody" },
+    { field: "after.authorMemberId", labelKey: "commentAuthor", valueKind: "member" },
   ],
   "task.dependency_added": [
-    { field: "after.dependencyType", label: "Loại phụ thuộc" },
-    { field: "after.blockerStatusType", label: "Trạng thái task chặn", valueKind: "status-type" },
+    { field: "after.dependencyType", labelKey: "dependencyType" },
+    { field: "after.blockerStatusType", labelKey: "blockerTaskStatus", valueKind: "status-type" },
   ],
   "task.dependency_removed": [
-    { field: "after.dependencyType", label: "Loại phụ thuộc" },
-    { field: "after.blockerStatusType", label: "Trạng thái task chặn", valueKind: "status-type" },
+    { field: "after.dependencyType", labelKey: "dependencyType" },
+    { field: "after.blockerStatusType", labelKey: "blockerTaskStatus", valueKind: "status-type" },
   ],
   "blocker.created": [
-    { field: "after.severity", label: "Mức độ nghiêm trọng", valueKind: "priority" },
-    { field: "after.ownerMemberId", label: "Người phụ trách", valueKind: "member" },
+    { field: "after.severity", labelKey: "severity", valueKind: "priority" },
+    { field: "after.ownerMemberId", labelKey: "owner", valueKind: "member" },
   ],
   "blocker.updated": [
-    { field: "after.status", label: "Trạng thái blocker", valueKind: "blocker-status" },
-    { field: "after.severity", label: "Mức độ nghiêm trọng", valueKind: "priority" },
-    { field: "after.ownerMemberId", label: "Người phụ trách", valueKind: "member" },
+    { field: "after.status", labelKey: "blockerStatus", valueKind: "blocker-status" },
+    { field: "after.severity", labelKey: "severity", valueKind: "priority" },
+    { field: "after.ownerMemberId", labelKey: "owner", valueKind: "member" },
   ],
   "blocker.resolved": [
-    { field: "after.status", label: "Trạng thái blocker", valueKind: "blocker-status" },
-    { field: "after.resolvedByMemberId", label: "Người giải quyết", valueKind: "member" },
+    { field: "after.status", labelKey: "blockerStatus", valueKind: "blocker-status" },
+    { field: "after.resolvedByMemberId", labelKey: "resolvedBy", valueKind: "member" },
   ],
   "risk.created": [
-    { field: "after.probability", label: "Xác suất (1-5)", valueKind: "number" },
-    { field: "after.impact", label: "Mức ảnh hưởng (1-5)", valueKind: "number" },
-    { field: "after.ownerMemberId", label: "Người phụ trách", valueKind: "member" },
+    { field: "after.probability", labelKey: "probability", valueKind: "number" },
+    { field: "after.impact", labelKey: "impact", valueKind: "number" },
+    { field: "after.ownerMemberId", labelKey: "owner", valueKind: "member" },
   ],
   "risk.updated": [
-    { field: "after.status", label: "Trạng thái rủi ro" },
-    { field: "after.probability", label: "Xác suất (1-5)", valueKind: "number" },
-    { field: "after.impact", label: "Mức ảnh hưởng (1-5)", valueKind: "number" },
+    { field: "after.status", labelKey: "riskStatus" },
+    { field: "after.probability", labelKey: "probability", valueKind: "number" },
+    { field: "after.impact", labelKey: "impact", valueKind: "number" },
   ],
   "milestone.created": [
-    { field: "after.targetDate", label: "Ngày mục tiêu", valueKind: "date" },
-    { field: "after.status", label: "Trạng thái milestone" },
+    { field: "after.targetDate", labelKey: "targetDate", valueKind: "date" },
+    { field: "after.status", labelKey: "milestoneStatus" },
   ],
   "milestone.updated": [
-    { field: "after.targetDate", label: "Ngày mục tiêu", valueKind: "date" },
-    { field: "before.status", label: "Trạng thái trước đó" },
-    { field: "after.status", label: "Trạng thái mới" },
+    { field: "after.targetDate", labelKey: "targetDate", valueKind: "date" },
+    { field: "before.status", labelKey: "milestoneStatus" },
+    { field: "after.status", labelKey: "milestoneStatus" },
   ],
   "daily_update.submitted": [
-    { field: "after.confidenceLevel", label: "Mức độ tự tin (1-5)", valueKind: "number" },
-    { field: "after.completedText", label: "Nội dung đã làm (chứa từ khoá)" },
-    { field: "after.blockersText", label: "Nội dung vướng mắc (chứa từ khoá)" },
-    { field: "after.memberId", label: "Thành viên", valueKind: "member" },
+    { field: "after.confidenceLevel", labelKey: "confidenceLevel", valueKind: "number" },
+    { field: "after.completedText", labelKey: "completedText" },
+    { field: "after.blockersText", labelKey: "dailyUpdateBlockers" },
+    { field: "after.memberId", labelKey: "member", valueKind: "member" },
   ],
 };
 

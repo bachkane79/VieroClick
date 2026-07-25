@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Button, Input } from "@vieroc/ui";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { deleteWorkspaceAction } from "@/modules/workspace/workspace.actions";
+import { useActionError } from "@/i18n/use-action-error";
 
 interface Props {
   workspaceId: string;
@@ -17,6 +19,8 @@ interface Props {
  *  app (cascades every project/task/member), so a plain Yes/No isn't enough. */
 export function WorkspaceDangerZone({ workspaceId, workspaceName }: Props) {
   const router = useRouter();
+  const t = useTranslations();
+  const actionError = useActionError();
   const [open, setOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [pending, start] = useTransition();
@@ -27,20 +31,18 @@ export function WorkspaceDangerZone({ workspaceId, workspaceName }: Props) {
     start(async () => {
       const res = await deleteWorkspaceAction({ workspaceId });
       if (!res.ok) {
-        toast.error(res.error);
+        toast.error(actionError(res));
         return;
       }
-      toast.success("Workspace deleted");
+      toast.success(t("settings.danger.deleted"));
       router.push("/dashboard");
     });
   }
 
   return (
     <section className="rounded-lg border border-destructive/30 bg-destructive/5 p-5">
-      <h2 className="text-sm font-semibold text-destructive">Danger zone</h2>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Deleting this workspace removes every project, task, channel, and member. This cannot be undone.
-      </p>
+      <h2 className="text-sm font-semibold text-destructive">{t("settings.danger.title")}</h2>
+      <p className="mt-1 text-xs text-muted-foreground">{t("settings.danger.desc")}</p>
       <Button
         type="button"
         variant="destructive"
@@ -51,7 +53,7 @@ export function WorkspaceDangerZone({ workspaceId, workspaceName }: Props) {
           setOpen(true);
         }}
       >
-        Delete workspace
+        {t("settings.danger.deleteBtn")}
       </Button>
 
       <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -59,10 +61,10 @@ export function WorkspaceDangerZone({ workspaceId, workspaceName }: Props) {
           <Dialog.Overlay className="fixed inset-0 z-50 bg-neutral-950/45 backdrop-blur-[3px]" />
           <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border bg-background p-5 shadow-2xl focus:outline-none">
             <Dialog.Title className="text-base font-bold tracking-tight text-foreground">
-              Delete &quot;{workspaceName}&quot;?
+              {t("settings.danger.confirmTitle", { name: workspaceName })}
             </Dialog.Title>
             <Dialog.Description className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              This is permanent and cascades to every project, task, and member. Type the workspace name to confirm.
+              {t("settings.danger.confirmDesc")}
             </Dialog.Description>
             <Input
               value={confirmText}
@@ -74,7 +76,7 @@ export function WorkspaceDangerZone({ workspaceId, workspaceName }: Props) {
             <div className="mt-5 flex items-center justify-end gap-2.5">
               <Dialog.Close asChild>
                 <Button type="button" variant="ghost" size="sm">
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
               </Dialog.Close>
               <Button
@@ -87,7 +89,7 @@ export function WorkspaceDangerZone({ workspaceId, workspaceName }: Props) {
                   setOpen(false);
                 }}
               >
-                Delete workspace
+                {t("settings.danger.deleteBtn")}
               </Button>
             </div>
           </Dialog.Content>

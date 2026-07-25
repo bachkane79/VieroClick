@@ -18,8 +18,7 @@ import {
   countRecentAutomationFailuresAction,
   listAllAutomationsAction,
 } from "@/modules/automation/automation.actions";
-import { useLocale } from "@/lib/i18n/client";
-import { t } from "@/lib/i18n/dict";
+import { useTranslations } from "next-intl";
 import {
   AlertOctagon,
   BarChart3,
@@ -98,6 +97,7 @@ const PROJECT_STATUS_DOT: Record<string, string> = {
 /** Keep the panel in sync when navigation happens outside the rail. */
 function deriveTab(pathname: string): RailTab | null {
   if (/\/docs(\/|$)/.test(pathname)) return "docs";
+  if (/\/team(\/|$)/.test(pathname)) return "teams";
   if (/\/my-tasks(\/|$)/.test(pathname)) return "planner";
   if (/\/projects\/[^/]+\/ai(\/|$)/.test(pathname)) return "ai";
   if (/\/automations(\/|$)/.test(pathname)) return "automations";
@@ -116,7 +116,15 @@ function deriveTab(pathname: string): RailTab | null {
  */
 export function AppSidebar({ workspaces }: Props) {
   const pathname = usePathname();
-  const locale = useLocale();
+  const t = useTranslations();
+  const panelTitles: Record<RailTab, string> = {
+    home: t("sidebar.home"),
+    planner: t("sidebar.myTasks"),
+    ai: t("sidebar.ai"),
+    teams: t("sidebar.teams"),
+    docs: t("sidebar.docs"),
+    automations: t("sidebar.automations"),
+  };
   const params = useParams() as { slug?: string; projectId?: string };
   const currentSlug = params.slug;
   const currentProjectId = params.projectId;
@@ -231,8 +239,16 @@ export function AppSidebar({ workspaces }: Props) {
           res.ok
             ? {
                 ok: true,
-                channels: res.data.channels.map((c) => ({ id: c.id, name: c.name, unreadCount: c.unreadCount })),
-                dms: res.data.dms.map((d) => ({ id: d.id, otherName: d.otherName, unreadCount: d.unreadCount })),
+                channels: res.data.channels.map((c) => ({
+                  id: c.id,
+                  name: c.name,
+                  unreadCount: c.unreadCount,
+                })),
+                dms: res.data.dms.map((d) => ({
+                  id: d.id,
+                  otherName: d.otherName,
+                  unreadCount: d.unreadCount,
+                })),
               }
             : { ok: false, channels: [], dms: [] }
         );
@@ -306,16 +322,26 @@ export function AppSidebar({ workspaces }: Props) {
   const moreBase = moreProjectId ? `${wsBase}/projects/${moreProjectId}` : null;
   const moreTiles: Array<[string, LucideIcon, string, string]> = moreBase
     ? [
-        [t(locale, "sb.dashboards"), LayoutDashboard, "bg-primary/10 text-primary", `${moreBase}/dashboard`],
+        [
+          t("sidebar.dashboards"),
+          LayoutDashboard,
+          "bg-primary/10 text-primary",
+          `${moreBase}/dashboard`,
+        ],
         ["Analytics", BarChart3, "bg-ai/10 text-ai", `${moreBase}/analytics`],
-        [t(locale, "sb.timeline"), CalendarRange, "bg-sky/10 text-sky", `${moreBase}/timeline`],
-        [t(locale, "sb.wbs"), Network, "bg-success/10 text-success", `${moreBase}/wbs`],
-        [t(locale, "sb.workload"), Gauge, "bg-warning/10 text-warning", `${moreBase}/workload`],
-        [t(locale, "sb.goals"), Target, "bg-primary/10 text-primary", `${moreBase}/risks-milestones`],
-        [t(locale, "sb.reports"), ClipboardList, "bg-ai/10 text-ai", `${moreBase}/reports`],
-        [t(locale, "sb.table"), Table2, "bg-sky/10 text-sky", `${moreBase}/table`],
-        [t(locale, "sb.blockers"), AlertOctagon, "bg-destructive/10 text-destructive", `${moreBase}/blockers`],
-        [t(locale, "sb.daily"), CalendarCheck, "bg-success/10 text-success", `${moreBase}/daily`],
+        [t("sidebar.timeline"), CalendarRange, "bg-sky/10 text-sky", `${moreBase}/timeline`],
+        [t("sidebar.wbs"), Network, "bg-success/10 text-success", `${moreBase}/wbs`],
+        [t("sidebar.workload"), Gauge, "bg-warning/10 text-warning", `${moreBase}/workload`],
+        [t("sidebar.goals"), Target, "bg-primary/10 text-primary", `${moreBase}/risks-milestones`],
+        [t("sidebar.reports"), ClipboardList, "bg-ai/10 text-ai", `${moreBase}/reports`],
+        [t("sidebar.table"), Table2, "bg-sky/10 text-sky", `${moreBase}/table`],
+        [
+          t("sidebar.blockers"),
+          AlertOctagon,
+          "bg-destructive/10 text-destructive",
+          `${moreBase}/blockers`,
+        ],
+        [t("sidebar.daily"), CalendarCheck, "bg-success/10 text-success", `${moreBase}/daily`],
       ]
     : [];
 
@@ -331,15 +357,34 @@ export function AppSidebar({ workspaces }: Props) {
     kind: "tab" | "link" | "more";
     sepBefore?: boolean;
   }> = [
-    { key: "home", icon: Home, label: t(locale, "sb.home"), href: wsBase || "/dashboard", kind: "tab" },
-    { key: "inbox", icon: Inbox, label: t(locale, "sb.inbox"), href: `${wsBase}/inbox`, kind: "link" },
-    { key: "planner", icon: ListTodo, label: t(locale, "sb.myTasks"), href: `${wsBase}/my-tasks`, kind: "tab" },
-    { key: "projects", icon: Layers, label: t(locale, "sb.projects"), href: `${wsBase}/projects`, kind: "link", sepBefore: true },
-    { key: "docs", icon: BookText, label: t(locale, "sb.docs"), href: `${wsBase}/docs`, kind: "tab" },
-    { key: "ai", icon: Sparkles, label: t(locale, "sb.ai"), kind: "tab" },
-    { key: "teams", icon: Users, label: t(locale, "sb.teams"), kind: "tab" },
-    { key: "automations", icon: Zap, label: t(locale, "sb.automations"), kind: "tab" },
-    { key: "more", icon: LayoutGrid, label: t(locale, "sb.more"), kind: "more" },
+    {
+      key: "home",
+      icon: Home,
+      label: t("sidebar.home"),
+      href: wsBase || "/dashboard",
+      kind: "tab",
+    },
+    { key: "inbox", icon: Inbox, label: t("sidebar.inbox"), href: `${wsBase}/inbox`, kind: "link" },
+    {
+      key: "planner",
+      icon: ListTodo,
+      label: t("sidebar.myTasks"),
+      href: `${wsBase}/my-tasks`,
+      kind: "tab",
+    },
+    {
+      key: "projects",
+      icon: Layers,
+      label: t("sidebar.projects"),
+      href: `${wsBase}/projects`,
+      kind: "link",
+      sepBefore: true,
+    },
+    { key: "docs", icon: BookText, label: t("sidebar.docs"), href: `${wsBase}/docs`, kind: "tab" },
+    { key: "ai", icon: Sparkles, label: t("sidebar.ai"), kind: "tab" },
+    { key: "teams", icon: Users, label: t("sidebar.teams"), href: `${wsBase}/team`, kind: "tab" },
+    { key: "automations", icon: Zap, label: t("sidebar.automations"), kind: "tab" },
+    { key: "more", icon: LayoutGrid, label: t("sidebar.more"), kind: "more" },
   ];
 
   // Which rail item reads as active. Link items (Inbox/Projects) key off the
@@ -398,8 +443,8 @@ export function AppSidebar({ workspaces }: Props) {
           <button
             type="button"
             onClick={() => setCollapsedPersist(false)}
-            title={t(locale, "sb.expand")}
-            aria-label={t(locale, "sb.expand")}
+            title={t("sidebar.expand")}
+            aria-label={t("sidebar.expand")}
             className="mb-1.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
           >
             <PanelLeftOpen className="h-[18px] w-[18px]" />
@@ -407,7 +452,6 @@ export function AppSidebar({ workspaces }: Props) {
         )}
 
         <nav className="relative flex flex-1 flex-col items-center gap-3">
-
           {RAIL.map((item) => {
             const Icon = item.icon;
             const active = railActive(item.key);
@@ -430,7 +474,7 @@ export function AppSidebar({ workspaces }: Props) {
                 {item.key === "automations" && automationFailures > 0 && (
                   <span
                     className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-white"
-                    title={t(locale, "sb.automationFailuresHint")}
+                    title={t("sidebar.automationFailuresHint")}
                   >
                     {automationFailures > 9 ? "9+" : automationFailures}
                   </span>
@@ -458,11 +502,11 @@ export function AppSidebar({ workspaces }: Props) {
                       sideOffset={12}
                       className="z-50 w-[288px] rounded-2xl border border-border bg-popover p-3 text-foreground shadow-elevated focus:outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
                     >
-                      <p className="px-1 text-sm font-semibold">{t(locale, "sb.moreTitle")}</p>
+                      <p className="px-1 text-sm font-semibold">{t("sidebar.moreTitle")}</p>
                       <p className="mt-0.5 px-1 text-[11px] text-muted-foreground">
                         {moreProject
-                          ? t(locale, "sb.moreProject", { name: moreProject.name })
-                          : t(locale, "sb.morePickProject")}
+                          ? t("sidebar.moreProject", { name: moreProject.name })
+                          : t("sidebar.morePickProject")}
                       </p>
                       {moreBase ? (
                         <div className="mt-2.5 grid grid-cols-3 gap-1.5">
@@ -472,7 +516,12 @@ export function AppSidebar({ workspaces }: Props) {
                                 href={href}
                                 className="dock-item flex cursor-pointer flex-col items-center gap-1.5 rounded-xl px-1 py-2.5 hover:bg-surface-hover focus:bg-surface-hover focus:outline-none"
                               >
-                                <span className={cn("grid h-10 w-10 place-items-center rounded-xl", color)}>
+                                <span
+                                  className={cn(
+                                    "grid h-10 w-10 place-items-center rounded-xl",
+                                    color
+                                  )}
+                                >
                                   <TileIcon className="h-[18px] w-[18px]" />
                                 </span>
                                 <span className="text-center text-[11px] font-medium leading-tight">
@@ -484,7 +533,7 @@ export function AppSidebar({ workspaces }: Props) {
                         </div>
                       ) : (
                         <div className="mt-2 rounded-lg bg-surface-subtle px-3 py-4 text-center text-xs text-muted-foreground">
-                          {t(locale, "sb.morePickProject")}
+                          {t("sidebar.morePickProject")}
                         </div>
                       )}
                       <DropdownMenu.Separator className="my-2.5 h-px bg-border" />
@@ -494,7 +543,7 @@ export function AppSidebar({ workspaces }: Props) {
                           className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-border px-2.5 py-2 text-xs font-semibold transition-colors hover:bg-surface-hover focus:bg-surface-hover focus:outline-none"
                         >
                           <Settings2 className="h-3.5 w-3.5" />
-                          {t(locale, "sb.customizeNav")}
+                          {t("sidebar.customizeNav")}
                         </Link>
                       </DropdownMenu.Item>
                     </DropdownMenu.Content>
@@ -562,7 +611,7 @@ export function AppSidebar({ workspaces }: Props) {
           {ws && (
             <Link
               href={`${wsBase}/chat`}
-              title={t(locale, "sb.openChat")}
+              title={t("sidebar.openChat")}
               className="grid h-10 w-10 place-items-center rounded-xl text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
             >
               <MessagesSquare className="h-5 w-5" strokeWidth={1.75} />
@@ -571,7 +620,7 @@ export function AppSidebar({ workspaces }: Props) {
           <button
             type="button"
             onClick={() => signOut({ callbackUrl: "/login" })}
-            title={t(locale, "sb.signOut")}
+            title={t("sidebar.signOut")}
             className="grid h-10 w-10 place-items-center rounded-xl text-text-secondary transition-colors hover:bg-destructive/10 hover:text-destructive"
           >
             <LogOut className="h-5 w-5" strokeWidth={1.75} />
@@ -583,57 +632,55 @@ export function AppSidebar({ workspaces }: Props) {
       {!collapsed ? (
         <div className="group/panel flex w-72 shrink-0 flex-col border-r border-border bg-surface">
           <div className="flex h-16 shrink-0 items-center justify-between gap-1 border-b border-border px-4">
-            <p className="truncate text-sm font-semibold text-foreground">
-              {panelTitle(tab, locale)}
-            </p>
+            <p className="truncate text-sm font-semibold text-foreground">{panelTitles[tab]}</p>
             <div className="flex items-center gap-0.5">
               {/* Create — the single global "new project / new doc" entry, kept
                   always visible so creating isn't a hunt (replaces the inline
                   "New project" link that used to duplicate it). */}
               <div>
-              <DropdownMenu.Root>
-                <DropdownMenu.Trigger asChild>
-                  <button
-                    title={t(locale, "tb.create")}
-                    className="grid h-8 w-8 place-items-center rounded-lg text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
-                  >
-                    <Plus className="h-[18px] w-[18px]" />
-                  </button>
-                </DropdownMenu.Trigger>
-                <DropdownMenu.Portal>
-                  <DropdownMenu.Content
-                    align="end"
-                    sideOffset={6}
-                    className="z-50 w-52 rounded-lg border border-border bg-popover p-1.5 shadow-elevated focus:outline-none"
-                  >
-                    <DropdownMenu.Item asChild>
-                      <Link
-                        href={`${wsBase}/projects/new`}
-                        className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
-                      >
-                        <FolderPlus className="h-4 w-4 text-muted-foreground" />
-                        {t(locale, "tb.newProject")}
-                      </Link>
-                    </DropdownMenu.Item>
-                    <DropdownMenu.Item asChild>
-                      <Link
-                        href={`${wsBase}/docs`}
-                        className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
-                      >
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        {t(locale, "tb.newDoc")}
-                      </Link>
-                    </DropdownMenu.Item>
-                  </DropdownMenu.Content>
-                </DropdownMenu.Portal>
-              </DropdownMenu.Root>
+                <DropdownMenu.Root>
+                  <DropdownMenu.Trigger asChild>
+                    <button
+                      title={t("topbar.create")}
+                      className="grid h-8 w-8 place-items-center rounded-lg text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
+                    >
+                      <Plus className="h-[18px] w-[18px]" />
+                    </button>
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.Content
+                      align="end"
+                      sideOffset={6}
+                      className="z-50 w-52 rounded-lg border border-border bg-popover p-1.5 shadow-elevated focus:outline-none"
+                    >
+                      <DropdownMenu.Item asChild>
+                        <Link
+                          href={`${wsBase}/projects/new`}
+                          className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
+                        >
+                          <FolderPlus className="h-4 w-4 text-muted-foreground" />
+                          {t("topbar.newProject")}
+                        </Link>
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item asChild>
+                        <Link
+                          href={`${wsBase}/docs`}
+                          className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
+                        >
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          {t("topbar.newDoc")}
+                        </Link>
+                      </DropdownMenu.Item>
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Portal>
+                </DropdownMenu.Root>
               </div>
               {/* Collapse — sits on the panel header when expanded (annotation). */}
               <button
                 type="button"
                 onClick={() => setCollapsedPersist(true)}
-                title={t(locale, "sb.collapse")}
-                aria-label={t(locale, "sb.collapse")}
+                title={t("sidebar.collapse")}
+                aria-label={t("sidebar.collapse")}
                 className="grid h-8 w-8 place-items-center rounded-lg text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
               >
                 <PanelLeftClose className="h-[18px] w-[18px]" />
@@ -643,7 +690,7 @@ export function AppSidebar({ workspaces }: Props) {
 
           <nav className="min-h-0 flex-1 overflow-y-auto p-2.5">
             {!ws ? (
-              <p className="px-2 pt-2 text-xs text-muted-foreground">{t(locale, "sb.selectWs")}</p>
+              <p className="px-2 pt-2 text-xs text-muted-foreground">{t("sidebar.selectWs")}</p>
             ) : tab === "home" ? (
               <HomePanel
                 wsBase={wsBase}
@@ -654,14 +701,29 @@ export function AppSidebar({ workspaces }: Props) {
                 phasesByProject={phasesByProject}
                 currentProjectId={currentProjectId}
                 chatDir={chatDir}
-                locale={locale}
               />
             ) : tab === "planner" ? (
-              <PlannerPanel projects={projects} wsBase={wsBase} pathname={pathname} currentProjectId={currentProjectId} locale={locale} />
+              <PlannerPanel
+                projects={projects}
+                wsBase={wsBase}
+                pathname={pathname}
+                currentProjectId={currentProjectId}
+              />
             ) : tab === "ai" ? (
-              <AiPanel projects={projects} wsBase={wsBase} pathname={pathname} currentProjectId={currentProjectId} locale={locale} />
+              <AiPanel
+                projects={projects}
+                wsBase={wsBase}
+                pathname={pathname}
+                currentProjectId={currentProjectId}
+              />
             ) : tab === "teams" ? (
-              <TeamsPanel teams={teams} projects={projects} wsBase={wsBase} pathname={pathname} currentProjectId={currentProjectId} locale={locale} />
+              <TeamsPanel
+                teams={teams}
+                projects={projects}
+                wsBase={wsBase}
+                pathname={pathname}
+                currentProjectId={currentProjectId}
+              />
             ) : tab === "automations" ? (
               <AutomationsPanel
                 items={automationItems}
@@ -669,34 +731,21 @@ export function AppSidebar({ workspaces }: Props) {
                 wsBase={wsBase}
                 pathname={pathname}
                 currentProjectId={currentProjectId}
-                locale={locale}
               />
             ) : (
-              <DocsPanel docs={docs} projects={projects} wsBase={wsBase} pathname={pathname} currentProjectId={currentProjectId} locale={locale} />
+              <DocsPanel
+                docs={docs}
+                projects={projects}
+                wsBase={wsBase}
+                pathname={pathname}
+                currentProjectId={currentProjectId}
+              />
             )}
           </nav>
         </div>
       ) : null}
     </div>
   );
-}
-
-/* ── Panel title ─────────────────────────────────────────────────────────── */
-function panelTitle(tab: RailTab, locale: ReturnType<typeof useLocale>): string {
-  switch (tab) {
-    case "planner":
-      return t(locale, "sb.myTasks");
-    case "ai":
-      return t(locale, "sb.ai");
-    case "teams":
-      return t(locale, "sb.teams");
-    case "docs":
-      return t(locale, "sb.docs");
-    case "automations":
-      return t(locale, "sb.automations");
-    default:
-      return t(locale, "sb.home");
-  }
 }
 
 /* ── Home panel ─────────────────────────────────────────────────────────── */
@@ -709,7 +758,6 @@ function HomePanel({
   phasesByProject,
   currentProjectId,
   chatDir,
-  locale,
 }: {
   wsBase: string;
   pathname: string;
@@ -719,8 +767,8 @@ function HomePanel({
   phasesByProject: Record<string, PhaseLink[]>;
   currentProjectId?: string;
   chatDir: ChatDir | null;
-  locale: ReturnType<typeof useLocale>;
 }) {
+  const t = useTranslations();
   return (
     <>
       {/* Inbox + My Tasks now live on the rail; workspace Settings on the
@@ -730,17 +778,17 @@ function HomePanel({
         <PanelLink
           href={`${wsBase}/dashboards`}
           icon={LayoutDashboard}
-          label={t(locale, "sb.allDashboards")}
+          label={t("sidebar.allDashboards")}
           active={pathname.endsWith("/dashboards")}
         />
       </div>
 
       {/* No section action: "all projects" lives on the rail "Dự án" icon —
           a briefcase here would duplicate that exact destination. */}
-      <SectionTitle>{t(locale, "sb.spaces")}</SectionTitle>
+      <SectionTitle>{t("sidebar.spaces")}</SectionTitle>
 
       {projects.length === 0 ? (
-        <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.noProjects")}</p>
+        <p className="px-2 py-2 text-xs text-muted-foreground">{t("sidebar.noProjects")}</p>
       ) : (
         projects.map((project) => {
           const base = `${wsBase}/projects/${project.id}`;
@@ -758,7 +806,7 @@ function HomePanel({
                   type="button"
                   onClick={() => toggleExpanded(project.id)}
                   className="grid h-7 w-6 place-items-center rounded text-text-secondary hover:text-foreground"
-                  aria-label={isExpanded ? "Collapse" : "Expand"}
+                  aria-label={isExpanded ? t("sidebar.collapse") : t("sidebar.expand")}
                 >
                   {isExpanded ? (
                     <ChevronDown className="h-3.5 w-3.5" />
@@ -773,12 +821,17 @@ function HomePanel({
                     isCurrent ? "font-semibold text-foreground" : "font-medium text-foreground/90"
                   )}
                 >
-                  <span className={cn("h-2 w-2 shrink-0 rounded-[3px]", PROJECT_STATUS_DOT[project.status] ?? "bg-text-disabled")} />
+                  <span
+                    className={cn(
+                      "h-2 w-2 shrink-0 rounded-[3px]",
+                      PROJECT_STATUS_DOT[project.status] ?? "bg-text-disabled"
+                    )}
+                  />
                   <span className="truncate">{project.name}</span>
                 </Link>
                 <Link
                   href={`${base}/overview`}
-                  title={locale === "vi" ? "Cài đặt dự án" : "Project settings"}
+                  title={t("sidebar.projectSettings")}
                   className="grid h-6 w-6 shrink-0 place-items-center rounded text-text-secondary opacity-0 transition-opacity hover:bg-surface-hover hover:text-foreground focus:opacity-100 group-hover:opacity-100"
                 >
                   <Settings className="h-3.5 w-3.5" />
@@ -786,14 +839,30 @@ function HomePanel({
               </div>
               {isExpanded && (
                 <div className="mb-1 ml-3 border-l border-border pl-1">
-                  <TreeLeaf href={`${base}/tasks`} icon={ListTodo} label={t(locale, "sb.list")} active={isCurrent && /\/(tasks|list)(\/|$)/.test(pathname)} />
-                  <TreeLeaf href={`${base}/board`} icon={KanbanSquare} label={t(locale, "sb.board")} active={isCurrent && /\/board(\/|$)/.test(pathname)} />
-                  <TreeLeaf href={`${base}/ai`} icon={Sparkles} label={t(locale, "sb.aiManager")} active={isCurrent && /\/ai(\/|$)/.test(pathname)} ai />
+                  <TreeLeaf
+                    href={`${base}/tasks`}
+                    icon={ListTodo}
+                    label={t("sidebar.list")}
+                    active={isCurrent && /\/(tasks|list)(\/|$)/.test(pathname)}
+                  />
+                  <TreeLeaf
+                    href={`${base}/board`}
+                    icon={KanbanSquare}
+                    label={t("sidebar.board")}
+                    active={isCurrent && /\/board(\/|$)/.test(pathname)}
+                  />
+                  <TreeLeaf
+                    href={`${base}/ai`}
+                    icon={Sparkles}
+                    label={t("sidebar.aiManager")}
+                    active={isCurrent && /\/ai(\/|$)/.test(pathname)}
+                    ai
+                  />
                   {(phasesByProject[project.id]?.length ?? 0) > 0 && (
                     <div className="mt-0.5">
                       <p className="flex items-center gap-1.5 py-1 pl-2 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
                         <Layers className="h-3 w-3" />
-                        {t(locale, "sb.phases")}
+                        {t("sidebar.phases")}
                       </p>
                       {phasesByProject[project.id]!.map((phase) => (
                         <Link
@@ -820,17 +889,17 @@ function HomePanel({
             action={
               <Link
                 href={`${wsBase}/chat`}
-                title={t(locale, "sb.openChat")}
+                title={t("sidebar.openChat")}
                 className="rounded p-0.5 text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
               >
                 <MessagesSquare className="h-3.5 w-3.5" />
               </Link>
             }
           >
-            {t(locale, "sb.channels")}
+            {t("sidebar.channels")}
           </SectionTitle>
           {chatDir === null ? (
-            <p className="px-2 py-1.5 text-xs text-muted-foreground">{t(locale, "sb.loading")}</p>
+            <p className="px-2 py-1.5 text-xs text-muted-foreground">{t("sidebar.loading")}</p>
           ) : (
             <div className="space-y-px">
               {chatDir.channels.map((c) => (
@@ -845,7 +914,7 @@ function HomePanel({
               ))}
               {chatDir.dms.length > 0 && (
                 <p className="px-2 pb-0.5 pt-2 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
-                  {t(locale, "sb.dmsSection")}
+                  {t("sidebar.dmsSection")}
                 </p>
               )}
               {chatDir.dms.map((d) => (
@@ -872,33 +941,44 @@ function PlannerPanel({
   wsBase,
   pathname,
   currentProjectId,
-  locale,
 }: {
   projects: SidebarProject[];
   wsBase: string;
   pathname: string;
   currentProjectId?: string;
-  locale: ReturnType<typeof useLocale>;
 }) {
+  const t = useTranslations();
   return (
     <>
       {projects.length > 0 ? (
         <>
-          <SectionTitle>{t(locale, "sb.plannerCalendars")}</SectionTitle>
+          <SectionTitle>{t("sidebar.plannerCalendars")}</SectionTitle>
           <div className="space-y-px">
             {projects.map((p) => (
-              <PanelLink key={p.id} href={`${wsBase}/projects/${p.id}/calendar`} icon={CalendarDays} label={p.name} active={currentProjectId === p.id && pathname.endsWith("/calendar")} />
+              <PanelLink
+                key={p.id}
+                href={`${wsBase}/projects/${p.id}/calendar`}
+                icon={CalendarDays}
+                label={p.name}
+                active={currentProjectId === p.id && pathname.endsWith("/calendar")}
+              />
             ))}
           </div>
-          <SectionTitle>{t(locale, "sb.plannerTimelines")}</SectionTitle>
+          <SectionTitle>{t("sidebar.plannerTimelines")}</SectionTitle>
           <div className="space-y-px">
             {projects.map((p) => (
-              <PanelLink key={p.id} href={`${wsBase}/projects/${p.id}/timeline`} icon={CalendarRange} label={p.name} active={currentProjectId === p.id && pathname.endsWith("/timeline")} />
+              <PanelLink
+                key={p.id}
+                href={`${wsBase}/projects/${p.id}/timeline`}
+                icon={CalendarRange}
+                label={p.name}
+                active={currentProjectId === p.id && pathname.endsWith("/timeline")}
+              />
             ))}
           </div>
         </>
       ) : (
-        <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.noProjects")}</p>
+        <p className="px-2 py-2 text-xs text-muted-foreground">{t("sidebar.noProjects")}</p>
       )}
     </>
   );
@@ -910,31 +990,38 @@ function AiPanel({
   wsBase,
   pathname,
   currentProjectId,
-  locale,
 }: {
   projects: SidebarProject[];
   wsBase: string;
   pathname: string;
   currentProjectId?: string;
-  locale: ReturnType<typeof useLocale>;
 }) {
+  const t = useTranslations();
   return (
     <>
-      <p className="px-2 pt-1 text-[11px] leading-snug text-text-secondary">{t(locale, "sb.aiHint")}</p>
-      <SectionTitle>{t(locale, "sb.aiByProject")}</SectionTitle>
+      <p className="px-2 pt-1 text-[11px] leading-snug text-text-secondary">
+        {t("sidebar.aiHint")}
+      </p>
+      <SectionTitle>{t("sidebar.aiByProject")}</SectionTitle>
       {projects.length > 0 ? (
         <div className="space-y-px">
           {projects.map((p) => (
-            <PanelLink key={p.id} href={`${wsBase}/projects/${p.id}/ai`} icon={Sparkles} label={p.name} active={currentProjectId === p.id && pathname.endsWith("/ai")} ai />
+            <PanelLink
+              key={p.id}
+              href={`${wsBase}/projects/${p.id}/ai`}
+              icon={Sparkles}
+              label={p.name}
+              active={currentProjectId === p.id && pathname.endsWith("/ai")}
+              ai
+            />
           ))}
         </div>
       ) : (
-        <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.noProjects")}</p>
+        <p className="px-2 py-2 text-xs text-muted-foreground">{t("sidebar.noProjects")}</p>
       )}
     </>
   );
 }
-
 
 /* ── Teams panel ────────────────────────────────────────────────────────── */
 function TeamsPanel({
@@ -943,52 +1030,71 @@ function TeamsPanel({
   wsBase,
   pathname,
   currentProjectId,
-  locale,
 }: {
   teams: TeamItem[] | null;
   projects: SidebarProject[];
   wsBase: string;
   pathname: string;
   currentProjectId?: string;
-  locale: ReturnType<typeof useLocale>;
 }) {
+  const t = useTranslations();
   return (
     <>
+      <div className="space-y-px">
+        <PanelLink
+          href={`${wsBase}/team`}
+          icon={Users}
+          label={t("sidebar.allMembers")}
+          active={pathname.endsWith("/team")}
+        />
+      </div>
       <SectionTitle
         action={
-          <Link href={`${wsBase}/settings`} title={t(locale, "sb.manageTeams")} className="rounded p-0.5 text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground">
+          <Link
+            href={`${wsBase}/settings`}
+            title={t("sidebar.manageTeams")}
+            className="rounded p-0.5 text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
+          >
             <Settings2 className="h-3.5 w-3.5" />
           </Link>
         }
       >
-        {t(locale, "sb.teamsInWs")}
+        {t("sidebar.teamsInWs")}
       </SectionTitle>
       {teams === null ? (
-        <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.loading")}</p>
+        <p className="px-2 py-2 text-xs text-muted-foreground">{t("sidebar.loading")}</p>
       ) : teams.length === 0 ? (
-        <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.noTeams")}</p>
+        <p className="px-2 py-2 text-xs text-muted-foreground">{t("sidebar.noTeams")}</p>
       ) : (
         <div className="space-y-px">
           {teams.map((team) => (
             <Link
               key={team.id}
               href={`${wsBase}/settings`}
-              title={t(locale, "sb.membersN", { n: team.memberIds.length })}
+              title={t("sidebar.membersN", { n: team.memberIds.length })}
               className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
             >
               <Users className="h-4 w-4 shrink-0" />
               <span className="min-w-0 flex-1 truncate">{team.name}</span>
-              <span className="rounded-full bg-surface-subtle px-1.5 text-[10px] font-semibold">{team.memberIds.length}</span>
+              <span className="rounded-full bg-surface-subtle px-1.5 text-[10px] font-semibold">
+                {team.memberIds.length}
+              </span>
             </Link>
           ))}
         </div>
       )}
       {projects.length > 0 && (
         <>
-          <SectionTitle>{t(locale, "sb.projectTeams")}</SectionTitle>
+          <SectionTitle>{t("sidebar.projectTeams")}</SectionTitle>
           <div className="space-y-px">
             {projects.map((p) => (
-              <PanelLink key={p.id} href={`${wsBase}/projects/${p.id}/team`} icon={Users} label={p.name} active={currentProjectId === p.id && pathname.endsWith("/team")} />
+              <PanelLink
+                key={p.id}
+                href={`${wsBase}/projects/${p.id}/team`}
+                icon={Users}
+                label={p.name}
+                active={currentProjectId === p.id && pathname.endsWith("/team")}
+              />
             ))}
           </div>
         </>
@@ -1012,15 +1118,14 @@ function AutomationsPanel({
   wsBase,
   pathname,
   currentProjectId,
-  locale,
 }: {
   items: AutomationItem[] | null;
   projects: SidebarProject[];
   wsBase: string;
   pathname: string;
   currentProjectId?: string;
-  locale: ReturnType<typeof useLocale>;
 }) {
+  const t = useTranslations();
   const workspaceWide = items?.filter((a) => a.projectId === null) ?? [];
   const countByProject = new Map<string, number>();
   for (const a of items ?? []) {
@@ -1031,17 +1136,17 @@ function AutomationsPanel({
     <>
       <SectionTitle
         action={
-          <Link href={`${wsBase}/automations`} title={t(locale, "sb.openAutomations")} className="rounded p-0.5 text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground">
+          <Link href={`${wsBase}/automations`} title={t("sidebar.openAutomations")} className="rounded p-0.5 text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground">
             <Zap className="h-3.5 w-3.5" />
           </Link>
         }
       >
-        {t(locale, "sb.wsAutomations")}
+        {t("sidebar.wsAutomations")}
       </SectionTitle>
       {items === null ? (
-        <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.loading")}</p>
+        <p className="px-2 py-2 text-xs text-muted-foreground">{t("common.loading")}</p>
       ) : workspaceWide.length === 0 ? (
-        <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.noAutomations")}</p>
+        <p className="px-2 py-2 text-xs text-muted-foreground">{t("sidebar.noAutomations")}</p>
       ) : (
         <div className="space-y-px">
           {workspaceWide.map((a) => (
@@ -1063,7 +1168,7 @@ function AutomationsPanel({
 
       {projects.length > 0 && (
         <>
-          <SectionTitle>{t(locale, "sb.projectAutomations")}</SectionTitle>
+          <SectionTitle>{t("sidebar.projectAutomations")}</SectionTitle>
           <div className="space-y-px">
             {projects.map((p) => (
               <PanelLink
@@ -1089,30 +1194,33 @@ function DocsPanel({
   wsBase,
   pathname,
   currentProjectId,
-  locale,
 }: {
   docs: DocItem[] | null;
   projects: SidebarProject[];
   wsBase: string;
   pathname: string;
   currentProjectId?: string;
-  locale: ReturnType<typeof useLocale>;
 }) {
+  const t = useTranslations();
   return (
     <>
       <SectionTitle
         action={
-          <Link href={`${wsBase}/docs`} title={t(locale, "sb.openDocs")} className="rounded p-0.5 text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground">
+          <Link
+            href={`${wsBase}/docs`}
+            title={t("sidebar.openDocs")}
+            className="rounded p-0.5 text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
+          >
             <BookText className="h-3.5 w-3.5" />
           </Link>
         }
       >
-        {t(locale, "sb.wsDocs")}
+        {t("sidebar.wsDocs")}
       </SectionTitle>
       {docs === null ? (
-        <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.loading")}</p>
+        <p className="px-2 py-2 text-xs text-muted-foreground">{t("sidebar.loading")}</p>
       ) : docs.length === 0 ? (
-        <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.noDocs")}</p>
+        <p className="px-2 py-2 text-xs text-muted-foreground">{t("sidebar.noDocs")}</p>
       ) : (
         <div className="space-y-px">
           <DocTree docs={docs} parentId={null} depth={0} baseHref={`${wsBase}/docs`} />
@@ -1120,10 +1228,16 @@ function DocsPanel({
       )}
       {projects.length > 0 && (
         <>
-          <SectionTitle>{t(locale, "sb.projectDocs")}</SectionTitle>
+          <SectionTitle>{t("sidebar.projectDocs")}</SectionTitle>
           <div className="space-y-px">
             {projects.map((p) => (
-              <PanelLink key={p.id} href={`${wsBase}/projects/${p.id}/docs-decisions`} icon={FileText} label={p.name} active={currentProjectId === p.id && pathname.endsWith("/docs-decisions")} />
+              <PanelLink
+                key={p.id}
+                href={`${wsBase}/projects/${p.id}/docs-decisions`}
+                icon={FileText}
+                label={p.name}
+                active={currentProjectId === p.id && pathname.endsWith("/docs-decisions")}
+              />
             ))}
           </div>
         </>
@@ -1166,22 +1280,44 @@ function DocTree({
 }
 
 /* ── Panel primitives ──────────────────────────────────────────────────────── */
-function SectionTitle({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
+function SectionTitle({
+  children,
+  action,
+}: {
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
   return (
     <div className="flex items-center justify-between px-2.5 pb-1 pt-4">
-      <p className="text-[11px] font-bold uppercase tracking-wider text-text-secondary">{children}</p>
+      <p className="text-[11px] font-bold uppercase tracking-wider text-text-secondary">
+        {children}
+      </p>
       {action}
     </div>
   );
 }
 
-function TreeLeaf({ href, icon: Icon, label, active, ai = false }: { href: string; icon: LucideIcon; label: string; active: boolean; ai?: boolean }) {
+function TreeLeaf({
+  href,
+  icon: Icon,
+  label,
+  active,
+  ai = false,
+}: {
+  href: string;
+  icon: LucideIcon;
+  label: string;
+  active: boolean;
+  ai?: boolean;
+}) {
   return (
     <Link
       href={href}
       className={cn(
         "flex items-center gap-2.5 rounded-lg py-1.5 pl-2.5 pr-2 text-[13px] transition-colors",
-        active ? "bg-primary/10 font-semibold text-foreground" : "text-text-secondary hover:bg-surface-hover hover:text-foreground"
+        active
+          ? "bg-primary/10 font-semibold text-foreground"
+          : "text-text-secondary hover:bg-surface-hover hover:text-foreground"
       )}
     >
       <Icon className={cn("h-4 w-4 shrink-0", ai && "text-ai")} />
@@ -1210,7 +1346,9 @@ function PanelLink({
       href={href}
       className={cn(
         "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
-        active ? "bg-primary/10 font-semibold text-foreground" : "text-text-secondary hover:bg-surface-hover hover:text-foreground"
+        active
+          ? "bg-primary/10 font-semibold text-foreground"
+          : "text-text-secondary hover:bg-surface-hover hover:text-foreground"
       )}
     >
       <Icon className={cn("h-[18px] w-[18px] shrink-0", ai && "text-ai")} />

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { getWorkspace } from "@/modules/workspace/workspace.service";
 import { getUserId } from "@/server/lib/context";
 import { NotFoundError } from "@/server/lib/errors";
@@ -21,17 +22,20 @@ export default async function WorkspaceGeneralSettingsPage({ params }: Props) {
     throw err;
   }
   const userId = await getUserId();
+  const t = await getTranslations();
 
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Tổng quan</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Cấu hình cơ bản của workspace.</p>
+        <h1 className="text-2xl font-bold tracking-tight">{t("settings.general.pageTitle")}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t("settings.general.pageSubtitle")}</p>
       </header>
       <GeneralSettingsForm workspace={workspace} />
       <section className="rounded-lg border p-5">
-        <h2 className="text-sm font-semibold">Deleted projects</h2>
-        <p className="mt-1 text-xs text-muted-foreground">Restore a project that was recently deleted.</p>
+        <h2 className="text-sm font-semibold">{t("settings.general.deletedProjects")}</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {t("settings.general.deletedProjectsDesc")}
+        </p>
         <div className="mt-3">
           <DeletedProjectsPanel workspaceId={workspace.id} slug={slug} />
         </div>

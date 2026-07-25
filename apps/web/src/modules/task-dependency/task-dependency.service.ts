@@ -27,17 +27,13 @@ export async function listDependencies(workspaceId: string, projectId: string) {
   return repo.listByProject(projectId);
 }
 
-export async function addDependency(p: {
-  workspaceId: string;
-  projectId: string;
-  input: unknown;
-}) {
+export async function addDependency(p: { workspaceId: string; projectId: string; input: unknown }) {
   const data = createTaskDependencySchema.parse(p.input);
   const ctx = await requireActor(p.workspaceId, p.projectId);
   assertCanManageTasks(ctx);
 
   if (data.blockerTaskId === data.blockedTaskId) {
-    throw new ValidationError("A task cannot depend on itself");
+    throw new ValidationError("A task cannot depend on itself", "taskSelfDependency");
   }
 
   return db.transaction(async (tx) => {

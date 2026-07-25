@@ -5,6 +5,7 @@ import { getWorkspace } from "@/modules/workspace/workspace.service";
 import { listMyTasks } from "@/modules/task/task.service";
 import { MyTasksList } from "@/modules/task/components/my-tasks-list";
 import { toMyTaskView } from "@/modules/task/task.view";
+import { getTranslations } from "next-intl/server";
 import { NotFoundError } from "@/server/lib/errors";
 
 interface Props {
@@ -23,6 +24,7 @@ export default async function MyTasksPage({ params }: Props) {
   }
 
   const tasks = await listMyTasks(workspace.id);
+  const t = await getTranslations();
   const todayStr = new Date().toISOString().split("T")[0]!;
 
   const isOpen = (t: (typeof tasks)[number]) =>
@@ -36,18 +38,48 @@ export default async function MyTasksPage({ params }: Props) {
   return (
     <div className="mx-auto max-w-[1240px] px-4 py-5 lg:px-6">
       {/* Giant Unified White Shell Container */}
-      <div className="rounded-3xl border border-border bg-surface p-6 lg:p-8 shadow-soft space-y-6">
+      <div className="space-y-6 rounded-3xl border border-border bg-surface p-6 shadow-soft lg:p-8">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{workspace.name}</p>
-          <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-foreground">My tasks</h1>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {workspace.name}
+          </p>
+          <h1 className="mt-0.5 text-2xl font-bold tracking-tight text-foreground">
+            {t("myTasksPage.title")}
+          </h1>
         </div>
 
         {/* Tinted Stat Tiles */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <Stat label="Việc đang mở" value={myOpen} accent="primary" trend="Open" icon="open" />
-          <Stat label="Đang chờ duyệt" value={myInReview} accent={myInReview > 0 ? "warning" : "muted"} trend="In Review" icon="review" />
-          <Stat label="Quá hạn" value={myOverdue} accent={myOverdue > 0 ? "danger" : "muted"} trend={myOverdue > 0 ? "Cần xử lý" : "On track"} icon="overdue" />
-          <Stat label="Hoàn thành" value={myDone} accent="success" trend="Completed" icon="done" />
+          <Stat
+            label={t("myTasksPage.stat.open")}
+            value={myOpen}
+            accent="primary"
+            trend={t("myTasksPage.trend.open")}
+            icon="open"
+          />
+          <Stat
+            label={t("myTasksPage.stat.review")}
+            value={myInReview}
+            accent={myInReview > 0 ? "warning" : "muted"}
+            trend={t("myTasksPage.trend.review")}
+            icon="review"
+          />
+          <Stat
+            label={t("myTasksPage.stat.overdue")}
+            value={myOverdue}
+            accent={myOverdue > 0 ? "danger" : "muted"}
+            trend={
+              myOverdue > 0 ? t("myTasksPage.trend.needsAction") : t("myTasksPage.trend.onTrack")
+            }
+            icon="overdue"
+          />
+          <Stat
+            label={t("myTasksPage.stat.done")}
+            value={myDone}
+            accent="success"
+            trend={t("myTasksPage.trend.done")}
+            icon="done"
+          />
         </div>
 
         <MyTasksList workspaceSlug={slug} tasks={tasks.map(toMyTaskView)} />
@@ -86,11 +118,18 @@ const ACCENT: Record<string, { text: string; bg: string; badge: string }> = {
   muted: DEFAULT_STYLE,
 };
 
-const STAT_ICONS: Record<string, { bg: string; text: string; icon: React.ComponentType<{ className?: string }> }> = {
+const STAT_ICONS: Record<
+  string,
+  { bg: string; text: string; icon: React.ComponentType<{ className?: string }> }
+> = {
   open: { bg: "bg-primary/10", text: "text-primary", icon: Activity },
   review: { bg: "bg-amber-500/10", text: "text-amber-600 dark:text-amber-400", icon: Eye },
   overdue: { bg: "bg-destructive/10", text: "text-destructive", icon: Flag },
-  done: { bg: "bg-emerald-500/10", text: "text-emerald-600 dark:text-emerald-400", icon: CheckCircle2 },
+  done: {
+    bg: "bg-emerald-500/10",
+    text: "text-emerald-600 dark:text-emerald-400",
+    icon: CheckCircle2,
+  },
 };
 
 function Stat({
@@ -111,23 +150,39 @@ function Stat({
   const IconComp = iconMeta?.icon;
 
   return (
-    <div className={cn("rounded-2xl border p-4 shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md", style.bg)}>
+    <div
+      className={cn(
+        "rounded-2xl border p-4 shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md",
+        style.bg
+      )}
+    >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {IconComp && (
-            <span className={cn("grid h-6 w-6 place-items-center rounded-full text-xs", iconMeta.bg, iconMeta.text)}>
+            <span
+              className={cn(
+                "grid h-6 w-6 place-items-center rounded-full text-xs",
+                iconMeta.bg,
+                iconMeta.text
+              )}
+            >
               <IconComp className="h-3.5 w-3.5" />
             </span>
           )}
           <p className="text-xs font-semibold text-muted-foreground">{label}</p>
         </div>
         {trend && (
-          <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums", style.badge)}>
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums",
+              style.badge
+            )}
+          >
             {trend}
           </span>
         )}
       </div>
-      <p className={cn("mt-2 text-2xl font-bold tracking-tight tabular-nums", style.text)}>
+      <p className={cn("mt-2 text-2xl font-bold tabular-nums tracking-tight", style.text)}>
         {value}
       </p>
     </div>

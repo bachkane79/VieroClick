@@ -8,20 +8,26 @@ import { isWorkspaceAdmin, requirePermission } from "@/server/lib/permissions";
  * Viewers may read but not post.
  */
 export function assertCanAccessChat(ctx: ActorContext): void {
-  requirePermission(ctx.workspaceRole !== "guest", "Chat is not available to guests");
+  requirePermission(
+    ctx.workspaceRole !== "guest",
+    "Chat is not available to guests",
+    "guestNoChat"
+  );
 }
 
 export function assertCanPostMessage(ctx: ActorContext): void {
   requirePermission(
     ctx.workspaceRole !== "guest" && ctx.workspaceRole !== "viewer",
-    "You do not have permission to post messages"
+    "You do not have permission to post messages",
+    "contributorOnly"
   );
 }
 
 export function assertCanCreateChannel(ctx: ActorContext): void {
   requirePermission(
     ctx.workspaceRole !== "guest" && ctx.workspaceRole !== "viewer",
-    "You do not have permission to create channels"
+    "You do not have permission to create channels",
+    "contributorOnly"
   );
 }
 
@@ -29,6 +35,7 @@ export function assertCanCreateChannel(ctx: ActorContext): void {
 export function assertCanManageChannel(ctx: ActorContext, createdByMemberId: string): void {
   requirePermission(
     ctx.workspaceMemberId === createdByMemberId || isWorkspaceAdmin(ctx),
-    "Only the channel creator or a workspace admin can delete this channel"
+    "Only the channel creator or a workspace admin can delete this channel",
+    "channelOwnerOnly"
   );
 }

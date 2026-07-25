@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@vieroc/ui";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
+import { useActionError } from "@/i18n/use-action-error";
 import { listDeletedProjectsAction, restoreProjectAction } from "../project.actions";
 
 interface DeletedProject {
@@ -20,6 +22,8 @@ interface Props {
 /** WP-D4: workspace-admin restore panel for soft-deleted projects. */
 export function DeletedProjectsPanel({ workspaceId, slug }: Props) {
   const router = useRouter();
+  const actionError = useActionError();
+  const t = useTranslations();
   const [loaded, setLoaded] = useState(false);
   const [items, setItems] = useState<DeletedProject[]>([]);
   const [restoringId, setRestoringId] = useState<string | null>(null);
@@ -27,7 +31,7 @@ export function DeletedProjectsPanel({ workspaceId, slug }: Props) {
   async function load() {
     const result = await listDeletedProjectsAction({ workspaceId });
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(actionError(result));
       return;
     }
     setItems(result.data);
@@ -39,10 +43,10 @@ export function DeletedProjectsPanel({ workspaceId, slug }: Props) {
     const result = await restoreProjectAction({ workspaceId, projectId, slug });
     setRestoringId(null);
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(actionError(result));
       return;
     }
-    toast.success("Project restored");
+    toast.success(t("project.restored"));
     setItems((prev) => prev.filter((p) => p.id !== projectId));
     router.refresh();
   }
@@ -50,16 +54,21 @@ export function DeletedProjectsPanel({ workspaceId, slug }: Props) {
   if (!loaded) {
     return (
       <Button type="button" variant="outline" size="sm" onClick={load}>
-        Show deleted projects
+        {t("project.showDeleted")}
       </Button>
     );
   }
 
   return (
     <div className="space-y-2">
-      {items.length === 0 && <p className="text-xs text-muted-foreground">No deleted projects.</p>}
+      {items.length === 0 && (
+        <p className="text-xs text-muted-foreground">{t("project.noDeleted")}</p>
+      )}
       {items.map((project) => (
-        <div key={project.id} className="flex items-center justify-between gap-2 rounded-md border px-3 py-2">
+        <div
+          key={project.id}
+          className="flex items-center justify-between gap-2 rounded-md border px-3 py-2"
+        >
           <span className="truncate text-sm">{project.name}</span>
           <Button
             type="button"
@@ -68,7 +77,7 @@ export function DeletedProjectsPanel({ workspaceId, slug }: Props) {
             disabled={restoringId === project.id}
             onClick={() => restore(project.id)}
           >
-            Restore
+            {t("project.restore")}
           </Button>
         </div>
       ))}

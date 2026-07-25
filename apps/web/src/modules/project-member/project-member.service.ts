@@ -38,7 +38,8 @@ export async function addMember(p: { workspaceId: string; projectId: string; inp
   assertCanManageMembers(ctx);
 
   const existing = await repo.findByMember(p.projectId, data.workspaceMemberId);
-  if (existing) throw new ValidationError("Member already on this project");
+  if (existing)
+    throw new ValidationError("Member already on this project", "memberAlreadyOnProject");
 
   return db.transaction(async (tx) => {
     const member = await repo.add(
@@ -94,7 +95,11 @@ export async function updateMember(p: {
   });
 }
 
-export async function removeMember(p: { workspaceId: string; projectId: string; memberId: string }) {
+export async function removeMember(p: {
+  workspaceId: string;
+  projectId: string;
+  memberId: string;
+}) {
   const ctx = await requireActor(p.workspaceId, p.projectId);
   assertCanManageMembers(ctx);
 

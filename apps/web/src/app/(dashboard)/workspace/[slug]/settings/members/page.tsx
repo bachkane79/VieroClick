@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { getWorkspace, listWorkspaceMembers } from "@/modules/workspace/workspace.service";
 import { NotFoundError } from "@/server/lib/errors";
 import { MembersManager } from "./members-manager";
@@ -20,13 +21,13 @@ export default async function WorkspaceMembersSettingsPage({ params }: Props) {
     throw err;
   }
 
+  const t = await getTranslations();
+
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Thành viên</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Mời người vào workspace và quản lý vai trò truy cập.
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight">{t("members.pageTitle")}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t("members.pageDesc")}</p>
       </header>
       <MembersManager workspaceId={workspace.id} slug={slug} initialMembers={members} />
     </div>

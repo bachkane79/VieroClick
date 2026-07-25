@@ -6,6 +6,8 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { createWorkspaceAction } from "../workspace.actions";
 import { Button } from "@vieroc/ui";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
+import { useActionError } from "@/i18n/use-action-error";
 
 interface Props {
   open: boolean;
@@ -17,6 +19,8 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
   const [slug, setSlug] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
+  const t = useTranslations();
+  const actionError = useActionError();
 
   // Helper to auto-slugify name
   const handleNameChange = (val: string) => {
@@ -37,7 +41,7 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
     try {
       const res = await createWorkspaceAction({ name, slug });
       if (res.ok) {
-        toast.success("Workspace created successfully!");
+        toast.success(t("workspaceCreate.created"));
         onOpenChange(false);
         // Clear fields
         setName("");
@@ -45,10 +49,10 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
         // Redirect to new workspace dashboard
         router.push(`/workspace/${res.data.slug}`);
       } else {
-        toast.error(res.error ?? "Failed to create workspace");
+        toast.error(actionError(res, t("workspaceCreate.createFailed")));
       }
     } catch {
-      toast.error("An unexpected error occurred");
+      toast.error(t("common.somethingWrong"));
     } finally {
       setSubmitting(false);
     }
@@ -58,21 +62,24 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         {/* Overlay */}
-        <Dialog.Overlay className="fixed inset-0 bg-neutral-950/40 backdrop-blur-sm z-50 transition-opacity animate-in fade-in" />
-        
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-neutral-950/40 backdrop-blur-sm transition-opacity animate-in fade-in" />
+
         {/* Content */}
-        <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-card border rounded-2xl p-6 shadow-2xl z-50 focus:outline-none animate-in zoom-in-95 slide-in-from-top-4 duration-200 border-border">
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-card p-6 shadow-2xl duration-200 animate-in zoom-in-95 slide-in-from-top-4 focus:outline-none">
           <Dialog.Title className="text-xl font-bold tracking-tight">
-            Create Workspace
+            {t("workspaceCreate.title")}
           </Dialog.Title>
-          <Dialog.Description className="text-sm text-muted-foreground mt-1 mb-5">
-            Workspaces isolate your organizations, projects, members, and event logs.
+          <Dialog.Description className="mb-5 mt-1 text-sm text-muted-foreground">
+            {t("workspaceCreate.description")}
           </Dialog.Description>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label htmlFor="ws-name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Workspace Name
+              <label
+                htmlFor="ws-name"
+                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              >
+                {t("workspaceCreate.nameLabel")}
               </label>
               <input
                 id="ws-name"
@@ -80,14 +87,17 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
                 required
                 value={name}
                 onChange={(e) => handleNameChange(e.target.value)}
-                placeholder="Acme Corporation"
-                className="w-full px-3.5 py-2 rounded-xl border border-input bg-background/50 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+                placeholder={t("workspaceCreate.namePlaceholder")}
+                className="w-full rounded-xl border border-input bg-background/50 px-3.5 py-2 text-sm placeholder-neutral-400 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label htmlFor="ws-slug" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Workspace Slug
+              <label
+                htmlFor="ws-slug"
+                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              >
+                {t("workspaceCreate.slugLabel")}
               </label>
               <div className="relative flex items-center">
                 <input
@@ -96,27 +106,27 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: Props) {
                   required
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
-                  placeholder="acme-corp"
-                  className="w-full px-3.5 py-2 rounded-xl border border-input bg-background/50 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm pr-20"
+                  placeholder={t("workspaceCreate.slugPlaceholder")}
+                  className="w-full rounded-xl border border-input bg-background/50 px-3.5 py-2 pr-20 text-sm placeholder-neutral-400 transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
-                <span className="absolute right-3 text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded border">
+                <span className="absolute right-3 rounded border bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                   viero.click/
                 </span>
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-3 border-t border-border mt-6">
+            <div className="mt-6 flex justify-end gap-3 border-t border-border pt-3">
               <Dialog.Close asChild>
                 <Button type="button" variant="outline" className="rounded-xl px-4">
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
               </Dialog.Close>
               <Button
                 type="submit"
                 disabled={submitting || !name || !slug}
-                className="rounded-xl px-4 bg-primary text-primary-foreground font-semibold hover:bg-primary/95"
+                className="rounded-xl bg-primary px-4 font-semibold text-primary-foreground hover:bg-primary/95"
               >
-                {submitting ? "Creating..." : "Create Workspace"}
+                {submitting ? t("workspaceCreate.creating") : t("workspaceCreate.submit")}
               </Button>
             </div>
           </form>

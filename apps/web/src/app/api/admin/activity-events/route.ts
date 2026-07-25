@@ -26,7 +26,8 @@ export const GET = withApiLogging("api.admin.activity-events.list", async (reque
   if (!workspaceId) throw new ValidationError("workspaceId is required");
 
   const ctx = await requireActor(workspaceId);
-  if (!isWorkspaceAdmin(ctx)) throw new ForbiddenError("Admin access required");
+  if (!isWorkspaceAdmin(ctx))
+    throw new ForbiddenError("Admin access required", "workspaceAdminOnly");
 
   const limit = Math.min(MAX_LIMIT, Math.max(1, Number(params.get("limit")) || DEFAULT_LIMIT));
   const cursor = decodeCursor(params.get("cursor"));

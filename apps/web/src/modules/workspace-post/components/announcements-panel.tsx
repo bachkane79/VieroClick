@@ -4,7 +4,9 @@ import { useState } from "react";
 import { Button, cn, Textarea } from "@vieroc/ui";
 import { Megaphone, Pin, PinOff, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useFormatter, useTranslations } from "next-intl";
 import { memberInitials } from "@/modules/task/status-colors";
+import { useActionError } from "@/i18n/use-action-error";
 import {
   createWorkspacePostAction,
   deleteWorkspacePostAction,
@@ -28,14 +30,6 @@ interface Props {
   currentMemberId: string;
 }
 
-function relativeTime(iso: string): string {
-  const diff = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(iso));
-}
-
 export function AnnouncementsPanel({
   workspaceId,
   workspaceSlug,
@@ -43,6 +37,10 @@ export function AnnouncementsPanel({
   canManage,
   currentMemberId,
 }: Props) {
+  const t = useTranslations();
+  const actionError = useActionError();
+  const format = useFormatter();
+  const now = new Date();
   const [posts, setPosts] = useState<PostView[]>(initialPosts);
   const [body, setBody] = useState("");
   const [pinned, setPinned] = useState(false);
@@ -59,7 +57,7 @@ export function AnnouncementsPanel({
     });
     setSubmitting(false);
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
     setPosts((cur) => [
@@ -68,7 +66,7 @@ export function AnnouncementsPanel({
         body: trimmed,
         pinned: res.data.pinned,
         authorMemberId: currentMemberId,
-        authorName: "You",
+        authorName: t("announcements.you"),
         createdAt: new Date().toISOString(),
       },
       ...cur,
@@ -88,14 +86,14 @@ export function AnnouncementsPanel({
     });
     if (!res.ok) {
       setPosts((cur) => cur.map((p) => (p.id === post.id ? { ...p, pinned: post.pinned } : p)));
-      toast.error(res.error);
+      toast.error(actionError(res));
     }
   }
 
   async function remove(id: string) {
     const res = await deleteWorkspacePostAction({ workspaceId, slug: workspaceSlug, postId: id });
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
     setPosts((cur) => cur.filter((p) => p.id !== id));
@@ -109,15 +107,15 @@ export function AnnouncementsPanel({
     <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-soft">
       <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
         <Megaphone className="h-4 w-4 text-primary" />
-        Team board
+        {t("announcements.teamBoard")}
       </h2>
 
       <div className="mb-3.5 rounded-xl border border-border/70 bg-surface-subtle p-2.5">
         <Textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          placeholder="Chia sẻ với cả team…"
-          className="min-h-16 border-0 bg-transparent shadow-none focus-visible:ring-0 text-xs"
+          placeholder={t("announcements.placeholder")}
+          className="min-h-16 border-0 bg-transparent text-xs shadow-none focus-visible:ring-0"
         />
         <div className="flex items-center justify-between gap-2 px-1 pt-1">
           {canManage ? (
@@ -128,20 +126,27 @@ export function AnnouncementsPanel({
                 onChange={(e) => setPinned(e.target.checked)}
                 className="h-3.5 w-3.5 rounded text-primary focus:ring-primary/40"
               />
-              <Pin className="h-3 w-3" /> Ghim
+              <Pin className="h-3 w-3" /> {t("announcements.pin")}
             </label>
           ) : (
             <span />
           )}
-          <Button type="button" variant="dark" size="sm" className="h-7 px-3.5 text-xs gap-1.5" disabled={submitting || !body.trim()} onClick={submit}>
+          <Button
+            type="button"
+            variant="dark"
+            size="sm"
+            className="h-7 gap-1.5 px-3.5 text-xs"
+            disabled={submitting || !body.trim()}
+            onClick={submit}
+          >
             <Send className="h-3 w-3" />
-            Đăng
+            {t("announcements.post")}
           </Button>
         </div>
       </div>
 
       {ordered.length === 0 ? (
-        <p className="py-4 text-center text-xs text-muted-foreground">Chưa có thông báo nào.</p>
+        <p className="py-4 text-center text-xs text-muted-foreground">{t("announcements.empty")}</p>
       ) : (
         <div className="space-y-2">
           {ordered.map((post) => {
@@ -161,23 +166,29 @@ export function AnnouncementsPanel({
                     </span>
                     <span className="text-sm font-medium">{post.authorName}</span>
                     {post.pinned && <Pin className="h-3 w-3 text-primary" />}
-                    <span className="text-[11px] text-muted-foreground">{relativeTime(post.createdAt)}</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {format.relativeTime(new Date(post.createdAt), now)}
+                    </span>
                   </div>
                   <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                     {canManage && (
                       <button
                         type="button"
-                        aria-label={post.pinned ? "Unpin" : "Pin"}
+                        aria-label={post.pinned ? t("announcements.unpin") : t("announcements.pin")}
                         onClick={() => togglePin(post)}
                         className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
                       >
-                        {post.pinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+                        {post.pinned ? (
+                          <PinOff className="h-3.5 w-3.5" />
+                        ) : (
+                          <Pin className="h-3.5 w-3.5" />
+                        )}
                       </button>
                     )}
                     {(mine || canManage) && (
                       <button
                         type="button"
-                        aria-label="Delete"
+                        aria-label={t("common.delete")}
                         onClick={() => remove(post.id)}
                         className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-red-500"
                       >

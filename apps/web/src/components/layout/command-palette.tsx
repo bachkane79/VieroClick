@@ -21,8 +21,7 @@ import {
   Folder,
 } from "lucide-react";
 import { listProjectsAction } from "@/modules/project/project.actions";
-import { useLocale } from "@/lib/i18n/client";
-import { t } from "@/lib/i18n/dict";
+import { useTranslations } from "next-intl";
 
 interface Props {
   workspaces: Array<{ id: string; name: string; slug: string }>;
@@ -43,7 +42,7 @@ interface Command {
  */
 export function CommandPalette({ workspaces }: Props) {
   const router = useRouter();
-  const locale = useLocale();
+  const t = useTranslations();
   const params = useParams() as { slug?: string; projectId?: string };
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -96,29 +95,119 @@ export function CommandPalette({ workspaces }: Props) {
     const list: Command[] = [];
     if (activeWorkspace) {
       list.push(
-        { id: "home", label: t(locale, "sb.home"), icon: Home, href: wsBase, keywords: "home trang chu" },
-        { id: "mywork", label: t(locale, "sb.myWork"), icon: ListChecks, href: `${wsBase}/my-tasks`, keywords: "tasks viec cua toi" },
-        { id: "inbox", label: t(locale, "sb.inbox"), icon: Inbox, href: `${wsBase}/inbox`, keywords: "notifications hop thu" },
-        { id: "projects", label: t(locale, "sb.projects"), icon: Folder, href: `${wsBase}/projects`, keywords: "du an" },
-        { id: "docs", label: t(locale, "sb.docs"), icon: BookText, href: `${wsBase}/docs`, keywords: "tai lieu wiki" },
-        { id: "chat", label: t(locale, "sb.chat"), icon: MessagesSquare, href: `${wsBase}/chat`, keywords: "trao doi" },
-        { id: "dashboards", label: t(locale, "sb.dashboards"), icon: LayoutDashboard, href: `${wsBase}/dashboards`, keywords: "bao cao" },
-        { id: "settings", label: t(locale, "sb.settings"), icon: Settings, href: `${wsBase}/settings`, keywords: "cai dat members" }
+        {
+          id: "home",
+          label: t("sidebar.home"),
+          icon: Home,
+          href: wsBase,
+          keywords: "home trang chu",
+        },
+        {
+          id: "mywork",
+          label: t("sidebar.myWork"),
+          icon: ListChecks,
+          href: `${wsBase}/my-tasks`,
+          keywords: "tasks viec cua toi",
+        },
+        {
+          id: "inbox",
+          label: t("sidebar.inbox"),
+          icon: Inbox,
+          href: `${wsBase}/inbox`,
+          keywords: "notifications hop thu",
+        },
+        {
+          id: "projects",
+          label: t("sidebar.projects"),
+          icon: Folder,
+          href: `${wsBase}/projects`,
+          keywords: "du an",
+        },
+        {
+          id: "docs",
+          label: t("sidebar.docs"),
+          icon: BookText,
+          href: `${wsBase}/docs`,
+          keywords: "tai lieu wiki",
+        },
+        {
+          id: "chat",
+          label: t("sidebar.chat"),
+          icon: MessagesSquare,
+          href: `${wsBase}/chat`,
+          keywords: "trao doi",
+        },
+        {
+          id: "dashboards",
+          label: t("sidebar.dashboards"),
+          icon: LayoutDashboard,
+          href: `${wsBase}/dashboards`,
+          keywords: "bao cao",
+        },
+        {
+          id: "settings",
+          label: t("sidebar.settings"),
+          icon: Settings,
+          href: `${wsBase}/settings`,
+          keywords: "cai dat members",
+        }
       );
     } else {
-      list.push({ id: "home", label: t(locale, "sb.home"), icon: Home, href: "/dashboard", keywords: "home" });
+      list.push({
+        id: "home",
+        label: t("sidebar.home"),
+        icon: Home,
+        href: "/dashboard",
+        keywords: "home",
+      });
     }
 
     // Current project view jumps.
     if (activeWorkspace && params.projectId) {
       const pBase = `${wsBase}/projects/${params.projectId}`;
       list.push(
-        { id: "cur-list", label: "List view", hint: "current project", icon: ListChecks, href: `${pBase}/tasks` },
-        { id: "cur-board", label: "Board view", hint: "current project", icon: KanbanSquare, href: `${pBase}/board` },
-        { id: "cur-cal", label: "Calendar view", hint: "current project", icon: CalendarDays, href: `${pBase}/calendar` },
-        { id: "cur-table", label: "Table view", hint: "current project", icon: Table2, href: `${pBase}/table` },
-        { id: "cur-workload", label: "Workload", hint: "current project", icon: Network, href: `${pBase}/workload` },
-        { id: "cur-ai", label: "Ask AI Manager", hint: "current project", icon: Sparkles, href: `${pBase}/ai` }
+        {
+          id: "cur-list",
+          label: "List view",
+          hint: "current project",
+          icon: ListChecks,
+          href: `${pBase}/tasks`,
+        },
+        {
+          id: "cur-board",
+          label: "Board view",
+          hint: "current project",
+          icon: KanbanSquare,
+          href: `${pBase}/board`,
+        },
+        {
+          id: "cur-cal",
+          label: "Calendar view",
+          hint: "current project",
+          icon: CalendarDays,
+          href: `${pBase}/calendar`,
+        },
+        {
+          id: "cur-table",
+          label: "Table view",
+          hint: "current project",
+          icon: Table2,
+          href: `${pBase}/table`,
+        },
+        {
+          id: "cur-workload",
+          label: "Workload",
+          hint: "current project",
+          icon: Network,
+          href: `${pBase}/workload`,
+        },
+        {
+          id: "cur-ai",
+          label: "Ask AI Manager",
+          hint: "current project",
+          icon: Sparkles,
+          href: `${pBase}/ai`,
+        }
       );
     }
 
@@ -134,7 +223,7 @@ export function CommandPalette({ workspaces }: Props) {
       });
     }
     return list;
-  }, [activeWorkspace, wsBase, params.projectId, projects, locale]);
+  }, [activeWorkspace, wsBase, params.projectId, projects, t]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -174,7 +263,7 @@ export function CommandPalette({ workspaces }: Props) {
           className="fixed left-1/2 top-[15%] z-50 w-full max-w-xl -translate-x-1/2 overflow-hidden rounded-xl border border-border bg-popover shadow-elevated focus:outline-none"
           aria-describedby={undefined}
         >
-          <Dialog.Title className="sr-only">Command palette</Dialog.Title>
+          <Dialog.Title className="sr-only">{t("topbar.commandPalette")}</Dialog.Title>
           <div className="flex items-center gap-2 border-b border-border px-3">
             <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
             {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
@@ -186,7 +275,7 @@ export function CommandPalette({ workspaces }: Props) {
                 setActive(0);
               }}
               onKeyDown={onInputKeyDown}
-              placeholder={t(locale, "tb.search")}
+              placeholder={t("topbar.search")}
               className="h-12 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
             <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
@@ -207,7 +296,9 @@ export function CommandPalette({ workspaces }: Props) {
                   onClick={() => go(cmd)}
                   className={cn(
                     "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors",
-                    i === active ? "bg-accent text-foreground" : "text-foreground/90 hover:bg-accent/60"
+                    i === active
+                      ? "bg-accent text-foreground"
+                      : "text-foreground/90 hover:bg-accent/60"
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />

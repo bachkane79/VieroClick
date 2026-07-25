@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@vieroc/ui";
+import { useTranslations } from "next-intl";
 import {
   SlidersHorizontal,
   Users,
@@ -31,41 +32,52 @@ type NavGroup = { title: string; items: NavItem[] };
  */
 export function SettingsNav({ slug }: { slug: string }) {
   const pathname = usePathname();
+  const t = useTranslations();
   const base = `/workspace/${slug}/settings`;
 
   const groups: NavGroup[] = [
     {
-      title: "Chung",
+      title: t("settings.workspace.groupGeneral"),
       items: [
         {
           href: base,
-          label: "Tổng quan",
-          desc: "Tên, đường dẫn workspace",
+          label: t("settings.workspace.overview"),
+          desc: t("settings.workspace.overviewDesc"),
           icon: SlidersHorizontal,
           exact: true,
         },
       ],
     },
     {
-      title: "Quản trị",
+      title: t("settings.workspace.groupAdmin"),
       items: [
-        { href: `${base}/members`, label: "Thành viên", desc: "Mời & phân vai trò", icon: Users },
-        { href: `${base}/teams`, label: "Teams", desc: "Nhóm chia sẻ quyền", icon: UsersRound },
+        {
+          href: `${base}/members`,
+          label: t("settings.workspace.members"),
+          desc: t("settings.workspace.membersDesc"),
+          icon: Users,
+        },
+        {
+          href: `${base}/teams`,
+          label: t("settings.workspace.teams"),
+          desc: t("settings.workspace.teamsDesc"),
+          icon: UsersRound,
+        },
         {
           href: `${base}/roles`,
-          label: "Vai trò & Quyền",
-          desc: "Ma trận quyền theo vai trò",
+          label: t("settings.workspace.roles"),
+          desc: t("settings.workspace.rolesDesc"),
           icon: ShieldCheck,
         },
       ],
     },
     {
-      title: "Tích hợp",
+      title: t("settings.workspace.groupIntegrations"),
       items: [
         {
           href: `${base}/integrations`,
-          label: "Tích hợp",
-          desc: "Telegram & kết nối",
+          label: t("settings.workspace.integrations"),
+          desc: t("settings.workspace.integrationsDesc"),
           icon: Plug,
         },
       ],
@@ -73,13 +85,15 @@ export function SettingsNav({ slug }: { slug: string }) {
   ];
 
   const isActive = (item: NavItem) =>
-    item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`);
+    item.exact
+      ? pathname === item.href
+      : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
   return (
-    <nav aria-label="Cài đặt" className="w-full shrink-0 md:w-60">
+    <nav aria-label={t("settings.workspace.navAria")} className="w-full shrink-0 md:w-60">
       <div className="mb-4 px-2">
-        <h2 className="text-base font-semibold tracking-tight">Cài đặt</h2>
-        <p className="text-xs text-muted-foreground">Quản trị workspace</p>
+        <h2 className="text-base font-semibold tracking-tight">{t("common.settings")}</h2>
+        <p className="text-xs text-muted-foreground">{t("settings.workspace.subheading")}</p>
       </div>
       <div className="space-y-5">
         {groups.map((group) => (
@@ -104,7 +118,10 @@ export function SettingsNav({ slug }: { slug: string }) {
                       )}
                     >
                       <Icon
-                        className={cn("mt-0.5 h-4 w-4 shrink-0", active ? "text-primary" : "text-muted-foreground")}
+                        className={cn(
+                          "mt-0.5 h-4 w-4 shrink-0",
+                          active ? "text-primary" : "text-muted-foreground"
+                        )}
                       />
                       <span className="min-w-0">
                         <span className="block leading-tight">{item.label}</span>

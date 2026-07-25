@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Button, cn, Input } from "@vieroc/ui";
 import { ChevronDown, ChevronRight, Eye, FileText, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import {
   createWorkspaceDocAction,
   deleteWorkspaceDocAction,
   updateWorkspaceDocAction,
 } from "../workspace-doc.actions";
+import { useActionError } from "@/i18n/use-action-error";
 
 export interface DocNode {
   id: string;
@@ -28,11 +30,13 @@ interface Props {
 
 /** Minimal, dependency-free markdown → HTML (escaped first). */
 function renderMarkdown(src: string): string {
-  const esc = (s: string) =>
-    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const inline = (s: string) =>
     esc(s)
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a class="text-primary underline" href="$2" target="_blank" rel="noreferrer">$1</a>')
+      .replace(
+        /\[([^\]]+)\]\(([^)]+)\)/g,
+        '<a class="text-primary underline" href="$2" target="_blank" rel="noreferrer">$1</a>'
+      )
       .replace(/`([^`]+)`/g, '<code class="rounded bg-muted px-1 py-0.5 text-[0.85em]">$1</code>')
       .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
       .replace(/\*([^*]+)\*/g, "<em>$1</em>");
@@ -56,9 +60,12 @@ function renderMarkdown(src: string): string {
       continue;
     }
     closeList();
-    if (/^###\s+/.test(line)) out.push(`<h3 class="mt-4 text-base font-semibold">${inline(line.slice(4))}</h3>`);
-    else if (/^##\s+/.test(line)) out.push(`<h2 class="mt-5 text-lg font-bold">${inline(line.slice(3))}</h2>`);
-    else if (/^#\s+/.test(line)) out.push(`<h1 class="mt-2 text-xl font-bold">${inline(line.slice(2))}</h1>`);
+    if (/^###\s+/.test(line))
+      out.push(`<h3 class="mt-4 text-base font-semibold">${inline(line.slice(4))}</h3>`);
+    else if (/^##\s+/.test(line))
+      out.push(`<h2 class="mt-5 text-lg font-bold">${inline(line.slice(3))}</h2>`);
+    else if (/^#\s+/.test(line))
+      out.push(`<h1 class="mt-2 text-xl font-bold">${inline(line.slice(2))}</h1>`);
     else if (line.trim() === "") out.push("");
     else out.push(`<p class="leading-7">${inline(line)}</p>`);
   }
@@ -68,6 +75,8 @@ function renderMarkdown(src: string): string {
 
 export function DocsClient({ workspaceId, workspaceSlug, initialDocs, initialDocId }: Props) {
   const initial = initialDocs.find((d) => d.id === initialDocId) ?? initialDocs[0] ?? null;
+  const t = useTranslations();
+  const actionError = useActionError();
   const [docs, setDocs] = useState<DocNode[]>(initialDocs);
   const [selectedId, setSelectedId] = useState<string | null>(initial?.id ?? null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -110,10 +119,10 @@ export function DocsClient({ workspaceId, workspaceSlug, initialDocs, initialDoc
     const res = await createWorkspaceDocAction({
       workspaceId,
       slug: workspaceSlug,
-      data: { title: "Untitled", parentId: parentId ?? undefined, content: "" },
+      data: { title: t("workspaceDocs.untitled"), parentId: parentId ?? undefined, content: "" },
     });
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
     const node: DocNode = {
@@ -134,24 +143,28 @@ export function DocsClient({ workspaceId, workspaceSlug, initialDocs, initialDoc
       workspaceId,
       slug: workspaceSlug,
       docId: selected.id,
-      data: { title: title.trim() || "Untitled", content },
+      data: { title: title.trim() || t("workspaceDocs.untitled"), content },
     });
     setSaving(false);
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
     setDocs((cur) =>
-      cur.map((d) => (d.id === selected.id ? { ...d, title: title.trim() || "Untitled", content } : d))
+      cur.map((d) =>
+        d.id === selected.id
+          ? { ...d, title: title.trim() || t("workspaceDocs.untitled"), content }
+          : d
+      )
     );
     setDirty(false);
-    toast.success("Saved");
+    toast.success(t("common.changesSaved"));
   }
 
   async function remove(id: string) {
     const res = await deleteWorkspaceDocAction({ workspaceId, slug: workspaceSlug, docId: id });
     if (!res.ok) {
-      toast.error(res.error);
+      toast.error(actionError(res));
       return;
     }
     // Drop the doc and any descendants from local state.
@@ -172,7 +185,7 @@ export function DocsClient({ workspaceId, workspaceSlug, initialDocs, initialDoc
       setTitle("");
       setContent("");
     }
-    toast.success("Deleted");
+    toast.success(t("workspaceDocs.toast.deleted"));
   }
 
   function renderTree(parentId: string | null, depth: number): React.ReactNode {
@@ -192,10 +205,17 @@ export function DocsClient({ workspaceId, workspaceSlug, initialDocs, initialDoc
             <button
               type="button"
               onClick={() => setCollapsed((c) => ({ ...c, [d.id]: !c[d.id] }))}
-              className={cn("rounded p-0.5 text-muted-foreground", kids.length === 0 && "invisible")}
-              aria-label="Toggle"
+              className={cn(
+                "rounded p-0.5 text-muted-foreground",
+                kids.length === 0 && "invisible"
+              )}
+              aria-label={t("workspaceDocs.toggle")}
             >
-              {isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              {isCollapsed ? (
+                <ChevronRight className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5" />
+              )}
             </button>
             <button
               type="button"
@@ -208,7 +228,7 @@ export function DocsClient({ workspaceId, workspaceSlug, initialDocs, initialDoc
             <button
               type="button"
               onClick={() => createDoc(d.id)}
-              title="Add sub-page"
+              title={t("workspaceDocs.addSubPage")}
               className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover:opacity-100"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -225,12 +245,14 @@ export function DocsClient({ workspaceId, workspaceSlug, initialDocs, initialDoc
       {/* Tree */}
       <aside className="flex w-64 shrink-0 flex-col rounded-lg border bg-card">
         <div className="flex items-center justify-between border-b px-3 py-2">
-          <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Pages</span>
+          <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+            {t("workspaceDocs.pages")}
+          </span>
           <button
             type="button"
             onClick={() => createDoc(null)}
             className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-            title="New page"
+            title={t("workspaceDocs.newPage")}
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -238,7 +260,7 @@ export function DocsClient({ workspaceId, workspaceSlug, initialDocs, initialDoc
         <div className="flex-1 overflow-y-auto p-1.5">
           {docs.length === 0 ? (
             <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-              No pages yet. Create the first team doc.
+              {t("workspaceDocs.emptyTree")}
             </p>
           ) : (
             renderTree(null, 0)
@@ -258,7 +280,7 @@ export function DocsClient({ workspaceId, workspaceSlug, initialDocs, initialDoc
                   setDirty(true);
                 }}
                 className="h-9 border-0 bg-transparent px-0 text-lg font-bold shadow-none focus-visible:ring-0"
-                placeholder="Untitled"
+                placeholder={t("workspaceDocs.untitled")}
               />
               <div className="flex shrink-0 items-center gap-1">
                 <button
@@ -266,16 +288,26 @@ export function DocsClient({ workspaceId, workspaceSlug, initialDocs, initialDoc
                   onClick={() => setMode(mode === "edit" ? "preview" : "edit")}
                   className="inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
                 >
-                  {mode === "edit" ? <Eye className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
-                  {mode === "edit" ? "Preview" : "Edit"}
+                  {mode === "edit" ? (
+                    <Eye className="h-3.5 w-3.5" />
+                  ) : (
+                    <Pencil className="h-3.5 w-3.5" />
+                  )}
+                  {mode === "edit" ? t("workspaceDocs.preview") : t("common.edit")}
                 </button>
-                <Button type="button" size="sm" className="h-8" disabled={saving || !dirty} onClick={save}>
-                  {saving ? "Saving..." : "Save"}
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8"
+                  disabled={saving || !dirty}
+                  onClick={save}
+                >
+                  {saving ? t("workspaceDocs.saving") : t("common.save")}
                 </Button>
                 <button
                   type="button"
                   onClick={() => remove(selected.id)}
-                  title="Delete page"
+                  title={t("workspaceDocs.deletePage")}
                   className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-red-500"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -289,7 +321,7 @@ export function DocsClient({ workspaceId, workspaceSlug, initialDocs, initialDoc
                   setContent(e.target.value);
                   setDirty(true);
                 }}
-                placeholder="Write with markdown — # heading, **bold**, - list, [link](url), `code`"
+                placeholder={t("workspaceDocs.contentPlaceholder")}
                 className="min-h-0 flex-1 resize-none bg-transparent px-4 py-3 font-mono text-sm leading-6 outline-none"
               />
             ) : (
@@ -303,8 +335,8 @@ export function DocsClient({ workspaceId, workspaceSlug, initialDocs, initialDoc
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center text-center text-muted-foreground">
             <FileText className="mb-3 h-8 w-8 opacity-40" />
-            <p className="text-sm font-semibold">Select or create a page</p>
-            <p className="mt-1 text-xs">Workspace docs are shared with your whole team.</p>
+            <p className="text-sm font-semibold">{t("workspaceDocs.emptyTitle")}</p>
+            <p className="mt-1 text-xs">{t("workspaceDocs.emptyHint")}</p>
           </div>
         )}
       </section>
