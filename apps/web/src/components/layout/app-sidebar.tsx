@@ -97,6 +97,7 @@ const PROJECT_STATUS_DOT: Record<string, string> = {
 /** Keep the panel in sync when navigation happens outside the rail. */
 function deriveTab(pathname: string): RailTab | null {
   if (/\/docs(\/|$)/.test(pathname)) return "docs";
+  if (/\/team(\/|$)/.test(pathname)) return "teams";
   if (/\/my-tasks(\/|$)/.test(pathname)) return "planner";
   if (/\/projects\/[^/]+\/ai(\/|$)/.test(pathname)) return "ai";
   if (/\/automations(\/|$)/.test(pathname)) return "automations";
@@ -381,7 +382,7 @@ export function AppSidebar({ workspaces }: Props) {
     },
     { key: "docs", icon: BookText, label: t("sidebar.docs"), href: `${wsBase}/docs`, kind: "tab" },
     { key: "ai", icon: Sparkles, label: t("sidebar.ai"), kind: "tab" },
-    { key: "teams", icon: Users, label: t("sidebar.teams"), kind: "tab" },
+    { key: "teams", icon: Users, label: t("sidebar.teams"), href: `${wsBase}/team`, kind: "tab" },
     { key: "automations", icon: Zap, label: t("sidebar.automations"), kind: "tab" },
     { key: "more", icon: LayoutGrid, label: t("sidebar.more"), kind: "more" },
   ];
@@ -1039,6 +1040,14 @@ function TeamsPanel({
   const t = useTranslations();
   return (
     <>
+      <div className="space-y-px">
+        <PanelLink
+          href={`${wsBase}/team`}
+          icon={Users}
+          label={t("sidebar.allMembers")}
+          active={pathname.endsWith("/team")}
+        />
+      </div>
       <SectionTitle
         action={
           <Link

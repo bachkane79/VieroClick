@@ -25,10 +25,19 @@ import * as events from "./task.events";
 import { wouldCreateCycle } from "@/modules/task-dependency/task-dependency.pure";
 
 /** Best-effort score recompute — never let a scoring hiccup fail the task mutation. */
-async function safeRecomputeScore(workspaceId: string, memberId: string | null, exec: Executor) {
+async function safeRecomputeScore(
+  projectId: string,
+  workspaceId: string,
+  memberId: string | null,
+  exec: Executor
+) {
   if (!memberId) return;
   try {
-    await recomputeMemberScore({ workspaceId, workspaceMemberId: memberId, exec });
+    // Refresh the member's snapshot for THIS project, then re-derive the
+    // workspace-level effective score (mean of seed + per-project profiles).
+    await recomputeMemberScore({ projectId, workspaceMemberId: memberId, exec });
+    // The workspace team directory aggregates every member's effective score.
+    await invalidateCache(`ws-team:${workspaceId}`);
   } catch (e) {
     console.error("Member score recompute failed:", e);
   }
@@ -465,7 +474,7 @@ export async function updateTask(p: {
 
     // 4.1: a reviewer/manager closing a task directly also refreshes scores.
     if (targetStatus?.type === "done") {
-      await safeRecomputeScore(ctx.workspaceId, updated.assigneeMemberId, tx);
+      await safeRecomputeScore(p.projectId, ctx.workspaceId, updated.assigneeMemberId, tx);
     }
 
     await invalidateCache(`board:${p.projectId}`);
@@ -536,7 +545,7 @@ export async function reviewTask(p: {
         ]);
       }
       // 4.1: closing a task feeds the assignee's operational scores.
-      await safeRecomputeScore(ctx.workspaceId, updated.assigneeMemberId, tx);
+      await safeRecomputeScore(p.projectId, ctx.workspaceId, updated.assigneeMemberId, tx);
       await invalidateCache(`board:${p.projectId}`);
       await invalidateProjectCaches(p.projectId); // WP-I2: dashboard/team-metrics aggregate over tasks too
       return updated;

@@ -63,6 +63,16 @@ export const memberProfiles = pgTable("member_profiles", {
   seniorityLevel: integer("seniority_level").notNull().default(1),
   availabilityHoursPerWeek: numeric("availability_hours_per_week", { precision: 5, scale: 2 }),
   timezone: text("timezone"),
+  // Leader-seeded baseline (the "hồ sơ ban đầu"). Nullable — null means "not
+  // seeded", so it does not contribute to the effective mean. The *_score
+  // columns below hold the materialized effective mean (seed + per-project
+  // profiles) that the card and the assignment agent read; see
+  // member-score.service#recomputeEffectiveScore.
+  reliabilitySeed: numeric("reliability_seed", { precision: 5, scale: 2 }),
+  speedSeed: numeric("speed_seed", { precision: 5, scale: 2 }),
+  qualitySeed: numeric("quality_seed", { precision: 5, scale: 2 }),
+  communicationSeed: numeric("communication_seed", { precision: 5, scale: 2 }),
+  blockerHandlingSeed: numeric("blocker_handling_seed", { precision: 5, scale: 2 }),
   reliabilityScore: numeric("reliability_score", { precision: 5, scale: 2 }).notNull().default("0"),
   speedScore: numeric("speed_score", { precision: 5, scale: 2 }).notNull().default("0"),
   qualityScore: numeric("quality_score", { precision: 5, scale: 2 }).notNull().default("0"),

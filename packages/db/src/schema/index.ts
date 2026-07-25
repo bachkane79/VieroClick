@@ -9,6 +9,7 @@ export * from "./tasks";
 export * from "./files";
 export * from "./knowledge";
 export * from "./updates";
+export * from "./member-scores";
 export * from "./planning";
 export * from "./events";
 export * from "./automations";

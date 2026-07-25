@@ -381,7 +381,8 @@
     "dmsSection": "Direct messages",
     "allDashboards": "All dashboards",
     "dashByProject": "Dashboards by project",
-    "projectSettings": "Project settings"
+    "projectSettings": "Project settings",
+    "allMembers": "All members"
   },
   "topbar": {
     "selectWs": "Select workspace",
@@ -1940,5 +1941,28 @@
       "recipient": "Recipient",
       "replanReason": "Reason (optional)"
     }
+  },
+  "team": {
+    "workspace": "Workspace",
+    "title": "Team",
+    "subtitleAdmin": "Capability profiles the AI uses for assignments — scoped to this workspace. You can edit each member’s baseline profile.",
+    "subtitleMember": "Capability profiles the AI uses for assignments — scoped to this workspace. You can only see your own scores.",
+    "emptyTitle": "No members yet",
+    "emptyHint": "Invite people to the workspace to build team profiles.",
+    "you": "You",
+    "private": "Private capability profile — visible only to owners/admins and the member themselves.",
+    "editProfile": "Edit profile",
+    "editTitle": "Baseline profile — {name}",
+    "editDesc": "Baseline scores (0–5) seed the AI. The scores on the card are the average of the baseline and per-project profiles.",
+    "seedSection": "Baseline scores (0–5, leave blank if not rated)",
+    "skills": "Skills (comma-separated)",
+    "skillsPlaceholder": "react, figma, copywriting",
+    "seniority": "Seniority",
+    "hoursPerWeek": "Hours/week",
+    "timezone": "Timezone",
+    "cancel": "Cancel",
+    "save": "Save profile",
+    "saving": "Saving…",
+    "saved": "Profile updated"
   }
 }

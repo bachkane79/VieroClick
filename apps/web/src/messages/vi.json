@@ -381,7 +381,8 @@
     "dmsSection": "Tin nhắn riêng",
     "allDashboards": "Tất cả trang tổng quan",
     "dashByProject": "Trang tổng quan theo dự án",
-    "projectSettings": "Cài đặt dự án"
+    "projectSettings": "Cài đặt dự án",
+    "allMembers": "Toàn bộ thành viên"
   },
   "topbar": {
     "selectWs": "Chọn không gian làm việc",
@@ -1940,5 +1941,28 @@
       "recipient": "Người nhận",
       "replanReason": "Lý do (không bắt buộc)"
     }
+  },
+  "team": {
+    "workspace": "Không gian làm việc",
+    "title": "Đội ngũ",
+    "subtitleAdmin": "Hồ sơ năng lực AI dùng để giao việc — chỉ có hiệu lực trong workspace này. Bạn có thể chỉnh hồ sơ gốc của mỗi thành viên.",
+    "subtitleMember": "Hồ sơ năng lực AI dùng để giao việc — chỉ có hiệu lực trong workspace này. Bạn chỉ xem được các chỉ số của chính mình.",
+    "emptyTitle": "Chưa có thành viên nào",
+    "emptyHint": "Mời người vào workspace để tạo hồ sơ đội ngũ.",
+    "you": "Bạn",
+    "private": "Hồ sơ năng lực riêng tư — chỉ chủ sở hữu/quản trị và chính thành viên xem được.",
+    "editProfile": "Chỉnh hồ sơ",
+    "editTitle": "Hồ sơ gốc — {name}",
+    "editDesc": "Điểm gốc (0–5) là mức khởi tạo cho AI. Chỉ số trên thẻ là trung bình cộng của điểm gốc và hồ sơ tại các dự án.",
+    "seedSection": "Điểm gốc (0–5, để trống nếu chưa đánh giá)",
+    "skills": "Kỹ năng (phân tách bằng dấu phẩy)",
+    "skillsPlaceholder": "react, figma, copywriting",
+    "seniority": "Cấp bậc",
+    "hoursPerWeek": "Giờ/tuần",
+    "timezone": "Múi giờ",
+    "cancel": "Hủy",
+    "save": "Lưu hồ sơ",
+    "saving": "Đang lưu…",
+    "saved": "Đã cập nhật hồ sơ"
   }
 }
