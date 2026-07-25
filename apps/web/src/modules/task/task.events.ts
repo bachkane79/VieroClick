@@ -36,15 +36,19 @@ export function taskStatusChanged(
   exec: Executor,
   ctx: ActorContext,
   before: TaskLike,
-  after: TaskLike
+  after: TaskLike,
+  statusType?: { from?: string | null; to: string }
 ) {
   return recordEvent(exec, {
     ...actorFields(ctx),
     entityType: "task",
     entityId: after.id,
     eventType: "task.status_changed",
-    before: { statusId: before.statusId },
-    after: { statusId: after.statusId },
+    // statusType (todo/in_progress/.../done) is included alongside the opaque
+    // statusId so automation conditions can filter on the human-meaningful
+    // type without a join back to task_statuses at evaluation time.
+    before: { statusId: before.statusId, statusType: statusType?.from ?? null },
+    after: { statusId: after.statusId, statusType: statusType?.to ?? null },
   });
 }
 

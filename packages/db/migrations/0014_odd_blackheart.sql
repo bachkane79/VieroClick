@@ -1,0 +1,1 @@
+ALTER TABLE "automations" ADD COLUMN "target_entity_id" uuid;

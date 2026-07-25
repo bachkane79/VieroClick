@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Check, ChevronRight, Circle, Flag, MoreHorizontal, UserRound } from "lucide-react";
+import { Check, ChevronRight, Circle, Flag, MoreHorizontal, UserRound, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@vieroc/ui";
 import {
@@ -117,6 +118,16 @@ export function TaskQuickActions({
           className={menuContentClass}
           onClick={(e) => e.stopPropagation()}
         >
+          <DropdownMenu.Item asChild className={menuItemClass}>
+            <Link
+              href={`/workspace/${workspaceSlug}/projects/${projectId}/automations?taskId=${task.id}`}
+            >
+              <Zap className="h-3.5 w-3.5" />
+              Thiết lập automation cho task này
+            </Link>
+          </DropdownMenu.Item>
+          <DropdownMenu.Separator className="my-1 h-px bg-border" />
+
           <DropdownMenu.Sub>
             <DropdownMenu.SubTrigger className={menuItemClass}>
               <Circle className="h-3.5 w-3.5" />

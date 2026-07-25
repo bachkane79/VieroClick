@@ -194,6 +194,14 @@ export async function listMyTasks(workspaceId: string) {
   return repo.listByAssigneeWithProject(workspaceId, ctx.workspaceMemberId);
 }
 
+/** Lightweight {id, title} list for pickers (e.g. scoping an automation to
+ * one specific task) — avoids pulling the full board payload just for a name. */
+export async function listTaskOptions(workspaceId: string, projectId: string) {
+  await requireActor(workspaceId, projectId);
+  const tasks = await repo.listByProject(projectId);
+  return tasks.map((t) => ({ id: t.id, title: t.title }));
+}
+
 export async function createTask(p: { workspaceId: string; projectId: string; input: unknown }) {
   const data = createTaskSchema.parse(p.input);
   const ctx = await requireActor(p.workspaceId, p.projectId);
@@ -322,6 +330,7 @@ export async function updateTask(p: {
     values.acceptanceCriteria !== undefined ? values.acceptanceCriteria : existing.acceptanceCriteria;
 
   let targetStatus: repo.TaskStatusRow | null = null;
+  let previousStatus: repo.TaskStatusRow | null = null;
   if (values.statusId !== undefined && values.statusId !== existing.statusId) {
     targetStatus = await assertCanMoveIntoStatus({
       ctx,
@@ -332,6 +341,7 @@ export async function updateTask(p: {
       blockerReason: data.blockerReason,
       allowBlockedOverride: data.allowBlockedOverride,
     });
+    previousStatus = await getStatusInProject(existing.statusId, p.projectId);
 
     values.completedAt = targetStatus.type === "done" ? new Date() : null;
   }
@@ -380,7 +390,10 @@ export async function updateTask(p: {
     await events.taskUpdated(tx, ctx, existing, updated);
 
     if (values.statusId && values.statusId !== existing.statusId) {
-      await events.taskStatusChanged(tx, ctx, existing, updated);
+      await events.taskStatusChanged(tx, ctx, existing, updated, {
+        from: previousStatus?.type,
+        to: targetStatus!.type,
+      });
       if (targetStatus?.type === "blocked" && data.blockerReason) {
         await createBlockerForTask(tx, ctx, updated, data.blockerReason);
       }
@@ -479,7 +492,10 @@ export async function reviewTask(p: {
       const updated = await repo.update(p.taskId, values, tx);
       if (!updated) throw new NotFoundError("Task");
 
-      await events.taskStatusChanged(tx, ctx, existing, updated);
+      await events.taskStatusChanged(tx, ctx, existing, updated, {
+        from: currentStatus.type,
+        to: doneStatus.type,
+      });
       await events.taskApproved(tx, ctx, updated);
       if (updated.assigneeMemberId && updated.assigneeMemberId !== ctx.workspaceMemberId) {
         await enqueueNotifications(tx, [
@@ -514,7 +530,10 @@ export async function reviewTask(p: {
     const updated = await repo.update(p.taskId, values, tx);
     if (!updated) throw new NotFoundError("Task");
 
-    await events.taskStatusChanged(tx, ctx, existing, updated);
+    await events.taskStatusChanged(tx, ctx, existing, updated, {
+      from: currentStatus.type,
+      to: backStatus.type,
+    });
     await events.taskReworkRequested(tx, ctx, updated, data.feedback);
     if (updated.assigneeMemberId && updated.assigneeMemberId !== ctx.workspaceMemberId) {
       await enqueueNotifications(tx, [

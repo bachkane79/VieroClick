@@ -149,6 +149,29 @@ async def run_daily_update_reminder(project_id: str, workspace_id: str) -> dict:
     return {"ok": True, "reminded": reminded}
 
 
+async def run_automation_tick() -> dict:
+    """Every ~15s — sweep unprocessed activity_events against active automation
+    rules (trigger/condition/action). Global, not per-project — mirrors
+    run_message_retention. See apps/web/src/modules/automation/automation.dispatcher.ts."""
+    headers = {"Authorization": f"Bearer {settings.vieroc_api_key}"}
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(
+            f"{settings.vieroc_api_url}/api/automations/tick",
+            headers=headers,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+    if data.get("matched", 0) > 0:
+        logger.info(
+            "automation_tick: scanned=%d matched=%d succeeded=%d failed=%d timed_out=%d depth_exceeded=%d",
+            data.get("scanned", 0), data.get("matched", 0), data.get("succeeded", 0),
+            data.get("failed", 0), data.get("timedOut", 0), data.get("depthExceeded", 0),
+        )
+    return {"ok": True, **data}
+
+
 async def run_message_retention() -> dict:
     """03:00 UTC+7 — WP-E2: prune chat messages past the retention window.
     Global (not per-project) — chat.channels are workspace-scoped, not project-scoped."""

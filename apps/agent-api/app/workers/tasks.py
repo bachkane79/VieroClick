@@ -154,3 +154,11 @@ def run_scheduled_message_retention(self: Any) -> dict[str, Any]:
     """03:00 UTC+7 — WP-E2: prune old chat messages (global, not per-project)."""
     from app.workers import schedule
     return run_async(schedule.run_message_retention())
+
+
+@celery_app.task(name="app.workers.tasks.run_scheduled_automation_tick", bind=True,
+                 max_retries=1, default_retry_delay=30)
+def run_scheduled_automation_tick(self: Any) -> dict[str, Any]:
+    """Every ~15s — automation outbox sweep (global, not per-project)."""
+    from app.workers import schedule
+    return run_async(schedule.run_automation_tick())

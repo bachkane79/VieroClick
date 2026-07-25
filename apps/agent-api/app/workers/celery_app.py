@@ -52,4 +52,11 @@ celery_app.conf.beat_schedule = {
         "task": "app.workers.tasks.run_scheduled_message_retention",
         "schedule": crontab(hour=20, minute=0),
     },
+    # Automation outbox sweep — sub-minute interval, so a plain numeric
+    # (seconds) schedule is used instead of crontab() (crontab has no
+    # sub-minute resolution). Adjust this constant to retune polling frequency.
+    "automation-tick": {
+        "task": "app.workers.tasks.run_scheduled_automation_tick",
+        "schedule": 15.0,
+    },
 }

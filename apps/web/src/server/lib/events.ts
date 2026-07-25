@@ -1,7 +1,7 @@
 import { activityEvents, type Executor } from "@vieroc/db";
 import type { ActorContext } from "./context";
 
-export type ActorType = "human" | "agent" | "system";
+export type ActorType = "human" | "agent" | "system" | "automation";
 
 export interface RecordEventInput {
   workspaceId: string;

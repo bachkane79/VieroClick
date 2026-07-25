@@ -1,4 +1,5 @@
 import { pgTable, text, uuid, jsonb, index } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { timestamptz } from "./_helpers";
 import { users } from "./users";
 import { workspaces, workspaceMembers } from "./workspaces";
@@ -22,6 +23,10 @@ export const activityEvents = pgTable(
     afterData: jsonb("after_data").$type<Record<string, unknown>>(),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
     createdAt: timestamptz("created_at").notNull().defaultNow(),
+    // Automation outbox marker: null = not yet picked up by the automation
+    // dispatcher tick. Set once processPendingEvents() has evaluated this row
+    // against all matching automations (see automation.dispatcher.ts).
+    automationProcessedAt: timestamptz("automation_processed_at"),
   },
   (t) => [
     // WP-D1: keyset pagination for the (future) paginated activity feed, plus
@@ -29,5 +34,8 @@ export const activityEvents = pgTable(
     // no index beyond PK — every query was a full table scan.
     index("activity_events_project_created_idx").on(t.projectId, t.createdAt),
     index("activity_events_workspace_created_idx").on(t.workspaceId, t.createdAt),
+    index("activity_events_unprocessed_idx")
+      .on(t.createdAt)
+      .where(sql`${t.automationProcessedAt} is null`),
   ]
 );

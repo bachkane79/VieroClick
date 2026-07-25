@@ -14,6 +14,10 @@ import { unreadCountAction } from "@/modules/notification/notification.actions";
 import { listTeamsWithMembersAction } from "@/modules/permission/permission.actions";
 import { listWorkspaceDocsAction } from "@/modules/workspace-doc/workspace-doc.actions";
 import { chatUnreadCountsAction, listChatDirectoryAction } from "@/modules/channel/channel.actions";
+import {
+  countRecentAutomationFailuresAction,
+  listAllAutomationsAction,
+} from "@/modules/automation/automation.actions";
 import { useLocale } from "@/lib/i18n/client";
 import { t } from "@/lib/i18n/dict";
 import {
@@ -50,6 +54,7 @@ import {
   Target,
   Users,
   UserCircle,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 
@@ -68,9 +73,17 @@ type ChatDir = {
   channels: Array<{ id: string; name: string; unreadCount: number }>;
   dms: Array<{ id: string; otherName: string; unreadCount: number }>;
 };
+type AutomationItem = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  projectId: string | null;
+  projectName: string | null;
+  lastRun: { status: string } | null;
+};
 
 /** Rail tab = the contextual panel currently shown (ClickUp model). */
-type RailTab = "home" | "planner" | "ai" | "teams" | "docs";
+type RailTab = "home" | "planner" | "ai" | "teams" | "docs" | "automations";
 
 const SIDEBAR_COLLAPSED_KEY = "vc-sidebar-collapsed";
 
@@ -87,6 +100,7 @@ function deriveTab(pathname: string): RailTab | null {
   if (/\/docs(\/|$)/.test(pathname)) return "docs";
   if (/\/my-tasks(\/|$)/.test(pathname)) return "planner";
   if (/\/projects\/[^/]+\/ai(\/|$)/.test(pathname)) return "ai";
+  if (/\/automations(\/|$)/.test(pathname)) return "automations";
   // Inbox and the all-projects page have no panel of their own — keep the Home
   // navigator beside them (matches the rail link's onClick).
   if (/\/inbox(\/|$)/.test(pathname)) return "home";
@@ -116,6 +130,8 @@ export function AppSidebar({ workspaces }: Props) {
   const [teams, setTeams] = useState<TeamItem[] | null>(null);
   const [docs, setDocs] = useState<DocItem[] | null>(null);
   const [chatDir, setChatDir] = useState<ChatDir | null>(null);
+  const [automationItems, setAutomationItems] = useState<AutomationItem[] | null>(null);
+  const [automationFailures, setAutomationFailures] = useState(0);
 
   const activeWorkspace = workspaces.find((w) => w.slug === currentSlug) ?? workspaces[0];
   const ws = activeWorkspace?.slug;
@@ -170,7 +186,24 @@ export function AppSidebar({ workspaces }: Props) {
     setTeams(null);
     setDocs(null);
     setChatDir(null);
+    setAutomationItems(null);
   }, [wsId]);
+
+  // Attention badge on the rail icon itself — fetched regardless of which tab
+  // is open, same cadence as the Inbox unread count.
+  useEffect(() => {
+    let cancelled = false;
+    if (!wsId) {
+      setAutomationFailures(0);
+      return;
+    }
+    countRecentAutomationFailuresAction({ workspaceId: wsId }).then((res) => {
+      if (!cancelled && res.ok) setAutomationFailures(res.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [wsId, pathname]);
 
   // Lazy-load per-tab data on first open.
   useEffect(() => {
@@ -184,6 +217,11 @@ export function AppSidebar({ workspaces }: Props) {
     if (tab === "docs" && docs === null) {
       listWorkspaceDocsAction({ workspaceId: wsId }).then((res) => {
         if (!cancelled) setDocs(res.ok ? res.data : []);
+      });
+    }
+    if (tab === "automations" && automationItems === null) {
+      listAllAutomationsAction({ workspaceId: wsId }).then((res) => {
+        if (!cancelled) setAutomationItems(res.ok ? res.data : []);
       });
     }
     if (tab === "home" && chatDir === null) {
@@ -203,7 +241,7 @@ export function AppSidebar({ workspaces }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [tab, wsId, collapsed, teams, docs, chatDir]);
+  }, [tab, wsId, collapsed, teams, docs, chatDir, automationItems]);
 
   // WP-E2: refresh just the unread badges whenever the user navigates (same
   // cadence as the notifications badge above) — cheap enough not to need its
@@ -300,6 +338,7 @@ export function AppSidebar({ workspaces }: Props) {
     { key: "docs", icon: BookText, label: t(locale, "sb.docs"), href: `${wsBase}/docs`, kind: "tab" },
     { key: "ai", icon: Sparkles, label: t(locale, "sb.ai"), kind: "tab" },
     { key: "teams", icon: Users, label: t(locale, "sb.teams"), kind: "tab" },
+    { key: "automations", icon: Zap, label: t(locale, "sb.automations"), kind: "tab" },
     { key: "more", icon: LayoutGrid, label: t(locale, "sb.more"), kind: "more" },
   ];
 
@@ -320,6 +359,8 @@ export function AppSidebar({ workspaces }: Props) {
         return tab === "ai";
       case "teams":
         return tab === "teams";
+      case "automations":
+        return tab === "automations";
       case "home":
         return (
           tab === "home" &&
@@ -384,6 +425,14 @@ export function AppSidebar({ workspaces }: Props) {
                 {item.key === "inbox" && unread > 0 && (
                   <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-white">
                     {unread > 9 ? "9+" : unread}
+                  </span>
+                )}
+                {item.key === "automations" && automationFailures > 0 && (
+                  <span
+                    className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-white"
+                    title={t(locale, "sb.automationFailuresHint")}
+                  >
+                    {automationFailures > 9 ? "9+" : automationFailures}
                   </span>
                 )}
               </span>
@@ -613,6 +662,15 @@ export function AppSidebar({ workspaces }: Props) {
               <AiPanel projects={projects} wsBase={wsBase} pathname={pathname} currentProjectId={currentProjectId} locale={locale} />
             ) : tab === "teams" ? (
               <TeamsPanel teams={teams} projects={projects} wsBase={wsBase} pathname={pathname} currentProjectId={currentProjectId} locale={locale} />
+            ) : tab === "automations" ? (
+              <AutomationsPanel
+                items={automationItems}
+                projects={projects}
+                wsBase={wsBase}
+                pathname={pathname}
+                currentProjectId={currentProjectId}
+                locale={locale}
+              />
             ) : (
               <DocsPanel docs={docs} projects={projects} wsBase={wsBase} pathname={pathname} currentProjectId={currentProjectId} locale={locale} />
             )}
@@ -634,6 +692,8 @@ function panelTitle(tab: RailTab, locale: ReturnType<typeof useLocale>): string 
       return t(locale, "sb.teams");
     case "docs":
       return t(locale, "sb.docs");
+    case "automations":
+      return t(locale, "sb.automations");
     default:
       return t(locale, "sb.home");
   }
@@ -929,6 +989,91 @@ function TeamsPanel({
           <div className="space-y-px">
             {projects.map((p) => (
               <PanelLink key={p.id} href={`${wsBase}/projects/${p.id}/team`} icon={Users} label={p.name} active={currentProjectId === p.id && pathname.endsWith("/team")} />
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+/* ── Automations panel ──────────────────────────────────────────────────── */
+const RUN_STATUS_DOT: Record<string, string> = {
+  succeeded: "bg-success",
+  running: "bg-primary",
+  pending_review: "bg-warning",
+  failed: "bg-destructive",
+  timed_out: "bg-destructive",
+};
+
+function AutomationsPanel({
+  items,
+  projects,
+  wsBase,
+  pathname,
+  currentProjectId,
+  locale,
+}: {
+  items: AutomationItem[] | null;
+  projects: SidebarProject[];
+  wsBase: string;
+  pathname: string;
+  currentProjectId?: string;
+  locale: ReturnType<typeof useLocale>;
+}) {
+  const workspaceWide = items?.filter((a) => a.projectId === null) ?? [];
+  const countByProject = new Map<string, number>();
+  for (const a of items ?? []) {
+    if (a.projectId) countByProject.set(a.projectId, (countByProject.get(a.projectId) ?? 0) + 1);
+  }
+
+  return (
+    <>
+      <SectionTitle
+        action={
+          <Link href={`${wsBase}/automations`} title={t(locale, "sb.openAutomations")} className="rounded p-0.5 text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground">
+            <Zap className="h-3.5 w-3.5" />
+          </Link>
+        }
+      >
+        {t(locale, "sb.wsAutomations")}
+      </SectionTitle>
+      {items === null ? (
+        <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.loading")}</p>
+      ) : workspaceWide.length === 0 ? (
+        <p className="px-2 py-2 text-xs text-muted-foreground">{t(locale, "sb.noAutomations")}</p>
+      ) : (
+        <div className="space-y-px">
+          {workspaceWide.map((a) => (
+            <Link
+              key={a.id}
+              href={`${wsBase}/automations`}
+              title={a.name}
+              className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-text-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
+            >
+              <span className={cn("h-2 w-2 shrink-0 rounded-full", a.isActive ? "bg-success" : "bg-text-disabled")} />
+              <span className="min-w-0 flex-1 truncate">{a.name}</span>
+              {a.lastRun && (
+                <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", RUN_STATUS_DOT[a.lastRun.status] ?? "bg-text-disabled")} title={a.lastRun.status} />
+              )}
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {projects.length > 0 && (
+        <>
+          <SectionTitle>{t(locale, "sb.projectAutomations")}</SectionTitle>
+          <div className="space-y-px">
+            {projects.map((p) => (
+              <PanelLink
+                key={p.id}
+                href={`${wsBase}/projects/${p.id}/automations`}
+                icon={Zap}
+                label={p.name}
+                active={currentProjectId === p.id && pathname.endsWith("/automations")}
+                badge={countByProject.get(p.id) ?? 0}
+              />
             ))}
           </div>
         </>

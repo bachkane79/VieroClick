@@ -11,6 +11,7 @@ export * from "./knowledge";
 export * from "./updates";
 export * from "./planning";
 export * from "./events";
+export * from "./automations";
 export * from "./analytics";
 export * from "./agent";
 export * from "./telegram";

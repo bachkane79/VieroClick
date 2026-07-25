@@ -26,6 +26,8 @@ import {
   postApplySideEffects,
   type ValidatedPlan,
 } from "./agent-suggestion.apply";
+import { applyPendingAutomationRun } from "@/modules/automation/automation.dispatcher";
+import { recordDeadLetter } from "@/server/lib/dead-letter";
 
 export async function listSuggestions(workspaceId: string, projectId: string) {
   await requireActor(workspaceId, projectId);
@@ -88,6 +90,7 @@ export async function reviewSuggestion(p: {
   // Side effects collected in-tx, fired after commit.
   let newTaskIds: string[] = [];
   let replanRequest: { title: string; body: string } | null = null;
+  let automationRunIdToApply: string | null = null;
 
   const updated = await db.transaction(async (tx) => {
     const updated = await repo.updateReview(
@@ -138,6 +141,16 @@ export async function reviewSuggestion(p: {
           workspaceId: p.workspaceId,
           assignments: parsed.valid,
         });
+      } else if (existing.suggestionType === "automation_action") {
+        // Payload written by automation.dispatcher.ts#queueForReview:
+        // { automationId, automationRunId }. The actual run (Group A tx +
+        // Group B) happens after this transaction commits — same reasoning
+        // as the observer's deferred replan dispatch below.
+        const automationRunId = payload.automationRunId;
+        if (typeof automationRunId !== "string") {
+          throw new ValidationError("Stored automation suggestion payload is missing automationRunId");
+        }
+        automationRunIdToApply = automationRunId;
       } else {
         // Observer suggestions store the original suggestion object (with
         // action_type) as their payload.
@@ -171,6 +184,23 @@ export async function reviewSuggestion(p: {
         actorUserId: ctx.userId,
         payload: { mode: "replan", reason: replan.body },
       }).catch((err) => console.error("Approved replan dispatch failed:", err));
+    }
+
+    if (automationRunIdToApply !== null) {
+      const runId = automationRunIdToApply;
+      try {
+        await applyPendingAutomationRun(runId);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error("Approved automation run failed:", message);
+        await recordDeadLetter({
+          source: "agent-suggestion:automation-action-approved",
+          jobType: "automation",
+          projectId: p.projectId,
+          payload: { automationRunId: runId },
+          error: message,
+        });
+      }
     }
 
     await postApplySideEffects({
