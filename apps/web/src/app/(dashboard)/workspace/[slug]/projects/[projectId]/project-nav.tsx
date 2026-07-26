@@ -16,7 +16,7 @@ import {
   Table2,
   Network,
   ClipboardList,
-  Inbox,
+  Ticket,
   AlertOctagon,
   AlertTriangle,
   FileText,
@@ -79,7 +79,7 @@ const EXTRA: ViewDef[] = [
     path: "daily",
     icon: ClipboardList,
   },
-  { key: "tickets", name: "Tickets", nameKey: "projectNav.tickets", path: "tickets", icon: Inbox },
+  { key: "tickets", name: "Tickets", nameKey: "projectNav.tickets", path: "tickets", icon: Ticket },
   {
     key: "blockers",
     name: "Blockers",

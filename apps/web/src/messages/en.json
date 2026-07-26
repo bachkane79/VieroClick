@@ -1857,6 +1857,49 @@
     "deleteConfirm": "Delete this automation?",
     "retry": "Retry",
     "retrying": "Retrying…",
+    "details": "Details",
+    "hideDetails": "Hide details",
+    "edit": "Edit",
+    "detail": {
+      "conditionsTitle": "Conditions",
+      "actionsTitle": "Actions",
+      "noConditions": "No conditions — always runs when the trigger fires",
+      "noParams": "(no parameters)"
+    },
+    "op": {
+      "eq": "equals",
+      "neq": "not equal to",
+      "in": "in",
+      "gt": "greater than",
+      "lt": "less than",
+      "contains": "contains",
+      "before_date": "before date",
+      "after_date": "after date",
+      "within_days": "within (days)"
+    },
+    "enum": {
+      "taskStatusType": {
+        "todo": "To do",
+        "in_progress": "In progress",
+        "in_review": "In review",
+        "blocked": "Blocked",
+        "done": "Done",
+        "cancelled": "Cancelled"
+      },
+      "blockerStatus": {
+        "open": "Open",
+        "in_review": "In review",
+        "resolved": "Resolved",
+        "ignored": "Ignored"
+      },
+      "projectRole": {
+        "project_lead": "Project lead",
+        "tech_lead": "Tech lead",
+        "member": "Member",
+        "reviewer": "Reviewer",
+        "stakeholder": "Stakeholder"
+      }
+    },
     "runs": {
       "status": "Status",
       "depth": "Depth",
@@ -1882,6 +1925,8 @@
       "conditions": "Conditions ({count}/{max})",
       "actions": "Actions ({count}/{max})",
       "create": "Create automation",
+      "save": "Save changes",
+      "saved": "Changes saved",
       "summary": "When {trigger}{scope}{conditions} → {actions}",
       "summaryScope": " (only the task \"{title}\")",
       "summaryConditions": " and {conditions}",
@@ -1952,7 +1997,7 @@
       "startDate": "Start date",
       "targetDate": "Target date",
       "isMilestone": "Is a milestone?",
-      "milestoneId": "Milestone (ID)",
+      "milestoneId": "Milestone",
       "milestoneStatus": "Milestone status",
       "taskLabels": "Labels",
       "reworkCount": "Rework count",
@@ -1968,7 +2013,7 @@
       "newOwner": "New owner",
       "resolvedBy": "Resolved by",
       "riskStatus": "Risk status",
-      "riskId": "Risk ID",
+      "riskId": "Risk",
       "newRiskStatus": "New status",
       "newMilestoneStatus": "New status",
       "newTargetDate": "New target date",
@@ -1987,7 +2032,10 @@
       "notificationTitle": "Notification title",
       "notificationBody": "Message",
       "recipient": "Recipient",
-      "replanReason": "Reason (optional)"
+      "replanReason": "Reason (optional)",
+      "chatTarget": "Send to",
+      "chatTargetChannels": "Channel",
+      "chatTargetMembers": "Direct message (DM)"
     }
   },
   "team": {

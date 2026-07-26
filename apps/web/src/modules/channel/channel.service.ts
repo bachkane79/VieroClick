@@ -36,6 +36,14 @@ async function requireChannelAccess(
   return channel;
 }
 
+/** Lightweight open-channel list (no DM/seeding side effects) — used by the
+ * automation form's "send channel message" target picker. */
+export async function listChatChannels(workspaceId: string) {
+  const ctx = await requireActor(workspaceId);
+  assertCanAccessChat(ctx);
+  return repo.listChannels(workspaceId);
+}
+
 /** Channels + my DMs — the chat sidebar dataset. Seeds #general on first visit. */
 export async function listChatDirectory(workspaceId: string) {
   const ctx = await requireActor(workspaceId);

@@ -8,7 +8,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useActionError } from "@/i18n/use-action-error";
 import type { EventTranslator } from "@/i18n/activity-event";
 import { automationLabel } from "@/modules/automation/automation.labels";
-import { createAutomationAction } from "@/modules/automation/automation.actions";
+import { createAutomationAction, updateAutomationAction } from "@/modules/automation/automation.actions";
 import {
   AUTOMATION_TRIGGER_TYPES,
   ACTION_FIELD_SPECS,
@@ -20,6 +20,7 @@ import {
   PROJECT_ROLE_TYPES,
   AUTOMATION_CONDITION_OPS,
   type ActionFieldType,
+  type ConditionValueKind,
 } from "@/modules/automation/automation.schema";
 
 const PRIORITY_OPTIONS = ["low", "medium", "high", "urgent"];
@@ -35,9 +36,25 @@ type StatusOption = { id: string; name: string; type: string };
 type MemberOption = { id: string; fullName: string };
 type BlockerOption = { id: string; title: string };
 type TaskOption = { id: string; title: string };
+type RiskOption = { id: string; title: string };
+type MilestoneOption = { id: string; title: string };
+type ChannelOption = { id: string; name: string };
 
 type ConditionDraft = { field: string; op: string; value: string };
 type ActionDraft = { type: string; params: Record<string, unknown> };
+
+/** Present when editing an existing rule instead of creating a new one.
+ * triggerType is immutable once created (server-enforced — see
+ * assertTriggerScoping), so the trigger select is locked in this mode. */
+export type AutomationEditTarget = {
+  automationId: string;
+  name: string;
+  description: string | null;
+  triggerType: string;
+  targetEntityId: string | null;
+  conditions: { field: string; op: string; value: unknown }[];
+  actions: ActionDraft[];
+};
 
 interface Props {
   workspaceId: string;
@@ -48,9 +65,17 @@ interface Props {
   members: MemberOption[];
   blockers: BlockerOption[];
   tasks: TaskOption[];
+  risks: RiskOption[];
+  milestones: MilestoneOption[];
+  channels: ChannelOption[];
   initialTaskId?: string;
+  editing?: AutomationEditTarget;
   onCreated: () => void;
   onCancel: () => void;
+}
+
+function conditionValueToDraft(value: unknown): string {
+  return typeof value === "string" ? value : JSON.stringify(value ?? "");
 }
 
 export function AutomationForm({
@@ -61,7 +86,11 @@ export function AutomationForm({
   members,
   blockers,
   tasks,
+  risks,
+  milestones,
+  channels,
   initialTaskId,
+  editing,
   onCreated,
   onCancel,
 }: Props) {
@@ -71,20 +100,28 @@ export function AutomationForm({
     automationLabel(t as unknown as EventTranslator, "trigger", code);
 
   const [submitting, setSubmitting] = useState(false);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [triggerType, setTriggerType] = useState<string>(AUTOMATION_TRIGGER_TYPES[0]);
-  const [scope, setScope] = useState<"all" | "task">(initialTaskId ? "task" : "all");
+  const [name, setName] = useState(editing?.name ?? "");
+  const [description, setDescription] = useState(editing?.description ?? "");
+  const [triggerType, setTriggerType] = useState<string>(editing?.triggerType ?? AUTOMATION_TRIGGER_TYPES[0]);
+  const [scope, setScope] = useState<"all" | "task">(
+    editing ? (editing.targetEntityId ? "task" : "all") : initialTaskId ? "task" : "all"
+  );
   const [taskFilter, setTaskFilter] = useState("");
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(initialTaskId ?? null);
-  const [conditions, setConditions] = useState<ConditionDraft[]>([]);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(
+    editing?.targetEntityId ?? initialTaskId ?? null
+  );
+  const [conditions, setConditions] = useState<ConditionDraft[]>(
+    editing?.conditions.map((c) => ({ field: c.field, op: c.op, value: conditionValueToDraft(c.value) })) ?? []
+  );
 
   // Two filters compose: which actions make sense for this trigger (always),
   // further narrowed to non-project-scoped ones on the workspace-wide page.
   const allowedActionTypes = (ACTION_TYPES_BY_TRIGGER[triggerType] ?? []).filter(
     (t) => projectId !== null || !PROJECT_ONLY_ACTION_TYPES.has(t)
   );
-  const [actions, setActions] = useState<ActionDraft[]>([{ type: allowedActionTypes[0] ?? "", params: {} }]);
+  const [actions, setActions] = useState<ActionDraft[]>(
+    editing?.actions ?? [{ type: allowedActionTypes[0] ?? "", params: {} }]
+  );
 
   const canScopeToTask = projectId !== null && triggerType.startsWith("task.");
   const filteredTasks = tasks.filter((t) =>
@@ -119,27 +156,41 @@ export function AutomationForm({
     }));
 
     setSubmitting(true);
-    const res = await createAutomationAction({
-      workspaceId,
-      projectId,
-      slug: workspaceSlug,
-      data: {
-        name: name.trim(),
-        description: description.trim() || undefined,
-        triggerType,
-        targetEntityId: scope === "task" ? selectedTaskId : null,
-        conditions: parsedConditions,
-        actions,
-        isActive: true,
-      },
-    });
+    const res = editing
+      ? await updateAutomationAction({
+          workspaceId,
+          projectId,
+          slug: workspaceSlug,
+          automationId: editing.automationId,
+          data: {
+            name: name.trim(),
+            description: description.trim() || null,
+            targetEntityId: scope === "task" ? selectedTaskId : null,
+            conditions: parsedConditions,
+            actions,
+          },
+        })
+      : await createAutomationAction({
+          workspaceId,
+          projectId,
+          slug: workspaceSlug,
+          data: {
+            name: name.trim(),
+            description: description.trim() || undefined,
+            triggerType,
+            targetEntityId: scope === "task" ? selectedTaskId : null,
+            conditions: parsedConditions,
+            actions,
+            isActive: true,
+          },
+        });
     setSubmitting(false);
 
     if (!res.ok) {
       toast.error(actionError(res));
       return;
     }
-    toast.success(t("automations.form.created"));
+    toast.success(t(editing ? "automations.form.saved" : "automations.form.created"));
     onCreated();
   }
 
@@ -159,8 +210,9 @@ export function AutomationForm({
       <div>
         <label className="mb-1 block text-sm font-medium">{t("automations.form.triggerLabel")}</label>
         <select
-          className="w-full rounded-lg border border-border px-3 py-2"
+          className="w-full rounded-lg border border-border px-3 py-2 disabled:cursor-not-allowed disabled:opacity-60"
           value={triggerType}
+          disabled={!!editing}
           onChange={(e) => {
             const nextTrigger = e.target.value;
             setTriggerType(nextTrigger);
@@ -284,6 +336,9 @@ export function AutomationForm({
             members={members}
             blockers={blockers}
             tasks={tasks}
+            risks={risks}
+            milestones={milestones}
+            channels={channels}
             onTypeChange={(newType) => resetActionParams(i, newType)}
             onParamChange={(key, value) => updateActionParam(i, key, value)}
             onRemove={() => setActions((a) => a.filter((_, j) => j !== i))}
@@ -292,12 +347,21 @@ export function AutomationForm({
       </div>
 
       <p className="rounded-lg bg-surface-subtle px-3 py-2 text-xs text-muted-foreground">
-        {buildSummary(t as unknown as Translator, triggerType, conditions, actions, scope, selectedTaskId, tasks)}
+        {buildSummary(
+          t as unknown as Translator,
+          triggerType,
+          conditions,
+          actions,
+          scope,
+          selectedTaskId,
+          tasks,
+          members
+        )}
       </p>
 
       <div className="flex gap-2">
         <Button type="submit" variant="dark" disabled={submitting}>
-          {t("automations.form.create")}
+          {t(editing ? "automations.form.save" : "automations.form.create")}
         </Button>
         <Button type="button" variant="outline" onClick={onCancel}>
           {t("common.cancel")}
@@ -315,6 +379,24 @@ function parseConditionValue(raw: string): unknown {
   }
 }
 
+/** Same enum → label mapping the guided condition/action controls use, applied
+ * to a draft (still-string) condition value for the live text preview below. */
+function resolveDraftConditionValue(
+  t: Translator,
+  valueKind: ConditionValueKind | undefined,
+  value: string,
+  members: MemberOption[]
+): string {
+  if (!value) return "";
+  if (valueKind === "member") return members.find((m) => m.id === value)?.fullName ?? value;
+  if (valueKind === "boolean") return value === "true" ? t("common.yes") : t("common.no");
+  if (valueKind === "priority") return t(`task.priority.${value}`);
+  if (valueKind === "status-type") return t(`automations.enum.taskStatusType.${value}`);
+  if (valueKind === "blocker-status") return t(`automations.enum.blockerStatus.${value}`);
+  if (valueKind === "project-role") return t(`automations.enum.projectRole.${value}`);
+  return value;
+}
+
 /**
  * Live preview of the rule being built. Assembled from parts rather than a
  * single sentence key because the condition and action lists are user-built
@@ -327,7 +409,8 @@ function buildSummary(
   actions: ActionDraft[],
   scope: "all" | "task",
   selectedTaskId: string | null,
-  tasks: TaskOption[]
+  tasks: TaskOption[],
+  members: MemberOption[]
 ): string {
   const scopeLabel =
     scope === "task" && selectedTaskId
@@ -335,9 +418,16 @@ function buildSummary(
           title: tasks.find((task) => task.id === selectedTaskId)?.title ?? "?",
         })
       : "";
+  const fieldOptions = CONDITION_FIELDS_BY_TRIGGER[triggerType] ?? [];
   const condLabel = conditions
     .filter((c) => c.field)
-    .map((c) => `${c.field} ${c.op} ${c.value}`)
+    .map((c) => {
+      const spec = fieldOptions.find((f) => f.field === c.field);
+      const fieldLabel = spec ? t(`automations.field.${spec.labelKey}`) : c.field;
+      const opLabel = t(`automations.op.${c.op}`);
+      const valueLabel = resolveDraftConditionValue(t, spec?.valueKind, c.value, members);
+      return `${fieldLabel} ${opLabel} ${valueLabel}`;
+    })
     .join(t("automations.form.conditionJoiner"));
   const actionLabel =
     actions.map((a) => automationLabel(t, "action", a.type)).join(", ") ||
@@ -395,7 +485,7 @@ function ConditionRow({
       >
         {CONDITION_OPS.map((op) => (
           <option key={op} value={op}>
-            {op}
+            {t(`automations.op.${op}` as Parameters<typeof t>[0])}
           </option>
         ))}
       </select>
@@ -464,8 +554,8 @@ function renderConditionValueInput(
     return (
       <select className="rounded-lg border border-border px-2" value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">{t("automations.form.select")}</option>
-        <option value="true">true</option>
-        <option value="false">false</option>
+        <option value="true">{t("common.yes")}</option>
+        <option value="false">{t("common.no")}</option>
       </select>
     );
   }
@@ -475,7 +565,7 @@ function renderConditionValueInput(
         <option value="">{t("automations.form.select")}</option>
         {PROJECT_ROLE_TYPES.map((r) => (
           <option key={r} value={r}>
-            {r}
+            {t(`automations.enum.projectRole.${r}`)}
           </option>
         ))}
       </select>
@@ -487,7 +577,7 @@ function renderConditionValueInput(
         <option value="">{t("automations.form.select")}</option>
         {TASK_STATUS_TYPES.map((s) => (
           <option key={s} value={s}>
-            {s}
+            {t(`automations.enum.taskStatusType.${s}`)}
           </option>
         ))}
       </select>
@@ -499,7 +589,7 @@ function renderConditionValueInput(
         <option value="">{t("automations.form.select")}</option>
         {PRIORITY_OPTIONS.map((p) => (
           <option key={p} value={p}>
-            {p}
+            {t(`task.priority.${p}`)}
           </option>
         ))}
       </select>
@@ -527,7 +617,7 @@ function renderConditionValueInput(
         <option value="">{t("automations.form.select")}</option>
         {BLOCKER_STATUS_TYPES.map((s) => (
           <option key={s} value={s}>
-            {s}
+            {t(`automations.enum.blockerStatus.${s}`)}
           </option>
         ))}
       </select>
@@ -549,6 +639,9 @@ function ActionRow({
   members,
   blockers,
   tasks,
+  risks,
+  milestones,
+  channels,
   onTypeChange,
   onParamChange,
   onRemove,
@@ -559,6 +652,9 @@ function ActionRow({
   members: MemberOption[];
   blockers: BlockerOption[];
   tasks: TaskOption[];
+  risks: RiskOption[];
+  milestones: MilestoneOption[];
+  channels: ChannelOption[];
   onTypeChange: (type: string) => void;
   onParamChange: (key: string, value: unknown) => void;
   onRemove: () => void;
@@ -593,6 +689,9 @@ function ActionRow({
           members={members}
           blockers={blockers}
           tasks={tasks}
+          risks={risks}
+          milestones={milestones}
+          channels={channels}
           onChange={(v) => onParamChange(spec.key, v)}
         />
       ))}
@@ -607,6 +706,9 @@ function ActionFieldControl({
   members,
   blockers,
   tasks,
+  risks,
+  milestones,
+  channels,
   onChange,
 }: {
   spec: { key: string; labelKey: string; type: ActionFieldType };
@@ -615,6 +717,9 @@ function ActionFieldControl({
   members: MemberOption[];
   blockers: BlockerOption[];
   tasks: TaskOption[];
+  risks: RiskOption[];
+  milestones: MilestoneOption[];
+  channels: ChannelOption[];
   onChange: (v: unknown) => void;
 }) {
   const t = useTranslations();
@@ -647,7 +752,7 @@ function ActionFieldControl({
         <option value="">{label}</option>
         {PRIORITY_OPTIONS.map((p) => (
           <option key={p} value={p}>
-            {p}
+            {t(`task.priority.${p}` as Parameters<typeof t>[0])}
           </option>
         ))}
       </select>
@@ -698,6 +803,67 @@ function ActionFieldControl({
             {t.title}
           </option>
         ))}
+      </select>
+    );
+  }
+  if (spec.type === "select-risk") {
+    return (
+      <select
+        className="w-full rounded-lg border border-border px-3 py-2 text-sm"
+        value={strValue}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="">{label}</option>
+        {risks.map((r) => (
+          <option key={r.id} value={r.id}>
+            {r.title}
+          </option>
+        ))}
+      </select>
+    );
+  }
+  if (spec.type === "select-milestone") {
+    return (
+      <select
+        className="w-full rounded-lg border border-border px-3 py-2 text-sm"
+        value={strValue}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="">{label}</option>
+        {milestones.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.title}
+          </option>
+        ))}
+      </select>
+    );
+  }
+  if (spec.type === "select-chat-target") {
+    return (
+      <select
+        className="w-full rounded-lg border border-border px-3 py-2 text-sm"
+        value={strValue}
+        onChange={(e) => onChange(e.target.value || undefined)}
+      >
+        <option value="">{label}</option>
+        {channels.length > 0 && (
+          <optgroup label={t("automations.field.chatTargetChannels")}>
+            {channels.map((c) => (
+              <option key={c.id} value={`channel:${c.id}`}>
+                #{c.name}
+              </option>
+            ))}
+          </optgroup>
+        )}
+        {members.length > 0 && (
+          <optgroup label={t("automations.field.chatTargetMembers")}>
+            {members.map((m) => (
+              <option key={m.id} value={`member:${m.id}`}>
+                {m.fullName}
+              </option>
+            ))}
+          </optgroup>
+        )}
       </select>
     );
   }

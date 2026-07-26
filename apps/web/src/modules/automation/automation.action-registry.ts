@@ -1,14 +1,24 @@
 import "server-only";
-import { db, projects, projectRisks, taskComments, notifications, agentJobs, type Executor } from "@vieroc/db";
-import { eq, sql } from "drizzle-orm";
+import {
+  db,
+  projects,
+  projectRisks,
+  taskComments,
+  notifications,
+  agentJobs,
+  workspaceMembers,
+  type Executor,
+} from "@vieroc/db";
+import { and, eq, sql } from "drizzle-orm";
 import { recordEvent } from "@/server/lib/events";
 import { enqueueNotifications } from "@/server/lib/notifications";
 import { dispatchAgent } from "@/server/lib/agent-dispatch";
-import { notifyWorkspaceBot } from "@/modules/telegram/telegram.notify";
+import { publishChannelMessage } from "@/server/lib/chat-pubsub";
 import * as taskRepo from "@/modules/task/task.repo";
 import * as blockerRepo from "@/modules/blocker/blocker.repo";
 import * as riskRepo from "@/modules/risk/risk.repo";
 import * as milestoneRepo from "@/modules/milestone/milestone.repo";
+import * as channelRepo from "@/modules/channel/channel.repo";
 import { wouldCreateCycle } from "@/modules/task-dependency/task-dependency.pure";
 
 /**
@@ -761,21 +771,80 @@ async function triggerReplan(
   return { ok: true, dispatched: true };
 }
 
-/** Forwards to the workspace's connected Telegram bot (single bot per
- * workspace — see telegram.notify.ts). No separate idempotency ledger needed:
- * retryAutomationRun() only ever re-invokes Group B actions whose last result
- * was ok:false (see automation.dispatcher.ts), so a successful send is never
- * replayed. notifyWorkspaceBot is itself best-effort (no-op if no bot is
- * connected), so this always resolves ok. */
+/** Resolves the automation rule's creator (a `users.id`) to their
+ * `workspace_members.id` in this workspace — chat messages are authored by a
+ * member, not a user. Falls back to null if that user is no longer a member
+ * (e.g. removed from the workspace after creating the rule). */
+async function resolveAutomationMemberId(ctx: ActionEventContext): Promise<string | null> {
+  const [row] = await db
+    .select({ id: workspaceMembers.id })
+    .from(workspaceMembers)
+    .where(
+      and(
+        eq(workspaceMembers.workspaceId, ctx.workspaceId),
+        eq(workspaceMembers.userId, ctx.automationCreatedBy)
+      )
+    )
+    .limit(1);
+  return row?.id ?? null;
+}
+
+/** Posts into the in-app chat: either an open channel (`channel:<id>`) or a
+ * DM with a specific member (`member:<id>`, opened on demand). Authored by
+ * the automation rule's creator, since the dispatcher has no acting user. No
+ * separate idempotency ledger needed: retryAutomationRun() only ever
+ * re-invokes Group B actions whose last result was ok:false, so a successful
+ * send is never replayed. */
 async function sendChannelMessage(
   ctx: ActionEventContext,
   _meta: AutomationRunMeta,
   params: Record<string, unknown>
 ): Promise<ActionResult> {
+  const target = params.target as string | undefined;
+  if (!target) return { ok: false, reason: "missing target" };
+  const [kind, targetId] = target.split(":", 2);
+  if (!targetId || (kind !== "channel" && kind !== "member")) {
+    return { ok: false, reason: "invalid target" };
+  }
+
+  const authorMemberId = await resolveAutomationMemberId(ctx);
+  if (!authorMemberId) return { ok: false, reason: "automation creator is no longer a workspace member" };
+
+  let channelId: string;
+  if (kind === "channel") {
+    const channel = await channelRepo.findById(targetId);
+    if (!channel || channel.workspaceId !== ctx.workspaceId || channel.type !== "channel") {
+      return { ok: false, reason: "channel not found" };
+    }
+    channelId = channel.id;
+  } else {
+    if (targetId === authorMemberId) return { ok: false, reason: "cannot DM the automation's own author" };
+    const existing = await channelRepo.findDmBetween(ctx.workspaceId, authorMemberId, targetId);
+    if (existing) {
+      channelId = existing.id;
+    } else {
+      const created = await channelRepo.createChannel({
+        workspaceId: ctx.workspaceId,
+        type: "dm",
+        name: "dm",
+        createdByMemberId: authorMemberId,
+      });
+      await channelRepo.addMembers(created.id, [authorMemberId, targetId]);
+      channelId = created.id;
+    }
+  }
+
   const title = (params.title as string | undefined) ?? "Automation triggered";
   const body = (params.body as string | undefined) ?? null;
-  await notifyWorkspaceBot(ctx.workspaceId, title, body);
-  return { ok: true };
+  // In-app chat renders message body as plain text (no Markdown), unlike the
+  // Telegram bot this action used to forward to — so no `**bold**` wrapping.
+  const text = body ? `${title}\n${body}` : title;
+
+  const message = await channelRepo.createMessage({ channelId, authorMemberId, body: text });
+  const full = await channelRepo.getMessageWithAuthor(message.id);
+  if (full) void publishChannelMessage(channelId, { ...full, createdAt: full.createdAt.toISOString() });
+
+  return { ok: true, channelId, messageId: message.id };
 }
 
 export const GROUP_B_HANDLERS: Record<string, GroupBHandler> = {

@@ -181,6 +181,9 @@ export type ActionFieldType =
   | "select-member"
   | "select-blocker"
   | "select-task"
+  | "select-risk"
+  | "select-milestone"
+  | "select-chat-target"
   | "date"
   | "text"
   | "textarea"
@@ -226,19 +229,19 @@ export const ACTION_FIELD_SPECS: Record<string, ActionFieldSpec[]> = {
     { key: "memberId", labelKey: "newOwner", type: "select-member", required: true },
   ],
   update_risk_status: [
-    { key: "riskId", labelKey: "riskId", type: "text", required: true },
+    { key: "riskId", labelKey: "riskId", type: "select-risk", required: true },
     { key: "status", labelKey: "newRiskStatus", type: "text", required: true },
   ],
   reassign_risk_owner: [
-    { key: "riskId", labelKey: "riskId", type: "text", required: true },
+    { key: "riskId", labelKey: "riskId", type: "select-risk", required: true },
     { key: "memberId", labelKey: "newOwner", type: "select-member", required: true },
   ],
   update_milestone_status: [
-    { key: "milestoneId", labelKey: "milestoneId", type: "text", required: true },
+    { key: "milestoneId", labelKey: "milestoneId", type: "select-milestone", required: true },
     { key: "status", labelKey: "newMilestoneStatus", type: "text", required: true },
   ],
   update_milestone_date: [
-    { key: "milestoneId", labelKey: "milestoneId", type: "text", required: true },
+    { key: "milestoneId", labelKey: "milestoneId", type: "select-milestone", required: true },
     { key: "targetDate", labelKey: "newTargetDate", type: "date", required: true },
   ],
   notify_lead: [
@@ -251,6 +254,7 @@ export const ACTION_FIELD_SPECS: Record<string, ActionFieldSpec[]> = {
     { key: "body", labelKey: "notificationBody", type: "textarea" },
   ],
   send_channel_message: [
+    { key: "target", labelKey: "chatTarget", type: "select-chat-target", required: true },
     { key: "title", labelKey: "notificationTitle", type: "text", required: true },
     { key: "body", labelKey: "notificationBody", type: "textarea" },
   ],

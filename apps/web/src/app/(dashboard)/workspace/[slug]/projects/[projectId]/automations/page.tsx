@@ -5,6 +5,9 @@ import { listWorkspaceMembers } from "@/modules/workspace/workspace.service";
 import { listTaskOptions } from "@/modules/task/task.service";
 import { listStatuses } from "@/modules/task-status/task-status.service";
 import { listBlockers } from "@/modules/blocker/blocker.service";
+import { listRisks } from "@/modules/risk/risk.service";
+import { listMilestones } from "@/modules/milestone/milestone.service";
+import { listChatChannels } from "@/modules/channel/channel.service";
 import { listAutomations, listAutomationRuns } from "@/modules/automation/automation.service";
 import { NotFoundError } from "@/server/lib/errors";
 import { AutomationsViewClient } from "./automations-view-client";
@@ -27,12 +30,15 @@ export default async function ProjectAutomationsPage({ params, searchParams }: P
     throw err;
   }
 
-  const [automations, statuses, members, blockers, tasks] = await Promise.all([
+  const [automations, statuses, members, blockers, tasks, risks, milestones, channels] = await Promise.all([
     listAutomations(workspace.id, projectId),
     listStatuses(workspace.id, projectId),
     listWorkspaceMembers(workspace.id),
     listBlockers(workspace.id, projectId),
     listTaskOptions(workspace.id, projectId),
+    listRisks(workspace.id, projectId),
+    listMilestones(workspace.id, projectId),
+    listChatChannels(workspace.id),
   ]);
 
   const withRuns = await Promise.all(
@@ -57,6 +63,9 @@ export default async function ProjectAutomationsPage({ params, searchParams }: P
             .filter((b) => b.status === "open" || b.status === "in_review")
             .map((b) => ({ id: b.id, title: b.title }))}
           tasks={tasks}
+          risks={risks.map((r) => ({ id: r.id, title: r.title }))}
+          milestones={milestones.map((m) => ({ id: m.id, title: m.title }))}
+          channels={channels.map((c) => ({ id: c.id, name: c.name }))}
           initialTaskId={taskId}
         />
       </div>

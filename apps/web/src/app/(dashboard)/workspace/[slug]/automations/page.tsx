@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getWorkspace, listWorkspaceMembers } from "@/modules/workspace/workspace.service";
+import { listChatChannels } from "@/modules/channel/channel.service";
 import {
   listWorkspaceAutomations,
   listWorkspaceAutomationRuns,
@@ -26,9 +27,10 @@ export default async function WorkspaceAutomationsPage({ params }: Props) {
     throw err;
   }
 
-  const [automations, members] = await Promise.all([
+  const [automations, members, channels] = await Promise.all([
     listWorkspaceAutomations(workspace.id),
     listWorkspaceMembers(workspace.id),
+    listChatChannels(workspace.id),
   ]);
   const withRuns = await Promise.all(
     automations.map(async (automation) => ({
@@ -47,6 +49,7 @@ export default async function WorkspaceAutomationsPage({ params }: Props) {
           workspaceSlug={slug}
           initialAutomations={withRuns}
           members={members.map((m) => ({ id: m.id, fullName: m.fullName }))}
+          channels={channels.map((c) => ({ id: c.id, name: c.name }))}
         />
       </div>
     </div>

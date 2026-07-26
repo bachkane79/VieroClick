@@ -1857,6 +1857,49 @@
     "deleteConfirm": "Xóa automation này?",
     "retry": "Chạy lại",
     "retrying": "Đang chạy lại…",
+    "details": "Chi tiết",
+    "hideDetails": "Ẩn chi tiết",
+    "edit": "Sửa",
+    "detail": {
+      "conditionsTitle": "Điều kiện",
+      "actionsTitle": "Hành động",
+      "noConditions": "Không có điều kiện — luôn chạy khi trigger xảy ra",
+      "noParams": "(không có tham số)"
+    },
+    "op": {
+      "eq": "bằng",
+      "neq": "khác",
+      "in": "thuộc",
+      "gt": "lớn hơn",
+      "lt": "nhỏ hơn",
+      "contains": "chứa",
+      "before_date": "trước ngày",
+      "after_date": "sau ngày",
+      "within_days": "trong vòng (ngày)"
+    },
+    "enum": {
+      "taskStatusType": {
+        "todo": "Cần làm",
+        "in_progress": "Đang làm",
+        "in_review": "Chờ duyệt",
+        "blocked": "Bị chặn",
+        "done": "Hoàn thành",
+        "cancelled": "Đã hủy"
+      },
+      "blockerStatus": {
+        "open": "Đang mở",
+        "in_review": "Đang xem xét",
+        "resolved": "Đã giải quyết",
+        "ignored": "Đã bỏ qua"
+      },
+      "projectRole": {
+        "project_lead": "Trưởng dự án",
+        "tech_lead": "Trưởng nhóm kỹ thuật",
+        "member": "Thành viên",
+        "reviewer": "Người thẩm định",
+        "stakeholder": "Bên liên quan"
+      }
+    },
     "runs": {
       "status": "Trạng thái",
       "depth": "Độ sâu",
@@ -1866,7 +1909,7 @@
     "form": {
       "namePlaceholder": "Tên automation",
       "descPlaceholder": "Mô tả (không bắt buộc)",
-      "triggerLabel": "Khi nào (trigger)",
+      "triggerLabel": "Sự kiện kích hoạt",
       "scopeLabel": "Phạm vi áp dụng",
       "taskSearchPlaceholder": "Tìm task theo tên…",
       "fieldPlaceholder": "trường (VD: after.statusType)",
@@ -1882,6 +1925,8 @@
       "conditions": "Điều kiện ({count}/{max})",
       "actions": "Hành động ({count}/{max})",
       "create": "Tạo automation",
+      "save": "Lưu thay đổi",
+      "saved": "Đã lưu thay đổi",
       "summary": "Khi {trigger}{scope}{conditions} → {actions}",
       "summaryScope": " (chỉ task \"{title}\")",
       "summaryConditions": " và {conditions}",
@@ -1952,7 +1997,7 @@
       "startDate": "Ngày bắt đầu",
       "targetDate": "Ngày mục tiêu",
       "isMilestone": "Là cột mốc?",
-      "milestoneId": "Thuộc cột mốc (ID)",
+      "milestoneId": "Cột mốc",
       "milestoneStatus": "Trạng thái cột mốc",
       "taskLabels": "Nhãn (labels)",
       "reworkCount": "Số lần yêu cầu sửa lại",
@@ -1968,7 +2013,7 @@
       "newOwner": "Người phụ trách mới",
       "resolvedBy": "Người xử lý",
       "riskStatus": "Trạng thái rủi ro",
-      "riskId": "ID rủi ro",
+      "riskId": "Rủi ro",
       "newRiskStatus": "Trạng thái mới",
       "newMilestoneStatus": "Trạng thái mới",
       "newTargetDate": "Ngày mục tiêu mới",
@@ -1987,7 +2032,10 @@
       "notificationTitle": "Tiêu đề thông báo",
       "notificationBody": "Nội dung",
       "recipient": "Người nhận",
-      "replanReason": "Lý do (không bắt buộc)"
+      "replanReason": "Lý do (không bắt buộc)",
+      "chatTarget": "Gửi vào",
+      "chatTargetChannels": "Kênh chat",
+      "chatTargetMembers": "Nhắn riêng (DM)"
     }
   },
   "team": {
