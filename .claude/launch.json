@@ -6,7 +6,11 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@vieroc/web", "exec", "next", "dev", "--turbo"],
       "port": 3100,
-      "autoPort": true
+      "autoPort": false,
+      "env": {
+        "NEXTAUTH_URL": "http://localhost:3100",
+        "NEXT_PUBLIC_APP_URL": "http://localhost:3100"
+      }
     }
   ]
 }

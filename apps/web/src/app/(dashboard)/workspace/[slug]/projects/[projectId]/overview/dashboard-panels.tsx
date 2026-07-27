@@ -1,0 +1,566 @@
+import Link from "next/link";
+import { getTranslations, getFormatter } from "next-intl/server";
+import { cn } from "@vieroc/ui";
+import {
+  Activity,
+  AlertTriangle,
+  ArrowUpRight,
+  Ban,
+  CalendarClock,
+  CheckCircle2,
+  Circle,
+  Eye,
+  Gauge,
+  LayoutList,
+  Lightbulb,
+  Sparkles,
+  Timer,
+  UserX,
+  Users,
+  XCircle,
+  type LucideIcon,
+} from "lucide-react";
+import type { computeProjectDashboard } from "@/modules/project/project.dashboard";
+import { activityEventLabel, type EventTranslator } from "@/i18n/activity-event";
+
+type DashboardData = Awaited<ReturnType<typeof computeProjectDashboard>>;
+
+/** Per-status tint + icon — the reference's soft category-tile language. */
+const STATUS_META: Record<string, { tile: string; dot: string; icon: LucideIcon }> = {
+  todo: { tile: "bg-secondary text-text-secondary", dot: "bg-text-disabled", icon: Circle },
+  in_progress: { tile: "bg-sky-soft text-sky", dot: "bg-sky", icon: Timer },
+  in_review: { tile: "bg-lavender-soft text-lavender", dot: "bg-lavender", icon: Eye },
+  blocked: { tile: "bg-destructive/10 text-destructive", dot: "bg-destructive", icon: Ban },
+  done: { tile: "bg-mint-soft text-mint", dot: "bg-mint", icon: CheckCircle2 },
+  cancelled: { tile: "bg-muted text-text-disabled", dot: "bg-text-disabled", icon: XCircle },
+};
+
+const AVATAR_TONES = [
+  "bg-sky-soft text-sky",
+  "bg-mint-soft text-mint",
+  "bg-peach-soft text-peach",
+  "bg-lavender-soft text-lavender",
+  "bg-coral-soft text-coral",
+];
+
+/**
+ * The live project dashboard body (AI executive summary + 2×2 quadrant grid),
+ * extracted from the former standalone "Trang tổng quan" so it can be embedded
+ * inside the merged Overview tab (redesign v2). Renders its own translations —
+ * it is an async Server Component.
+ */
+export async function ProjectDashboardPanels({
+  data,
+  base,
+}: {
+  data: DashboardData;
+  base: string;
+}) {
+  const t = await getTranslations();
+  const format = await getFormatter();
+
+  const pct = Math.round((data.health.completionPct || 0) * 100);
+  const statusTotal = data.byStatus.reduce((sum, s) => sum + s.count, 0);
+  const maxAssignee = Math.max(1, ...data.byAssignee.map((a) => a.count));
+
+  const kpis: Array<{ label: string; value: number; icon: LucideIcon; tone: string }> = [
+    {
+      label: t("dashboards.kpi.unassigned"),
+      value: data.kpis.unassigned,
+      icon: UserX,
+      tone: "bg-peach-soft text-peach",
+    },
+    {
+      label: t("dashboards.kpi.inProgress"),
+      value: data.kpis.inProgress,
+      icon: Gauge,
+      tone: "bg-sky-soft text-sky",
+    },
+    {
+      label: t("dashboards.kpi.completed"),
+      value: data.kpis.completed,
+      icon: CheckCircle2,
+      tone: "bg-mint-soft text-mint",
+    },
+    {
+      label: t("dashboards.kpi.overdue"),
+      value: data.kpis.overdue,
+      icon: AlertTriangle,
+      tone: "bg-destructive/10 text-destructive",
+    },
+  ];
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* ── AI Executive Summary banner ──────────────────────────────────── */}
+      <section className="flex flex-col gap-3 rounded-card border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-center">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+          <Sparkles className="h-5 w-5" strokeWidth={1.75} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[12px] font-bold uppercase tracking-wider text-text-secondary">
+            {t("dashboards.aiSummary")}
+          </p>
+          <p className="mt-1 text-sm leading-6 text-foreground">
+            {data.summary
+              .map((part) =>
+                (t as unknown as (k: string, v?: Record<string, string | number>) => string)(
+                  `dashboards.summary.${part.key}`,
+                  part.params
+                )
+              )
+              .join(" ")}
+          </p>
+        </div>
+        <HealthBadge score={data.health.score} label={t("project.dashboard.health")} />
+      </section>
+
+      {/* ── 2×2 quadrant grid ────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        {/* CARD 1 — Progress ──────────────────────────────────────────────── */}
+        <Panel>
+          <PanelHead
+            icon={Gauge}
+            title={t("project.dashboard.progressTitle")}
+            action={
+              <PillLink href={`${base}/analytics`}>{t("project.dashboard.fullStats")}</PillLink>
+            }
+          />
+
+          <div className="mt-1 flex items-end justify-between gap-3">
+            <div>
+              <span className="text-4xl font-bold tabular-nums tracking-tight text-foreground">
+                {data.health.doneTasks}
+                <span className="text-2xl text-text-disabled">/{data.health.totalTasks}</span>
+              </span>
+              <p className="mt-1 text-xs font-medium text-text-secondary">
+                {t("project.dashboard.tasksCompleted")}
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 rounded-full border border-mint/20 bg-mint-soft px-3 py-1.5 text-xs font-semibold text-mint">
+              {pct}%
+              <span className="font-normal text-text-secondary">{t("project.dashboard.done")}</span>
+            </div>
+          </div>
+
+          <div className="relative mt-5 flex h-8 w-full items-center overflow-hidden rounded-full bg-surface-subtle p-1 shadow-[inset_0_1px_2px_rgba(16,24,40,0.05)]">
+            {pct > 0 && (
+              <div
+                className="bg-tone-progress relative h-full rounded-full shadow-sm"
+                style={{ width: `${Math.max(pct, 6)}%` }}
+              >
+                <span className="absolute inset-y-0 right-0 w-1 rounded-full bg-foreground/70" />
+              </div>
+            )}
+            <span className="absolute left-3 text-[12px] font-bold text-foreground/80">
+              {data.health.doneTasks}
+            </span>
+            <span className="absolute right-3 text-xs font-medium text-text-secondary">
+              {data.health.totalTasks}
+            </span>
+          </div>
+
+          <div className="mt-5 rounded-2xl border border-border bg-surface-subtle p-4">
+            <div className="grid grid-cols-4 gap-3">
+              {kpis.map((k) => (
+                <div key={k.label} className="flex flex-col items-start gap-1.5">
+                  <span className={cn("grid h-8 w-8 place-items-center rounded-lg", k.tone)}>
+                    <k.icon className="h-4 w-4" strokeWidth={1.75} />
+                  </span>
+                  <p className="text-lg font-bold tabular-nums leading-none tracking-tight">
+                    {k.value}
+                  </p>
+                  <p className="text-[11px] font-medium leading-tight text-text-secondary">
+                    {k.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Panel>
+
+        {/* CARD 2 — Workload by status + stat tiles ────────────────────────── */}
+        <Panel>
+          <PanelHead
+            icon={LayoutList}
+            title={t("project.dashboard.workloadTitle")}
+            action={
+              <PillLink href={`${base}/board`} variant="outline">
+                {t("project.dashboard.board")}
+              </PillLink>
+            }
+          />
+
+          <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-12">
+            <div className="flex flex-col rounded-2xl border border-border bg-surface-subtle p-4 md:col-span-7">
+              <div className="mb-3">
+                <h3 className="text-xs font-semibold text-foreground">
+                  {t("dashboards.workloadByStatus")}
+                </h3>
+                <p className="mt-0.5 text-[12px] text-text-secondary">
+                  <span className="font-semibold text-foreground">{data.health.totalTasks}</span>{" "}
+                  {t("project.dashboard.totalTasks")}
+                </p>
+              </div>
+
+              {data.byStatus.length === 0 ? (
+                <EmptyRow label={t("dashboards.noData")} />
+              ) : (
+                <div className="space-y-2">
+                  {data.byStatus.map((s) => {
+                    const meta = STATUS_META[s.type] ?? STATUS_META.todo!;
+                    const share = statusTotal > 0 ? Math.round((s.count / statusTotal) * 100) : 0;
+                    return (
+                      <div
+                        key={s.name}
+                        className="flex items-center justify-between rounded-xl border border-border bg-card p-2.5 shadow-xs"
+                      >
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <span
+                            className={cn(
+                              "grid h-8 w-8 shrink-0 place-items-center rounded-lg",
+                              meta.tile
+                            )}
+                          >
+                            <meta.icon className="h-4 w-4" strokeWidth={1.75} />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-semibold text-foreground">
+                              {s.name}
+                            </p>
+                            <p className="text-[11px] text-text-secondary">
+                              {share}% {t("project.dashboard.ofLoad")}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="pr-1 text-xs font-semibold tabular-nums text-foreground">
+                          {s.count}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-3 md:col-span-5">
+              <StatTile
+                label={t("project.dashboard.completionRate")}
+                value={`${pct}%`}
+                caption={t("project.dashboard.ofTasks", { total: data.health.totalTasks })}
+                tone={pct >= 50 ? "up" : "flat"}
+              />
+              <StatTile
+                label={t("dashboards.kpi.overdue")}
+                value={String(data.kpis.overdue)}
+                caption={
+                  data.kpis.overdue > 0
+                    ? t("project.dashboard.needsAttention")
+                    : t("project.dashboard.allOnTrack")
+                }
+                tone={data.kpis.overdue > 0 ? "down" : "up"}
+              />
+            </div>
+          </div>
+        </Panel>
+
+        {/* CARD 3 — Load by assignee (rings) ───────────────────────────────── */}
+        <Panel>
+          <PanelHead
+            icon={Users}
+            title={t("project.dashboard.loadByMember")}
+            action={
+              <PillLink href={`${base}/team`} variant="outline">
+                {t("project.dashboard.team")}
+              </PillLink>
+            }
+          />
+
+          {data.byAssignee.length === 0 ? (
+            <EmptyRow label={t("dashboards.noData")} />
+          ) : (
+            <div className="space-y-1.5">
+              {data.byAssignee.map((a, i) => {
+                const name = a.name ?? t("dashboards.unassignedLabel");
+                const ring = Math.round((a.count / maxAssignee) * 100);
+                const top = i === 0;
+                return (
+                  <div
+                    key={a.memberId ?? "unassigned"}
+                    className={cn(
+                      "flex items-center justify-between rounded-2xl p-2.5 transition-colors",
+                      top
+                        ? "border border-border bg-card shadow-sm ring-1 ring-black/5"
+                        : "hover:bg-surface-subtle"
+                    )}
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span
+                        className={cn(
+                          "grid h-9 w-9 shrink-0 place-items-center rounded-xl text-xs font-bold uppercase",
+                          a.name
+                            ? AVATAR_TONES[i % AVATAR_TONES.length]
+                            : "bg-muted text-text-disabled"
+                        )}
+                      >
+                        {name.charAt(0)}
+                      </span>
+                      <div className="min-w-0">
+                        <h3
+                          className={cn(
+                            "truncate text-xs font-semibold",
+                            a.name ? "text-foreground" : "italic text-text-secondary"
+                          )}
+                        >
+                          {name}
+                        </h3>
+                        <p className="text-[11px] text-text-secondary">
+                          {a.count} {t("project.dashboard.openTasks")}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {top && (
+                        <span className="hidden rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary sm:inline">
+                          {t("project.dashboard.topLoad")}
+                        </span>
+                      )}
+                      <Ring pct={ring} tone={a.name ? "text-primary" : "text-text-disabled"} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Panel>
+
+        {/* CARD 4 — Due soon + recent activity ─────────────────────────────── */}
+        <Panel>
+          <PanelHead
+            icon={CalendarClock}
+            title={t("dashboards.dueSoon")}
+            action={
+              <PillLink href={`${base}/tasks`} variant="outline">
+                {t("project.dashboard.all")}
+              </PillLink>
+            }
+          />
+
+          {data.dueSoon.length === 0 ? (
+            <EmptyRow label={t("dashboards.noData")} />
+          ) : (
+            <div className="space-y-0.5">
+              {data.dueSoon.map((task) => (
+                <Link
+                  key={task.id}
+                  href={`${base}/tasks`}
+                  className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 transition-colors hover:bg-surface-subtle"
+                >
+                  <span
+                    className={cn(
+                      "h-2 w-2 shrink-0 rounded-full",
+                      task.overdue ? "bg-destructive" : "bg-peach"
+                    )}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+                    {task.title}
+                  </span>
+                  {task.assigneeName && (
+                    <span className="hidden shrink-0 text-[12px] text-text-secondary sm:inline">
+                      {task.assigneeName}
+                    </span>
+                  )}
+                  <span
+                    className={cn(
+                      "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums",
+                      task.overdue
+                        ? "bg-destructive/10 text-destructive"
+                        : "bg-surface-subtle text-text-secondary"
+                    )}
+                  >
+                    {task.dueDate}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-4 border-t border-border pt-3">
+            <p className="mb-1.5 flex items-center gap-1.5 px-1 text-[11px] font-bold uppercase tracking-wider text-text-secondary">
+              <Activity className="h-3 w-3" />
+              {t("dashboards.latestActivity")}
+            </p>
+            {data.latestActivity.length === 0 ? (
+              <EmptyRow label={t("dashboards.noData")} />
+            ) : (
+              <div className="space-y-0.5">
+                {data.latestActivity.slice(0, 4).map((event) => (
+                  <div key={event.id} className="flex items-center gap-2 px-1 py-1 text-[12px]">
+                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-surface-subtle text-text-secondary">
+                      {event.actorType === "agent" ? (
+                        <Sparkles className="h-3 w-3 text-ai" />
+                      ) : (
+                        <Lightbulb className="h-3 w-3" />
+                      )}
+                    </span>
+                    <p className="min-w-0 flex-1 truncate text-foreground/80">
+                      <span className="font-semibold text-foreground">
+                        {event.actorName ??
+                          t(
+                            event.actorType === "agent"
+                              ? "activity.actor.agent"
+                              : "activity.actor.system"
+                          )}
+                      </span>{" "}
+                      {activityEventLabel(t as unknown as EventTranslator, event.eventType)}
+                    </p>
+                    <span className="shrink-0 text-[11px] text-text-secondary">
+                      {format.dateTime(new Date(event.createdAt), "dayMonth")}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Panel>
+      </div>
+    </div>
+  );
+}
+
+/* ── Local presentational components ──────────────────────────────────────── */
+
+function Panel({ children }: { children: React.ReactNode }) {
+  return (
+    <section className="flex flex-col rounded-card border border-border bg-card p-6 shadow-sm">
+      {children}
+    </section>
+  );
+}
+
+function PanelHead({
+  icon: Icon,
+  title,
+  action,
+}: {
+  icon: LucideIcon;
+  title: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2.5">
+        <Icon className="h-4 w-4 text-text-secondary" strokeWidth={1.75} />
+        <h2 className="text-base font-semibold text-foreground">{title}</h2>
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function PillLink({
+  href,
+  children,
+  variant = "primary",
+}: {
+  href: string;
+  children: React.ReactNode;
+  variant?: "primary" | "outline";
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "inline-flex h-8 shrink-0 items-center gap-1 rounded-full px-3.5 text-xs font-semibold transition-colors",
+        variant === "primary"
+          ? "bg-primary text-primary-foreground shadow-xs hover:bg-primary-hover"
+          : "border border-border bg-surface text-text-secondary shadow-xs hover:bg-surface-hover hover:text-foreground"
+      )}
+    >
+      {children}
+    </Link>
+  );
+}
+
+function HealthBadge({ score, label }: { score: number; label: string }) {
+  const tone =
+    score >= 80
+      ? "border-mint/20 bg-mint-soft text-mint"
+      : score >= 50
+        ? "border-peach/20 bg-peach-soft text-peach"
+        : "border-destructive/20 bg-destructive/10 text-destructive";
+  return (
+    <div className={cn("flex shrink-0 items-center gap-2 rounded-2xl border px-3.5 py-2.5", tone)}>
+      <Gauge className="h-4 w-4" strokeWidth={1.75} />
+      <div className="leading-tight">
+        <p className="text-lg font-bold tabular-nums">{score}</p>
+        <p className="text-[11px] font-medium opacity-80">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  caption,
+  tone,
+}: {
+  label: string;
+  value: string;
+  caption: string;
+  tone: "up" | "down" | "flat";
+}) {
+  const chip =
+    tone === "up"
+      ? "bg-mint text-white"
+      : tone === "down"
+        ? "bg-destructive text-white"
+        : "bg-peach text-white";
+  return (
+    <div className="flex flex-1 flex-col justify-center rounded-2xl border border-border bg-surface-subtle p-4">
+      <p className="mb-2 text-xs font-semibold text-text-secondary">{label}</p>
+      <div className="flex items-center gap-2">
+        <span className={cn("grid h-5 w-5 place-items-center rounded-full", chip)}>
+          <ArrowUpRight className={cn("h-3 w-3", tone === "down" && "rotate-90")} strokeWidth={2.25} />
+        </span>
+        <span className="text-3xl font-bold tabular-nums tracking-tight text-foreground">
+          {value}
+        </span>
+      </div>
+      <p className="mt-1 text-[12px] font-medium text-text-secondary">{caption}</p>
+    </div>
+  );
+}
+
+/** Circular-progress ring — the reference's per-learner completion dial. */
+function Ring({ pct, tone = "text-primary" }: { pct: number; tone?: string }) {
+  const dash = Math.max(0, Math.min(100, pct));
+  return (
+    <div className="relative flex h-9 w-9 items-center justify-center">
+      <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
+        <path
+          className="text-border"
+          strokeWidth="3.5"
+          stroke="currentColor"
+          fill="none"
+          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+        />
+        <path
+          className={tone}
+          strokeDasharray={`${dash}, 100`}
+          strokeWidth="3.5"
+          strokeLinecap="round"
+          stroke="currentColor"
+          fill="none"
+          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+        />
+      </svg>
+      <span className="absolute text-[10px] font-semibold text-foreground">{dash}%</span>
+    </div>
+  );
+}
+
+function EmptyRow({ label }: { label: string }) {
+  return <p className="py-3 text-center text-xs text-text-secondary">{label}</p>;
+}

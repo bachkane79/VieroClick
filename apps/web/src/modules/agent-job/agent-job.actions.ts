@@ -3,12 +3,34 @@
 import { revalidatePath } from "next/cache";
 import { runAction } from "@/server/lib/action";
 import * as service from "./agent-job.service";
-import { db, agentJobs, agentSuggestions, tasks, blockers, projectRisks } from "@vieroc/db";
+import { db, agentJobs, agentSuggestions } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
 import { eq } from "drizzle-orm";
 import { computeHealthDetails } from "@/modules/project/project.service";
 import { assertCanManageProject } from "@/modules/project/project.policy";
 import { dispatchAgent } from "@/server/lib/agent-dispatch";
+import { AppError } from "@/server/lib/errors";
+
+/**
+ * Agent failures used to surface as one generic "something went wrong" toast,
+ * which made a dead agent-api indistinguishable from a bad Gemini key or a
+ * misconfigured VIEROC_API_URL. These carry a `reason` (localized via
+ * `errors.reason.*`) plus a `detail` string the AI surfaces render verbatim —
+ * the assistant panel is the one place a technical cause is genuinely useful.
+ */
+function agentUnreachable(): AppError {
+  return new AppError("Agent service is unreachable", "error", 502, {
+    reason: "agentUnreachable",
+    detail: `AGENT_API_URL=${process.env.AGENT_API_URL || "http://localhost:8000"}`,
+  });
+}
+
+function agentFailed(detail: string): AppError {
+  return new AppError(`Agent run failed: ${detail}`, "error", 502, {
+    reason: "agentFailed",
+    detail: detail.slice(0, 400),
+  });
+}
 
 interface BaseArgs {
   workspaceId: string;
@@ -35,70 +57,120 @@ export async function askAiQuestionAction(args: {
 }) {
   return runAction(async () => {
     const ctx = await requireActor(args.workspaceId, args.projectId);
-    
-    // Create Job Record
-    const job = (await db
-      .insert(agentJobs)
-      .values({
-        projectId: args.projectId,
-        jobType: "qa",
-        status: "succeeded",
-        input: { question: args.question },
-        requestedByUserId: ctx.userId,
-        startedAt: new Date(),
-        finishedAt: new Date(),
-      })
-      .returning())[0]!;
 
-    // 1. Gather Project Context
-    const projectTasks = await db.select().from(tasks).where(eq(tasks.projectId, args.projectId));
-    const projectBlockers = await db.select().from(blockers).where(eq(blockers.projectId, args.projectId));
-    const activeBlockers = projectBlockers.filter((b) => b.status !== "resolved");
-    const activeRisks = await db.select().from(projectRisks).where(eq(projectRisks.projectId, args.projectId));
+    // Record the Q&A job (kept for the agent-jobs history / observability).
+    const job = (
+      await db
+        .insert(agentJobs)
+        .values({
+          projectId: args.projectId,
+          jobType: "qa",
+          status: "running",
+          input: { question: args.question },
+          requestedByUserId: ctx.userId,
+          startedAt: new Date(),
+        })
+        .returning()
+    )[0]!;
 
-    const q = args.question.toLowerCase();
-    let answer = "";
+    // Dispatch to the real, tool-calling project_qa agent (agent-api). It reads
+    // live project state over HTTP (15 read-only tools incl. read_document) and
+    // returns a grounded answer — no callback/apply, so no dispatch record.
+    const result = await dispatchAgent({
+      targetRole: "project_qa",
+      senderRole: "observer",
+      projectId: args.projectId,
+      actorUserId: ctx.userId,
+      message: args.question,
+      payload: { question: args.question },
+    });
 
-    if (q.includes("block") || q.includes("prevent") || q.includes("stuck")) {
-      if (activeBlockers.length === 0) {
-        answer = "Excellent news! There are currently no active blocker reports filed on the project. Tasks are proceeding normally.";
-      } else {
-        answer = `There are currently ${activeBlockers.length} active blockers on this project:\n` +
-          activeBlockers.map((b, idx) => `${idx + 1}. **${b.title}** (Severity: ${b.severity})`).join("\n") +
-          "\n\nYou can review details in the Blockers tab.";
-      }
-    } else if (q.includes("task") || q.includes("todo") || q.includes("doing") || q.includes("progress")) {
-      const pending = projectTasks.filter((t) => t.completedAt === null);
-      if (pending.length === 0) {
-        answer = "All tasks have been successfully completed! No pending items remain in the project scope.";
-      } else {
-        answer = `There are ${pending.length} pending tasks in the project board:\n` +
-          pending.slice(0, 5).map((t) => `- **${t.title}** (Priority: ${t.priority})`).join("\n") +
-          (pending.length > 5 ? `\n- ... and ${pending.length - 5} more tasks.` : "");
-      }
-    } else if (q.includes("risk") || q.includes("threat") || q.includes("mitigate")) {
-      if (activeRisks.length === 0) {
-        answer = "No critical risks have been logged in the Risk Register yet. You can document hypothetical threats in the Risks & Milestones panel.";
-      } else {
-        answer = `The project has ${activeRisks.length} active risks logged:\n` +
-          activeRisks.map((r) => `- **${r.title}** (Score: ${(r.probability ?? 1) * (r.impact ?? 1)}) - Mitigation: ${r.mitigation || "None listed"}`).join("\n");
-      }
-    } else {
-      answer = `Hello! I am your AI Virtual Project Manager. I can help analyze your workspace status.\n\n` +
-        `Current project stats:\n` +
-        `- Total Tasks: **${projectTasks.length}** (${projectTasks.filter(t => t.completedAt).length} completed)\n` +
-        `- Active Blockers: **${activeBlockers.length}**\n` +
-        `- Logged Risks: **${activeRisks.length}**\n\n` +
-        `Ask me about 'blockers', 'pending tasks', or 'project risks' for specific breakdowns!`;
+    if (result && "skipped" in result && result.skipped) {
+      await db
+        .update(agentJobs)
+        .set({ status: "failed", finishedAt: new Date(), error: "agent_api_unreachable" })
+        .where(eq(agentJobs.id, job.id));
+      throw agentUnreachable();
     }
 
-    // Save Output
+    const runResult = (result as { result?: Record<string, unknown> } | undefined)?.result;
+    const answer =
+      typeof runResult?.answer === "string" && runResult.answer.trim().length > 0
+        ? (runResult.answer as string)
+        : "";
+
+    if (!answer) {
+      const detail =
+        typeof runResult?.error === "string" && runResult.error.trim()
+          ? runResult.error
+          : "The agent returned no answer.";
+      await db
+        .update(agentJobs)
+        .set({ status: "failed", finishedAt: new Date(), error: detail })
+        .where(eq(agentJobs.id, job.id));
+      throw agentFailed(detail);
+    }
+
     await db
       .update(agentJobs)
-      .set({ output: { answer } })
+      .set({ status: "succeeded", finishedAt: new Date(), output: { answer, ...runResult } })
       .where(eq(agentJobs.id, job.id));
 
     return { answer };
+  });
+}
+
+/**
+ * Reassign FUTURE tasks (Team page "Giao việc lại"). Dispatches the assignment
+ * agent in reassign mode — it keeps completed + in-progress work untouched and
+ * only proposes assignees for not-started tasks. Results land as assignment
+ * suggestions (auto-applied or pending per the project's autonomy), reviewable
+ * in AI Manager › Phân công.
+ */
+export async function reassignTasksAction(args: {
+  workspaceId: string;
+  projectId: string;
+  slug: string;
+  keepExistingAssignments: boolean;
+  instructions?: string;
+}) {
+  return runAction(async () => {
+    const ctx = await requireActor(args.workspaceId, args.projectId);
+    assertCanManageProject(ctx);
+
+    const result = await dispatchAgent({
+      targetRole: "assignment",
+      senderRole: "assignment",
+      projectId: args.projectId,
+      actorUserId: ctx.userId,
+      message: "Reassign future tasks requested from the Team page.",
+      payload: {
+        mode: "reassign",
+        keepExistingAssignments: args.keepExistingAssignments,
+        instructions: (args.instructions ?? "").slice(0, 2000),
+      },
+    });
+
+    if (result && "skipped" in result && result.skipped) {
+      throw agentUnreachable();
+    }
+
+    // Report what actually happened. Without this the button looked inert: the
+    // agent can legitimately finish having applied nothing (everything already
+    // assigned, or every proposal parked for review under review_required).
+    const run = (result as { result?: Record<string, unknown> } | undefined)?.result ?? {};
+    if (run.ok === false) {
+      throw agentFailed(typeof run.error === "string" ? run.error : "Reassignment failed.");
+    }
+
+    const applied = typeof run.assignmentsApplied === "number" ? run.assignmentsApplied : 0;
+    const pending = typeof run.pendingCount === "number" ? run.pendingCount : 0;
+    const note = typeof run.note === "string" ? run.note : null;
+
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}/ai`);
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}/team`);
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}/tasks`);
+    return { kind: "dispatch" as const, applied, pending, note };
   });
 }
 

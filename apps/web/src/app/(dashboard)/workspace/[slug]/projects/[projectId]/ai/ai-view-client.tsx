@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import {
   Sparkles,
   MessageSquare,
-  Send,
   CheckCircle,
   XCircle,
   AlertTriangle,
@@ -20,8 +19,15 @@ import {
   Activity,
   Clock,
   ShieldX,
+  Wand2,
 } from "lucide-react";
 import { reviewSuggestionAction } from "@/modules/agent-suggestion/agent-suggestion.actions";
+import { ChatComposer, type DocRef } from "./chat-composer";
+import {
+  AssignByProfile,
+  type MemberCard,
+  type PendingSuggestion,
+} from "../assign/assign-by-profile";
 import {
   askAiQuestionAction,
   generateAiSuggestionsAction,
@@ -54,6 +60,10 @@ interface Props {
   agentAutonomy: "full_auto" | "review_required";
   agentConfidenceThreshold: number;
   projectVersion: number;
+  docs: DocRef[];
+  canAssign: boolean;
+  assignMembers: MemberCard[];
+  assignPending: PendingSuggestion[];
 }
 
 export function AiViewClient({
@@ -64,6 +74,10 @@ export function AiViewClient({
   agentAutonomy,
   agentConfidenceThreshold,
   projectVersion,
+  docs,
+  canAssign,
+  assignMembers,
+  assignPending,
 }: Props) {
   const router = useRouter();
   const t = useTranslations();
@@ -73,7 +87,9 @@ export function AiViewClient({
   const [autonomy, setAutonomy] = useState<"full_auto" | "review_required">(agentAutonomy);
   const [threshold, setThreshold] = useState(agentConfidenceThreshold);
   const [version, setVersion] = useState(projectVersion);
-  const [activePanel, setActivePanel] = useState<"assistant" | "suggestions">("assistant");
+  const [activePanel, setActivePanel] = useState<"assistant" | "suggestions" | "assign">(
+    "assistant"
+  );
   const [replanReason, setReplanReason] = useState("");
   const [showReplanInput, setShowReplanInput] = useState(false);
 
@@ -102,12 +118,10 @@ export function AiViewClient({
     | { healthScore?: number; issues?: HealthIssues }
     | undefined;
 
-  async function handleAsk(e: React.FormEvent) {
-    e.preventDefault();
-    if (!question.trim() || submitting) return;
+  async function sendMessage(raw: string) {
+    const query = raw.trim();
+    if (!query || submitting) return;
 
-    const query = question.trim();
-    setQuestion("");
     setChatLog((prev) => [...prev, { sender: "user", text: query }]);
     setSubmitting(true);
 
@@ -119,8 +133,16 @@ export function AiViewClient({
     setSubmitting(false);
 
     if (!res.ok) {
-      toast.error(actionError(res));
-      setChatLog((prev) => [...prev, { sender: "ai", text: t("ai.chat.error") }]);
+      // Show the real cause in the bubble (unreachable agent-api vs. a failed
+      // agent run look identical otherwise), with the technical detail appended
+      // so connectivity/config problems are diagnosable from the UI.
+      const localized = actionError(res, t("ai.chat.error"));
+      const detail = typeof res.details?.detail === "string" ? res.details.detail : null;
+      toast.error(localized);
+      setChatLog((prev) => [
+        ...prev,
+        { sender: "ai", text: detail ? `${localized}\n\n${detail}` : localized },
+      ]);
       return;
     }
 
@@ -327,6 +349,19 @@ export function AiViewClient({
           <Sparkles className="h-4 w-4" />
           {t("ai.tabs.suggestions", { count: pendingSuggestions.length })}
         </button>
+        {canAssign && (
+          <button
+            onClick={() => setActivePanel("assign")}
+            className={`flex items-center gap-2 border-b-2 px-5 py-3 text-xs font-bold transition-all ${
+              activePanel === "assign"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Wand2 className="h-4 w-4" />
+            {t("ai.tabs.assign")}
+          </button>
+        )}
       </div>
 
       {activePanel === "assistant" ? (
@@ -361,25 +396,14 @@ export function AiViewClient({
                 )}
               </div>
 
-              {/* Chat Input */}
-              <form onSubmit={handleAsk} className="flex items-center gap-2">
-                <Input
-                  required
-                  placeholder={t("ai.chat.placeholder")}
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  disabled={submitting}
-                  className="h-10 flex-1 text-xs font-semibold"
-                />
-                <Button
-                  type="submit"
-                  size="icon"
-                  className="h-10 w-10 shrink-0"
-                  disabled={submitting}
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </form>
+              {/* Chat Input — slash commands (/) and file mentions (@) */}
+              <ChatComposer
+                value={question}
+                onChange={setQuestion}
+                onSubmit={sendMessage}
+                disabled={submitting}
+                docs={docs}
+              />
             </div>
           </div>
 
@@ -473,6 +497,16 @@ export function AiViewClient({
             </div>
           </div>
         </div>
+      ) : activePanel === "assign" ? (
+        <AssignByProfile
+          workspaceId={workspaceId}
+          slug={workspaceSlug}
+          projectId={projectId}
+          agentAutonomy={autonomy}
+          agentConfidenceThreshold={threshold}
+          members={assignMembers}
+          pending={assignPending}
+        />
       ) : (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
           {/* Suggestions List */}

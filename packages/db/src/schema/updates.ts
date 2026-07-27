@@ -93,6 +93,9 @@ export const leaderReports = pgTable(
       .notNull()
       .default([]),
     generatedByAgent: boolean("generated_by_agent").notNull().default(false),
+    // Link to the daily_updates this roll-up was synthesized from (captured at
+    // report time; a report aggregates every member's update for reportDate).
+    sourceUpdateIds: jsonb("source_update_ids").$type<string[]>().notNull().default([]),
     approvedByMemberId: uuid("approved_by_member_id").references(() => workspaceMembers.id),
     approvedAt: timestamptz("approved_at"),
     createdAt: timestamptz("created_at").notNull().defaultNow(),

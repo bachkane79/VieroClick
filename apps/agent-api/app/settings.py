@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -45,7 +45,11 @@ class Settings(BaseSettings):
     public_base_url: str = ""
     telegram_webhook_path: str = "/api/telegram/webhook"
 
-    # VieroClick web API (used by agent roles + report_runner)
+    # VieroClick web API (used by agent roles + report_runner).
+    # The key is the SAME shared secret the web app checks in `isAgentRequest`
+    # (it compares the bearer against AGENT_API_SECRET), so leaving
+    # VIEROC_API_KEY unset falls back to agent_api_secret below rather than
+    # sending an empty bearer and getting 401 on every project-data read.
     vieroc_api_url: str = "http://localhost:3000"
     vieroc_api_key: str = ""
 
@@ -56,6 +60,20 @@ class Settings(BaseSettings):
     # App
     debug: bool = Field(default=False, validation_alias="AGENT_API_DEBUG")
     cors_origins: list[str] = ["http://localhost:3000"]
+
+    @model_validator(mode="after")
+    def _default_vieroc_key_to_agent_secret(self) -> "Settings":
+        """Web-callback auth reuses AGENT_API_SECRET; don't require it twice.
+
+        Every agent role reads live state through `VieroClickClient`, which
+        bearer-authenticates with `vieroc_api_key`. The web side validates that
+        bearer against AGENT_API_SECRET, so the two values are the same secret.
+        Deployments that only set AGENT_API_SECRET used to silently send an
+        empty bearer and fail every read with 401.
+        """
+        if not self.vieroc_api_key and self.agent_api_secret:
+            self.vieroc_api_key = self.agent_api_secret
+        return self
 
 
 settings = Settings()

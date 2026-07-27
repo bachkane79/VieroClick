@@ -21,7 +21,7 @@ import {
   setTaskAssigneesAction,
   updateTaskAction,
 } from "../task.actions";
-import { memberInitials } from "../status-colors";
+import { memberInitials, statusColor } from "../status-colors";
 import { TaskComments } from "./task-comments";
 
 import type {
@@ -31,6 +31,9 @@ import type {
   TaskStatusView,
   TaskView,
 } from "../task.view";
+
+/** The form lives in the left column; the footer sits outside it and submits via `form=`. */
+const FORM_ID = "task-detail-form";
 
 interface Props {
   open: boolean;
@@ -335,14 +338,14 @@ export function TaskDetailDrawer({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-neutral-950/30" />
-        <Dialog.Content className="fixed inset-y-0 right-0 z-50 flex w-full max-w-2xl flex-col border-l bg-background shadow-2xl focus:outline-none">
-          <div className="flex items-start justify-between gap-4 border-b px-5 py-4">
+        <Dialog.Content className="fixed inset-y-0 right-0 z-50 flex w-full max-w-5xl flex-col border-l border-border bg-background shadow-2xl focus:outline-none">
+          <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-4">
             <div>
               <Dialog.Title className="text-lg font-semibold">
                 {task ? t("task.detail.title") : t("task.detail.newTask")}
               </Dialog.Title>
-              <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-                {selectedStatus?.name ?? t("task.detail.noStatusSelected")}
+              <Dialog.Description className="sr-only">
+                {task ? task.title : t("task.detail.newTask")}
               </Dialog.Description>
             </div>
             <Dialog.Close asChild>
@@ -352,348 +355,425 @@ export function TaskDetailDrawer({
             </Dialog.Close>
           </div>
 
-          <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
-            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-5">
-              <section className="grid gap-4">
-                <div className="grid gap-2">
-                  <label htmlFor="task-title" className="text-sm font-medium">
-                    {t("common.title")}
-                  </label>
-                  <Input
-                    id="task-title"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    required
-                    maxLength={500}
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <label htmlFor="task-description" className="text-sm font-medium">
-                    {t("common.description")}
-                  </label>
-                  <Textarea
-                    id="task-description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="min-h-28"
-                  />
-                </div>
-              </section>
-
-              <section className="grid gap-4 md:grid-cols-2">
-                <Field label={t("task.detail.status")} htmlFor="task-status">
-                  <select
-                    id="task-status"
-                    value={statusId}
-                    onChange={(e) => setStatusId(e.target.value)}
-                    className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    {statuses.map((status) => (
-                      <option key={status.id} value={status.id}>
-                        {status.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field label={t("task.priority.label")} htmlFor="task-priority">
-                  <select
-                    id="task-priority"
-                    value={priority}
-                    onChange={(e) => setPriority(e.target.value as typeof priority)}
-                    className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    <option value="low">{t("task.priority.low")}</option>
-                    <option value="medium">{t("task.priority.medium")}</option>
-                    <option value="high">{t("task.priority.high")}</option>
-                    <option value="urgent">{t("task.priority.urgent")}</option>
-                  </select>
-                </Field>
-
-                <div className="grid gap-2">
-                  <span className="text-sm font-medium">{t("task.assignees")}</span>
-                  <AssigneeMultiSelect
-                    members={members}
-                    selected={assigneeMemberIds}
-                    onToggle={(id) =>
-                      setAssigneeMemberIds((cur) =>
-                        cur.includes(id) ? cur.filter((m) => m !== id) : [...cur, id]
-                      )
-                    }
-                  />
-                </div>
-
-                <Field label={t("task.detail.parentTask")} htmlFor="task-parent">
-                  <select
-                    id="task-parent"
-                    value={parentTaskId}
-                    onChange={(e) => setParentTaskId(e.target.value)}
-                    className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    <option value="">{t("common.none")}</option>
-                    {tasks
-                      .filter((item) => item.id !== task?.id)
-                      .map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.title}
-                        </option>
-                      ))}
-                  </select>
-                </Field>
-
-                <Field label={t("task.detail.startDate")} htmlFor="task-start">
-                  <Input
-                    id="task-start"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                  />
-                </Field>
-
-                <Field label={t("task.dueDate")} htmlFor="task-due">
-                  <Input
-                    id="task-due"
-                    type="date"
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
-                  />
-                </Field>
-
-                <Field label={t("task.detail.estimateHours")} htmlFor="task-estimate">
-                  <Input
-                    id="task-estimate"
-                    type="number"
-                    min="0"
-                    step="0.25"
-                    value={estimateHours}
-                    onChange={(e) => setEstimateHours(e.target.value)}
-                  />
-                </Field>
-
-                <Field label={t("task.detail.actualHours")} htmlFor="task-actual">
-                  <Input
-                    id="task-actual"
-                    type="number"
-                    min="0"
-                    step="0.25"
-                    placeholder={t("task.detail.logRealTime")}
-                    value={actualHours}
-                    onChange={(e) => setActualHours(e.target.value)}
-                  />
-                </Field>
-
-                <label className="flex items-center gap-2 self-end rounded-md border px-3 py-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={isMilestone}
-                    onChange={(e) => setIsMilestone(e.target.checked)}
-                    className="h-4 w-4 rounded border-input"
-                  />
-                  {t("task.detail.milestone")}
-                </label>
-              </section>
-
-              {selectedStatus?.type === "blocked" && (
-                <section className="grid gap-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-950">
-                  <label htmlFor="task-blocker-reason" className="text-sm font-medium">
-                    {t("task.detail.blockerReason")}
-                  </label>
-                  <Textarea
-                    id="task-blocker-reason"
-                    value={blockerReason}
-                    onChange={(e) => setBlockerReason(e.target.value)}
-                    className="border-amber-200 bg-white"
-                  />
-                </section>
-              )}
-
-              {task && selectedStatus?.type === "in_review" && (
-                <section className="grid gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
-                  <div className="text-sm font-semibold">{t("task.detail.review")}</div>
-                  <p className="text-xs text-muted-foreground">{t("task.detail.reviewHint")}</p>
-                  <Textarea
-                    value={reviewFeedback}
-                    onChange={(e) => setReviewFeedback(e.target.value)}
-                    placeholder={t("task.detail.reviewFeedbackPlaceholder")}
-                    className="min-h-[64px] text-sm"
-                  />
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      onClick={() => handleReview("approve")}
-                      disabled={reviewSubmitting}
-                      className="bg-green-600 text-white hover:bg-green-700"
-                    >
-                      {t("task.detail.approveAndClose")}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => handleReview("rework")}
-                      disabled={reviewSubmitting}
-                    >
-                      {t("task.detail.requestChanges")}
-                    </Button>
-                  </div>
-                </section>
-              )}
-
-              <section className="grid gap-2">
-                <label htmlFor="task-labels" className="text-sm font-medium">
-                  {t("task.detail.labels")}
-                </label>
-                <Input
-                  id="task-labels"
-                  value={labels}
-                  onChange={(e) => setLabels(e.target.value)}
-                />
-              </section>
-
-              <section className="grid gap-3">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold">
-                    {t("task.detail.acceptanceCriteria")}
-                    {criteria.length > 0 && (
-                      <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
-                        {criteria.filter((c) => c.checked).length}/{criteria.length}
-                      </span>
-                    )}
-                  </h3>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="gap-2"
-                    onClick={() => setCriteria((current) => [...current, newCriterion()])}
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    {t("common.add")}
-                  </Button>
-                </div>
-                {criteria.length > 0 && (
-                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-primary transition-all"
-                      style={{
-                        width: `${Math.round(
-                          (criteria.filter((c) => c.checked).length / criteria.length) * 100
-                        )}%`,
-                      }}
+          {/* Two columns on lg+ (form | chat), stacked and page-scrolled below that. */}
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
+            <form
+              id={FORM_ID}
+              onSubmit={submit}
+              className="flex min-w-0 flex-1 flex-col lg:min-h-0"
+            >
+              <div className="flex-1 space-y-6 px-5 py-5 lg:min-h-0 lg:overflow-y-auto">
+                <section className="grid gap-4">
+                  <div className="grid gap-2">
+                    <StatusPickerButton
+                      statuses={statuses}
+                      statusId={statusId}
+                      onChange={setStatusId}
+                    />
+                    <label htmlFor="task-title" className="sr-only">
+                      {t("common.title")}
+                    </label>
+                    <Input
+                      id="task-title"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder={t("common.title")}
+                      required
+                      maxLength={500}
+                      className="h-auto rounded-lg border-0 bg-transparent px-2 py-1.5 text-xl font-semibold tracking-[-0.014em] shadow-none transition-colors hover:bg-surface-subtle focus-visible:bg-surface-subtle"
                     />
                   </div>
-                )}
-                <div className="space-y-2">
-                  {criteria.map((item, index) => (
-                    <div key={item.id ?? index} className="grid gap-2 rounded-md border p-3">
-                      <Input
-                        value={item.text}
-                        onChange={(e) =>
-                          setCriteria((current) =>
-                            current.map((criterion, i) =>
-                              i === index ? { ...criterion, text: e.target.value } : criterion
-                            )
-                          )
-                        }
-                      />
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex gap-4 text-sm">
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={item.required}
-                              onChange={(e) =>
-                                setCriteria((current) =>
-                                  current.map((criterion, i) =>
-                                    i === index
-                                      ? { ...criterion, required: e.target.checked }
-                                      : criterion
-                                  )
-                                )
-                              }
-                            />
-                            {t("task.detail.required")}
-                          </label>
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={item.checked}
-                              onChange={(e) =>
-                                setCriteria((current) =>
-                                  current.map((criterion, i) =>
-                                    i === index
-                                      ? { ...criterion, checked: e.target.checked }
-                                      : criterion
-                                  )
-                                )
-                              }
-                            />
-                            {t("task.detail.checked")}
-                          </label>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          aria-label={t("task.detail.removeCriterion")}
-                          onClick={() =>
-                            setCriteria((current) => current.filter((_, i) => i !== index))
-                          }
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
 
-              {task && (
-                <section className="grid gap-3">
-                  <h3 className="text-sm font-semibold">{t("task.detail.dependencies")}</h3>
-                  <div className="space-y-2">
-                    {blockerDependencies.map((dependency) => (
-                      <div
-                        key={dependency.id}
-                        className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
-                      >
-                        <span className="truncate text-sm">
-                          {taskById.get(dependency.blockerTaskId)?.title ??
-                            t("task.detail.taskFallback")}
-                        </span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          aria-label={t("task.detail.removeDependency")}
-                          onClick={() => removeDependency(dependency.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+                  <div className="grid gap-2">
+                    <label htmlFor="task-description" className="text-sm font-medium">
+                      {t("common.description")}
+                    </label>
+                    <Textarea
+                      id="task-description"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      className="min-h-28"
+                    />
                   </div>
-                  <div className="flex gap-2">
+                </section>
+
+                <section className="grid gap-4 md:grid-cols-2">
+                  <Field label={t("task.priority.label")} htmlFor="task-priority">
                     <select
-                      value={dependencyCandidate}
-                      onChange={(e) => setDependencyCandidate(e.target.value)}
-                      className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      id="task-priority"
+                      value={priority}
+                      onChange={(e) => setPriority(e.target.value as typeof priority)}
+                      className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     >
-                      <option value="">{t("task.detail.selectBlocker")}</option>
-                      {availableBlockers.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.title}
-                        </option>
-                      ))}
+                      <option value="low">{t("task.priority.low")}</option>
+                      <option value="medium">{t("task.priority.medium")}</option>
+                      <option value="high">{t("task.priority.high")}</option>
+                      <option value="urgent">{t("task.priority.urgent")}</option>
                     </select>
-                    <Button type="button" variant="outline" onClick={addDependency}>
+                  </Field>
+
+                  <div className="grid gap-2">
+                    <span className="text-sm font-medium">{t("task.assignees")}</span>
+                    <AssigneeMultiSelect
+                      members={members}
+                      selected={assigneeMemberIds}
+                      onToggle={(id) =>
+                        setAssigneeMemberIds((cur) =>
+                          cur.includes(id) ? cur.filter((m) => m !== id) : [...cur, id]
+                        )
+                      }
+                    />
+                  </div>
+
+                  <Field label={t("task.detail.parentTask")} htmlFor="task-parent">
+                    <select
+                      id="task-parent"
+                      value={parentTaskId}
+                      onChange={(e) => setParentTaskId(e.target.value)}
+                      className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                      <option value="">{t("common.none")}</option>
+                      {tasks
+                        .filter((item) => item.id !== task?.id)
+                        .map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.title}
+                          </option>
+                        ))}
+                    </select>
+                  </Field>
+
+                  <Field label={t("task.detail.startDate")} htmlFor="task-start">
+                    <Input
+                      id="task-start"
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                    />
+                  </Field>
+
+                  <Field label={t("task.dueDate")} htmlFor="task-due">
+                    <Input
+                      id="task-due"
+                      type="date"
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                    />
+                  </Field>
+
+                  <Field label={t("task.detail.estimateHours")} htmlFor="task-estimate">
+                    <Input
+                      id="task-estimate"
+                      type="number"
+                      min="0"
+                      step="0.25"
+                      value={estimateHours}
+                      onChange={(e) => setEstimateHours(e.target.value)}
+                    />
+                  </Field>
+
+                  <Field label={t("task.detail.actualHours")} htmlFor="task-actual">
+                    <Input
+                      id="task-actual"
+                      type="number"
+                      min="0"
+                      step="0.25"
+                      placeholder={t("task.detail.logRealTime")}
+                      value={actualHours}
+                      onChange={(e) => setActualHours(e.target.value)}
+                    />
+                  </Field>
+
+                  <label className="flex items-center gap-2 self-end rounded-md border border-border px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={isMilestone}
+                      onChange={(e) => setIsMilestone(e.target.checked)}
+                      className="h-4 w-4 rounded border-input"
+                    />
+                    {t("task.detail.milestone")}
+                  </label>
+                </section>
+
+                {selectedStatus?.type === "blocked" && (
+                  <section className="grid gap-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-950">
+                    <label htmlFor="task-blocker-reason" className="text-sm font-medium">
+                      {t("task.detail.blockerReason")}
+                    </label>
+                    <Textarea
+                      id="task-blocker-reason"
+                      value={blockerReason}
+                      onChange={(e) => setBlockerReason(e.target.value)}
+                      className="border-amber-200 bg-white"
+                    />
+                  </section>
+                )}
+
+                {task && selectedStatus?.type === "in_review" && (
+                  <section className="grid gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
+                    <div className="text-sm font-semibold">{t("task.detail.review")}</div>
+                    <p className="text-xs text-muted-foreground">{t("task.detail.reviewHint")}</p>
+                    <Textarea
+                      value={reviewFeedback}
+                      onChange={(e) => setReviewFeedback(e.target.value)}
+                      placeholder={t("task.detail.reviewFeedbackPlaceholder")}
+                      className="min-h-[64px] text-sm"
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        onClick={() => handleReview("approve")}
+                        disabled={reviewSubmitting}
+                        className="bg-green-600 text-white hover:bg-green-700"
+                      >
+                        {t("task.detail.approveAndClose")}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => handleReview("rework")}
+                        disabled={reviewSubmitting}
+                      >
+                        {t("task.detail.requestChanges")}
+                      </Button>
+                    </div>
+                  </section>
+                )}
+
+                <section className="grid gap-2">
+                  <label htmlFor="task-labels" className="text-sm font-medium">
+                    {t("task.detail.labels")}
+                  </label>
+                  <Input
+                    id="task-labels"
+                    value={labels}
+                    onChange={(e) => setLabels(e.target.value)}
+                  />
+                </section>
+
+                <section className="grid gap-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="flex items-center gap-2 text-sm font-semibold">
+                      {t("task.detail.acceptanceCriteria")}
+                      {criteria.length > 0 && (
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                          {criteria.filter((c) => c.checked).length}/{criteria.length}
+                        </span>
+                      )}
+                    </h3>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => setCriteria((current) => [...current, newCriterion()])}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
                       {t("common.add")}
                     </Button>
                   </div>
+                  {criteria.length > 0 && (
+                    <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all"
+                        style={{
+                          width: `${Math.round(
+                            (criteria.filter((c) => c.checked).length / criteria.length) * 100
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    {criteria.map((item, index) => (
+                      <div
+                        key={item.id ?? index}
+                        className="grid gap-2 rounded-md border border-border p-3"
+                      >
+                        <Input
+                          value={item.text}
+                          onChange={(e) =>
+                            setCriteria((current) =>
+                              current.map((criterion, i) =>
+                                i === index ? { ...criterion, text: e.target.value } : criterion
+                              )
+                            )
+                          }
+                        />
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex gap-4 text-sm">
+                            <label className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={item.required}
+                                onChange={(e) =>
+                                  setCriteria((current) =>
+                                    current.map((criterion, i) =>
+                                      i === index
+                                        ? { ...criterion, required: e.target.checked }
+                                        : criterion
+                                    )
+                                  )
+                                }
+                              />
+                              {t("task.detail.required")}
+                            </label>
+                            <label className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={item.checked}
+                                onChange={(e) =>
+                                  setCriteria((current) =>
+                                    current.map((criterion, i) =>
+                                      i === index
+                                        ? { ...criterion, checked: e.target.checked }
+                                        : criterion
+                                    )
+                                  )
+                                }
+                              />
+                              {t("task.detail.checked")}
+                            </label>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label={t("task.detail.removeCriterion")}
+                            onClick={() =>
+                              setCriteria((current) => current.filter((_, i) => i !== index))
+                            }
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </section>
-              )}
 
-              {task && (
+                {task && (
+                  <section className="grid gap-3">
+                    <h3 className="text-sm font-semibold">{t("task.detail.dependencies")}</h3>
+                    <div className="space-y-2">
+                      {blockerDependencies.map((dependency) => (
+                        <div
+                          key={dependency.id}
+                          className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
+                        >
+                          <span className="truncate text-sm">
+                            {taskById.get(dependency.blockerTaskId)?.title ??
+                              t("task.detail.taskFallback")}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label={t("task.detail.removeDependency")}
+                            onClick={() => removeDependency(dependency.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <select
+                        value={dependencyCandidate}
+                        onChange={(e) => setDependencyCandidate(e.target.value)}
+                        className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      >
+                        <option value="">{t("task.detail.selectBlocker")}</option>
+                        {availableBlockers.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.title}
+                          </option>
+                        ))}
+                      </select>
+                      <Button type="button" variant="outline" onClick={addDependency}>
+                        {t("common.add")}
+                      </Button>
+                    </div>
+                  </section>
+                )}
+
+                {task && (
+                  <section className="grid gap-3 border-t border-border pt-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="flex items-center gap-2 text-sm font-semibold">
+                        <Paperclip className="h-4 w-4" />
+                        {t("task.detail.attachments")}
+                      </h3>
+                      <span className="text-xs text-muted-foreground">
+                        {taskAttachments.length}
+                      </span>
+                    </div>
+
+                    <div className="grid gap-2 rounded-2xl border border-border bg-surface-subtle p-3 md:grid-cols-[minmax(0,1fr)_auto]">
+                      <Input
+                        type="file"
+                        accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,application/pdf,text/plain,text/csv,application/msword,.docx,application/vnd.ms-excel,.xlsx,application/vnd.ms-powerpoint,.pptx,application/zip,application/json"
+                        onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+                        className="bg-background"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="gap-2"
+                        disabled={uploadSubmitting || !selectedFile}
+                        onClick={uploadAttachment}
+                      >
+                        <FileUp className="h-4 w-4" />
+                        {uploadSubmitting ? t("task.detail.uploading") : t("task.detail.upload")}
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {taskAttachments.map((attachment) => (
+                        <div
+                          key={attachment.attachmentId}
+                          className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">{attachment.fileName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatFileSize(attachment.sizeBytes, format)}
+                            </p>
+                          </div>
+                          <a
+                            href={`/api/files/${attachment.fileId}?projectId=${projectId}`}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2"
+                            aria-label={t("task.detail.downloadAttachment")}
+                          >
+                            <Download className="h-4 w-4" />
+                          </a>
+                        </div>
+                      ))}
+                      {taskAttachments.length === 0 && (
+                        <div className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
+                          {t("task.detail.noAttachments")}
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                )}
+
+                <label className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={allowBlockedOverride}
+                    onChange={(e) => setAllowBlockedOverride(e.target.checked)}
+                    className="h-4 w-4 rounded border-input"
+                  />
+                  {t("task.detail.overrideBlocker")}
+                </label>
+              </div>
+            </form>
+
+            {/* Chat-style comment rail — outside the <form> so it scrolls on its
+                own and can never take part in form submit. */}
+            {task && (
+              <aside className="flex h-[60vh] w-full shrink-0 flex-col border-t border-border bg-surface-subtle lg:h-auto lg:min-h-0 lg:w-[380px] lg:border-l lg:border-t-0">
                 <TaskComments
                   workspaceId={workspaceId}
                   workspaceSlug={workspaceSlug}
@@ -701,103 +781,39 @@ export function TaskDetailDrawer({
                   taskId={task.id}
                   members={members}
                 />
-              )}
+              </aside>
+            )}
+          </div>
 
+          <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-4">
+            <div>
               {task && (
-                <section className="grid gap-3 border-t pt-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="flex items-center gap-2 text-sm font-semibold">
-                      <Paperclip className="h-4 w-4" />
-                      {t("task.detail.attachments")}
-                    </h3>
-                    <span className="text-xs text-muted-foreground">{taskAttachments.length}</span>
-                  </div>
-
-                  <div className="grid gap-2 rounded-2xl border border-border bg-surface-subtle p-3 md:grid-cols-[minmax(0,1fr)_auto]">
-                    <Input
-                      type="file"
-                      accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,application/pdf,text/plain,text/csv,application/msword,.docx,application/vnd.ms-excel,.xlsx,application/vnd.ms-powerpoint,.pptx,application/zip,application/json"
-                      onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
-                      className="bg-background"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="gap-2"
-                      disabled={uploadSubmitting || !selectedFile}
-                      onClick={uploadAttachment}
-                    >
-                      <FileUp className="h-4 w-4" />
-                      {uploadSubmitting ? t("task.detail.uploading") : t("task.detail.upload")}
-                    </Button>
-                  </div>
-
-                  <div className="space-y-2">
-                    {taskAttachments.map((attachment) => (
-                      <div
-                        key={attachment.attachmentId}
-                        className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">{attachment.fileName}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatFileSize(attachment.sizeBytes, format)}
-                          </p>
-                        </div>
-                        <a
-                          href={`/api/files/${attachment.fileId}?projectId=${projectId}`}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2"
-                          aria-label={t("task.detail.downloadAttachment")}
-                        >
-                          <Download className="h-4 w-4" />
-                        </a>
-                      </div>
-                    ))}
-                    {taskAttachments.length === 0 && (
-                      <div className="rounded-md border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-                        {t("task.detail.noAttachments")}
-                      </div>
-                    )}
-                  </div>
-                </section>
-              )}
-
-              <label className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={allowBlockedOverride}
-                  onChange={(e) => setAllowBlockedOverride(e.target.checked)}
-                  className="h-4 w-4 rounded border-input"
-                />
-                {t("task.detail.overrideBlocker")}
-              </label>
-            </div>
-
-            <div className="flex items-center justify-between gap-3 border-t px-5 py-4">
-              <div>
-                {task && (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={() => setConfirmDeleteOpen(true)}
-                    disabled={submitting}
-                  >
-                    {t("common.delete")}
-                  </Button>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <Dialog.Close asChild>
-                  <Button type="button" variant="outline">
-                    {t("common.cancel")}
-                  </Button>
-                </Dialog.Close>
-                <Button type="submit" disabled={submitting || !title.trim()}>
-                  {submitting ? t("common.saving") : t("common.save")}
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => setConfirmDeleteOpen(true)}
+                  disabled={submitting}
+                >
+                  {t("common.delete")}
                 </Button>
-              </div>
+              )}
             </div>
-          </form>
+            <div className="flex gap-2">
+              <Dialog.Close asChild>
+                <Button type="button" variant="outline">
+                  {t("common.cancel")}
+                </Button>
+              </Dialog.Close>
+              <Button
+                type="submit"
+                form={FORM_ID}
+                variant="dark"
+                disabled={submitting || !title.trim()}
+              >
+                {submitting ? t("common.saving") : t("common.save")}
+              </Button>
+            </div>
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
       <ConfirmationDialog
@@ -810,6 +826,63 @@ export function TaskDetailDrawer({
         onConfirm={deleteTask}
       />
     </Dialog.Root>
+  );
+}
+
+/**
+ * Solid colored status pill sitting above the title — a Radix dropdown, so it is
+ * keyboard operable for free. It only moves local `statusId`; the drawer still
+ * persists it through the whole-form save (keeps blocked/review validation).
+ */
+function StatusPickerButton({
+  statuses,
+  statusId,
+  onChange,
+}: {
+  statuses: TaskStatusView[];
+  statusId: string;
+  onChange: (statusId: string) => void;
+}) {
+  const t = useTranslations();
+  const selected = statuses.find((status) => status.id === statusId);
+
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <button
+          type="button"
+          aria-label={t("task.detail.status")}
+          className={cn(
+            "inline-flex h-7 w-fit max-w-full items-center gap-1.5 rounded-full px-3 text-[11px] font-semibold tracking-[-0.006em] shadow-soft transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-1 focus-visible:ring-offset-background",
+            selected
+              ? statusColor(selected.type).pill
+              : "border border-border bg-muted text-muted-foreground"
+          )}
+        >
+          <span className="truncate">{selected?.name ?? t("task.detail.noStatusSelected")}</span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-80" />
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="start"
+          sideOffset={6}
+          className="z-[60] min-w-[200px] overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-md"
+        >
+          {statuses.map((status) => (
+            <DropdownMenu.Item
+              key={status.id}
+              onSelect={() => onChange(status.id)}
+              className="flex w-full cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
+            >
+              <span className={cn("h-2.5 w-2.5 rounded-sm", statusColor(status.type).dot)} />
+              <span className="min-w-0 truncate">{status.name}</span>
+              {status.id === statusId && <Check className="ml-auto h-3.5 w-3.5" />}
+            </DropdownMenu.Item>
+          ))}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }
 

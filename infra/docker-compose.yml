@@ -14,13 +14,22 @@ services:
     depends_on:
       - redis
 
+  # Agent roles read live project state back from the web app over HTTP, so they
+  # need its in-network address. Without this VIEROC_API_URL defaults to
+  # http://localhost:3000 — which inside these containers is the container
+  # itself, so every /api/project-data read failed and each role returned
+  # "Could not retrieve project tasks and members" (Q&A, assignment, observer,
+  # daily report). The bearer falls back to AGENT_API_SECRET in app/settings.py.
   agent-api:
     build:
       context: ../apps/agent-api
     env_file:
       - ../.env
+    environment:
+      VIEROC_API_URL: http://web:3000
     depends_on:
       - redis
+      - web
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   worker:
@@ -28,8 +37,11 @@ services:
       context: ../apps/agent-api
     env_file:
       - ../.env
+    environment:
+      VIEROC_API_URL: http://web:3000
     depends_on:
       - redis
+      - web
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=4
 
   scheduler:
@@ -37,8 +49,11 @@ services:
       context: ../apps/agent-api
     env_file:
       - ../.env
+    environment:
+      VIEROC_API_URL: http://web:3000
     depends_on:
       - redis
+      - web
     command: celery -A app.workers.celery_app beat --loglevel=info
 
   redis:

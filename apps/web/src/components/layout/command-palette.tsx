@@ -195,11 +195,11 @@ export function CommandPalette({ workspaces }: Props) {
           href: `${pBase}/table`,
         },
         {
-          id: "cur-workload",
-          label: "Workload",
+          id: "cur-analytics",
+          label: "Advanced analytics",
           hint: "current project",
           icon: Network,
-          href: `${pBase}/workload`,
+          href: `${pBase}/analytics`,
         },
         {
           id: "cur-ai",

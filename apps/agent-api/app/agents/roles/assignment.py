@@ -41,14 +41,18 @@ def _tokens(text: str) -> set[str]:
     return set(re.findall(r"[a-z0-9]+", (text or "").lower()))
 
 ASSIGNMENT_SYSTEM_PROMPT = """You are an expert Task Assignment Agent.
-Given a list of tasks, candidates, and pre-computed assignment scores, select the best assignee for each task.
+For each task you are given a ranked list of candidate members (each with skills
+and a pre-computed fit score that already respects the member's capacity). Choose
+exactly ONE member_id per task, picking only from that task's candidate options.
+Prefer the higher-scored candidate unless the leader's extra instructions justify
+another choice. If unsure, use the candidate marked as the default.
 Return only structured JSON in this exact format:
 {
   "assignments": [
     {
       "task_id": "uuid-of-task",
       "task_title": "Task title",
-      "member_id": "uuid-of-recommended-member",
+      "member_id": "uuid-of-chosen-member",
       "member_name": "Full name",
       "confidence": 0.85,
       "reason": "Brief reason",
@@ -58,13 +62,13 @@ Return only structured JSON in this exact format:
 }
 """
 
-ASSIGNMENT_USER_TEMPLATE = """Review these calculated task assignments:
+ASSIGNMENT_USER_TEMPLATE = """{context}Review these tasks and pick the best assignee for each.
 Tasks:
 {tasks}
 
-Candidates with pre-calculated fit scores (already respect each member's capacity):
+Per-task candidate options (choose one member_id per task from its own options):
 {candidates}
-
+{instructions}
 Confirm the best match, write reasons and risks, and return structured JSON.
 """
 
@@ -81,6 +85,25 @@ def _est_hours(task: dict) -> float:
 
 def _is_active(task: dict) -> bool:
     return not task.get("completedAt")
+
+
+# Status kinds that mean work has already started (or is closed) — the reassign
+# flow must NOT touch these; it only moves future / not-started work.
+IN_FLIGHT_STATUS_TYPES = {"in_progress", "in_review", "blocked", "done", "cancelled"}
+
+
+def _status_type(task: dict) -> str:
+    return str(task.get("statusType") or "").lower()
+
+
+def _is_future(task: dict) -> bool:
+    """A future (not-started, not-completed) task, eligible for reassignment.
+
+    Anything explicitly in-progress / in-review / blocked / done / cancelled is
+    preserved. `todo` or an unknown/empty status counts as future (backlog)."""
+    if task.get("completedAt"):
+        return False
+    return _status_type(task) not in IN_FLIGHT_STATUS_TYPES
 
 
 def _capacity_hours(member: dict, alloc_by_member: dict[str, int]) -> float:
@@ -133,7 +156,19 @@ async def run(project_id: str | None = None, payload: dict | None = None) -> dic
     weights = {**DEFAULT_WEIGHTS, **((payload or {}).get("weights") or {})}
     dispatch_id = (payload or {}).get("dispatch_id")
 
-    logger.info("Assignment agent: calculating assignments for %s", project_id)
+    # Reassign mode (Team page "Giao việc lại"): only future / not-started tasks
+    # are moved; completed and in-progress work is preserved. keep_existing keeps
+    # each future task with its current owner (fill only unassigned gaps); when
+    # false, all future tasks are rebalanced across the team.
+    reassign = (payload or {}).get("mode") == "reassign"
+    keep_existing = bool((payload or {}).get("keepExistingAssignments"))
+    instructions = str((payload or {}).get("instructions") or "").strip()
+
+    logger.info(
+        "Assignment agent: %s for %s",
+        "reassigning future tasks" if reassign else "calculating assignments",
+        project_id,
+    )
 
     proj_data = await vieroc.fetch_project_data(project_id)
     if not proj_data or "tasks" not in proj_data:
@@ -150,12 +185,32 @@ async def run(project_id: str | None = None, payload: dict | None = None) -> dic
         if wm_id is not None:
             alloc_by_member[wm_id] = int(pm.get("allocationPercent") or 100)
 
-    # Running committed hours per member from their existing active tasks.
-    # Multi-assignee: a task's estimate is split evenly across all its assignees
-    # (falling back to the primary assigneeMemberId when the set is absent).
+    # Candidate tasks to (re)assign.
+    if reassign:
+        future_tasks = [t for t in tasks_list if _is_future(t)]
+        if keep_existing:
+            # Only fill gaps — future tasks nobody owns yet.
+            candidate_tasks = [t for t in future_tasks if not t.get("assigneeMemberId")]
+        else:
+            # Rebalance every future task across the team.
+            candidate_tasks = future_tasks
+    else:
+        candidate_tasks = [t for t in tasks_list if not t.get("assigneeMemberId")]
+
+    if not candidate_tasks:
+        note = "No future tasks to reassign." if reassign else "All tasks are already assigned."
+        return {"ok": True, "projectId": project_id, "assignmentsApplied": 0, "note": note}
+
+    candidate_ids = {t.get("id") for t in candidate_tasks}
+
+    # Running committed hours per member from their existing active tasks. Tasks
+    # about to be (re)assigned are excluded so the load baseline reflects only work
+    # that stays put (in-progress tasks; and, in keep_existing mode, future tasks
+    # left with their current owner). Multi-assignee: a task's estimate is split
+    # evenly across its assignees (falling back to the primary assigneeMemberId).
     committed: dict[str, float] = {}
     for t in tasks_list:
-        if not _is_active(t):
+        if not _is_active(t) or t.get("id") in candidate_ids:
             continue
         assignees = t.get("assignees") or ([t["assigneeMemberId"]] if t.get("assigneeMemberId") else [])
         if not assignees:
@@ -166,13 +221,9 @@ async def run(project_id: str | None = None, payload: dict | None = None) -> dic
 
     capacity = {m.get("id"): _capacity_hours(m, alloc_by_member) for m in members_list}
 
-    unassigned_tasks = [t for t in tasks_list if not t.get("assigneeMemberId")]
-    if not unassigned_tasks:
-        return {"ok": True, "projectId": project_id, "assignmentsApplied": 0, "note": "All tasks are already assigned."}
-
     calculated_assignments = []
     overflow_count = 0
-    for task in unassigned_tasks:
+    for task in candidate_tasks:
         est = _est_hours(task)
 
         # Hard constraint: a member fits only if this task keeps them within capacity.
@@ -188,52 +239,88 @@ async def run(project_id: str | None = None, payload: dict | None = None) -> dic
             overflow_count += 1
             eligible = members_list
 
-        best_member = None
-        best_score = -1.0
+        # Rank eligible members and keep the top few as options for the LLM (so it
+        # can honour the leader's free-text instructions), reserving capacity for
+        # the deterministic best pick.
+        ranked = []
         for member in eligible:
             cap = capacity.get(member.get("id"), 0.0) or 1.0
             remaining_ratio = max((cap - committed.get(member.get("id"), 0.0)) / cap, 0.0)
-            score = _score_member(task, member, remaining_ratio, weights)
-            if score > best_score:
-                best_score = score
-                best_member = member
+            ranked.append((_score_member(task, member, remaining_ratio, weights), member))
+        ranked.sort(key=lambda pair: pair[0], reverse=True)
+        top = ranked[:3]
+        if not top:
+            continue
 
-        if best_member:
-            mid = best_member.get("id")
-            committed[mid] = committed.get(mid, 0.0) + est  # reserve capacity for next tasks
-            calculated_assignments.append(
-                {
-                    "task": task,
-                    "recommended_member": best_member,
-                    "score": round(best_score, 2),
-                    "over_capacity": used_fallback,
-                }
-            )
+        best_member = top[0][1]
+        mid = best_member.get("id")
+        committed[mid] = committed.get(mid, 0.0) + est  # reserve capacity for next tasks
+        calculated_assignments.append(
+            {
+                "task": task,
+                "recommended_member": best_member,
+                "score": round(top[0][0], 2),
+                "over_capacity": used_fallback,
+                "options": [
+                    {
+                        "member_id": m.get("id"),
+                        "member_name": m.get("fullName"),
+                        "skills": [str(s) for s in (m.get("skills") or [])][:8],
+                        "score": round(sc, 2),
+                    }
+                    for sc, m in top
+                ],
+            }
+        )
 
     if not calculated_assignments:
         return {"ok": True, "projectId": project_id, "assignmentsApplied": 0, "note": "No eligible members to assign."}
 
+    context_note = ""
+    if reassign:
+        context_note = (
+            "This is a REASSIGNMENT of future (not-started) tasks only; completed and "
+            "in-progress work is left untouched. "
+            + (
+                "Keep each task with its current owner unless a clearly better fit exists. "
+                if keep_existing
+                else "You may rebalance these future tasks freely across the team. "
+            )
+        )
+    instructions_block = (
+        f"\nLeader's extra instructions (follow these closely):\n{instructions}\n"
+        if instructions
+        else ""
+    )
     try:
         llm_response = await generate(
             ASSIGNMENT_SYSTEM_PROMPT,
             ASSIGNMENT_USER_TEMPLATE.format(
+                context=(context_note + "\n\n") if context_note else "",
                 tasks=json.dumps(
-                    [{"id": x["task"]["id"], "title": x["task"]["title"]} for x in calculated_assignments],
+                    [
+                        {
+                            "id": x["task"]["id"],
+                            "title": x["task"].get("title"),
+                            "priority": x["task"].get("priority"),
+                        }
+                        for x in calculated_assignments
+                    ],
                     ensure_ascii=False,
                 ),
                 candidates=json.dumps(
                     [
                         {
                             "task_id": x["task"]["id"],
-                            "member_id": x["recommended_member"]["id"],
-                            "member_name": x["recommended_member"].get("fullName"),
-                            "score": x["score"],
+                            "default_member_id": x["recommended_member"]["id"],
                             "over_capacity": x["over_capacity"],
+                            "options": x["options"],
                         }
                         for x in calculated_assignments
                     ],
                     ensure_ascii=False,
                 ),
+                instructions=instructions_block,
             ),
             as_json=True,
         )

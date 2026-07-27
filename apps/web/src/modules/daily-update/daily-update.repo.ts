@@ -87,6 +87,20 @@ export async function listUpdatesForDate(
     .where(and(eq(dailyUpdates.projectId, projectId), eq(dailyUpdates.workDate, workDate)));
 }
 
+/** IDs of the daily_updates submitted for a given workDate — captured as the
+ * source link on a leader_report roll-up (report ← daily updates). */
+export async function listUpdateIdsForDate(
+  projectId: string,
+  workDate: string,
+  exec: Executor = db
+): Promise<string[]> {
+  const rows = await exec
+    .select({ id: dailyUpdates.id })
+    .from(dailyUpdates)
+    .where(and(eq(dailyUpdates.projectId, projectId), eq(dailyUpdates.workDate, workDate)));
+  return rows.map((r) => r.id);
+}
+
 /**
  * Return workspace member IDs of project members who haven't submitted a daily-update
  * for the given workDate. Uses LEFT JOIN: any member with no row for that date is included.

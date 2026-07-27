@@ -20,13 +20,9 @@ import {
   AlertOctagon,
   AlertTriangle,
   FileText,
-  TrendingUp,
   BarChart3,
-  LayoutDashboard,
-  Gauge,
   Users,
   Sparkles,
-  Wand2,
   Plus,
   Pin,
   Check,
@@ -63,21 +59,22 @@ type ViewDef = {
 // `name` remains the last-resort fallback for a view whose key is missing from
 // the catalog. WBS and Gantt stay English deliberately (§6.1 keep-list), as
 // does "AI Manager" — a product feature name, like "AI Leader" in §6.6.
+// Optional views — everything not pinned to the fixed bar. Several former tabs
+// were consolidated into their siblings (redesign v2): Workload → "Phân tích
+// nâng cao" (analytics), Reports → the "Rủi ro & Cột mốc" report sub-tab, and
+// "Giao việc AI" → "AI Manager". The routes for the removed tabs redirect.
 const EXTRA: ViewDef[] = [
+  { key: "calendar", name: "Calendar", nameKey: "projectNav.calendar", path: "calendar", icon: CalendarDays },
+  // "Gantt" is a proper noun and stays English in both locales (§6.1).
+  { key: "timeline", name: "Gantt", path: "timeline", icon: CalendarRange },
+  { key: "table", name: "Table", nameKey: "projectNav.table", path: "table", icon: Table2 },
   { key: "wbs", name: "WBS", path: "wbs", icon: Network },
   {
-    key: "workload",
-    name: "Workload",
-    nameKey: "projectNav.workload",
-    path: "workload",
-    icon: Gauge,
-  },
-  {
-    key: "daily",
-    name: "Daily Updates",
-    nameKey: "projectNav.daily",
-    path: "daily",
-    icon: ClipboardList,
+    key: "analytics",
+    name: "Advanced analytics",
+    nameKey: "projectNav.analytics",
+    path: "analytics",
+    icon: BarChart3,
   },
   { key: "tickets", name: "Tickets", nameKey: "projectNav.tickets", path: "tickets", icon: Ticket },
   {
@@ -88,44 +85,13 @@ const EXTRA: ViewDef[] = [
     icon: AlertOctagon,
   },
   {
-    key: "risks",
-    name: "Risks & Milestones",
-    nameKey: "projectNav.risks",
-    path: "risks-milestones",
-    icon: AlertTriangle,
-  },
-  {
     key: "docs",
     name: "Docs & Decisions",
     nameKey: "projectNav.docs",
     path: "docs-decisions",
     icon: FileText,
   },
-  {
-    key: "reports",
-    name: "Reports",
-    nameKey: "projectNav.reports",
-    path: "reports",
-    icon: TrendingUp,
-  },
-  {
-    key: "analytics",
-    name: "Analytics",
-    nameKey: "projectNav.analytics",
-    path: "analytics",
-    icon: BarChart3,
-  },
   { key: "team", name: "Team", nameKey: "projectNav.team", path: "team", icon: Users },
-  {
-    key: "assign",
-    name: "Giao việc AI",
-    nameKey: "projectNav.assign",
-    path: "assign",
-    icon: Wand2,
-  },
-  // AI is a global entry (top bar); it stays reachable here as a normal view,
-  // but no longer competes as a highlighted tab (redesign §7.1).
-  { key: "ai", name: "AI Manager", nameKey: "projectNav.ai", path: "ai", icon: Sparkles },
 ];
 
 function storageKey(projectId: string) {
@@ -175,19 +141,19 @@ export function ProjectNav({ slug, projectId }: Props) {
   // current location is never hidden inside the dropdown.
   const activeExtraKey = EXTRA.find((v) => isActive(v))?.key ?? null;
   const barViews = useMemo(() => {
+    // Fixed pinned tabs (redesign v2 §3): always on the bar, cannot be unpinned.
     const essential: ViewDef[] = [
       { key: "overview", name: t("projectNav.overview"), path: "overview", icon: Info },
       { key: "tasks", name: t("projectNav.list"), path: "tasks", icon: ListTodo },
       { key: "board", name: t("projectNav.board"), path: "board", icon: Kanban },
-      { key: "calendar", name: t("projectNav.calendar"), path: "calendar", icon: CalendarDays },
-      // "Gantt" is a proper noun and stays English in both locales (§6.1).
-      { key: "timeline", name: "Gantt", path: "timeline", icon: CalendarRange },
-      { key: "table", name: t("projectNav.table"), path: "table", icon: Table2 },
+      // "Báo cáo" — daily-update submissions (leader roll-ups live under Risks & Milestones).
+      { key: "daily", name: t("projectNav.daily"), path: "daily", icon: ClipboardList },
+      { key: "ai", name: t("projectNav.ai"), path: "ai", icon: Sparkles },
       {
-        key: "dashboard",
-        name: t("projectNav.dashboard"),
-        path: "dashboard",
-        icon: LayoutDashboard,
+        key: "risks",
+        name: t("projectNav.risks"),
+        path: "risks-milestones",
+        icon: AlertTriangle,
       },
     ];
     const pinnedViews = EXTRA.filter((v) => pinned.includes(v.key) || v.key === activeExtraKey);

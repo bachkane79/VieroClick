@@ -1,5 +1,5 @@
 import "server-only";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, or } from "drizzle-orm";
 import { db, agentJobs, type Executor } from "@vieroc/db";
 
 export type AgentJobInsert = typeof agentJobs.$inferInsert;
@@ -19,6 +19,35 @@ export async function listByProject(
     .from(agentJobs)
     .where(eq(agentJobs.projectId, projectId))
     .orderBy(desc(agentJobs.createdAt));
+}
+
+/**
+ * Jobs the activity tray shows: everything still in flight (queued/running,
+ * however old — a stuck run must stay visible) plus anything that finished
+ * inside `sinceMs`, so a completed run lingers briefly instead of vanishing.
+ */
+export async function listForTray(
+  projectId: string,
+  sinceMs: number,
+  limit = 12,
+  exec: Executor = db
+): Promise<AgentJobRow[]> {
+  const since = new Date(Date.now() - sinceMs);
+  return exec
+    .select()
+    .from(agentJobs)
+    .where(
+      and(
+        eq(agentJobs.projectId, projectId),
+        or(
+          eq(agentJobs.status, "running"),
+          eq(agentJobs.status, "queued"),
+          gte(agentJobs.createdAt, since)
+        )
+      )
+    )
+    .orderBy(desc(agentJobs.createdAt))
+    .limit(limit);
 }
 
 export async function create(values: AgentJobInsert, exec: Executor = db): Promise<AgentJobRow> {

@@ -8,6 +8,8 @@ import {
   computeBurndown,
   buildStakeholderReport,
 } from "@/modules/project/project.analytics";
+import { listMembers as listProjectMembers } from "@/modules/project-member/project-member.service";
+import { loadProjectViewData } from "@/modules/task/task-page-data";
 import { requireActor } from "@/server/lib/context";
 import { NotFoundError } from "@/server/lib/errors";
 import { AnalyticsViewClient } from "./analytics-view-client";
@@ -15,6 +17,10 @@ import { AnalyticsViewClient } from "./analytics-view-client";
 interface Props {
   params: Promise<{ slug: string; projectId: string }>;
 }
+
+// Nominal weekly capacity for a 100%-allocated member. Estimates are rough,
+// so this is a planning heuristic, not a billing figure.
+const WEEKLY_HOURS = 40;
 
 export default async function ProjectAnalyticsPage({ params }: Props) {
   const { slug, projectId } = await params;
@@ -30,6 +36,46 @@ export default async function ProjectAnalyticsPage({ params }: Props) {
   }
 
   await requireActor(workspace.id, projectId);
+
+  // Workload data (folded in from the former Workload tab). Reuses the exact
+  // same server-side loaders the workload page used.
+  const workloadData = await loadProjectViewData(slug, projectId);
+  const workloadProjectMembers = await listProjectMembers(workspace.id, projectId);
+
+  const workloadStatusType = new Map(workloadData.statuses.map((s) => [s.id, s.type]));
+  const isWorkloadOpen = (statusId: string) => {
+    const st = workloadStatusType.get(statusId);
+    return st !== "done" && st !== "cancelled";
+  };
+
+  const allocationByMember = new Map(
+    workloadProjectMembers.map((m) => [m.workspaceMemberId, m.allocationPercent])
+  );
+
+  // Per-member load = sum of estimate hours across open assigned tasks.
+  const workloadRows = workloadData.members
+    .map((member) => {
+      const openTasks = workloadData.tasks
+        .filter((tk) => tk.assigneeMemberId === member.id && isWorkloadOpen(tk.statusId))
+        .map((tk) => ({
+          id: tk.id,
+          title: tk.title,
+          estimateHours: Number(tk.estimateHours ?? 0),
+        }));
+      const load = openTasks.reduce((sum, tk) => sum + tk.estimateHours, 0);
+      const allocation = allocationByMember.get(member.id) ?? 100;
+      const capacity = (WEEKLY_HOURS * allocation) / 100;
+      return { memberId: member.id, fullName: member.fullName, openTasks, load, allocation, capacity };
+    })
+    .sort((a, b) => b.load - a.load);
+
+  const workloadUnassigned = workloadData.tasks
+    .filter((tk) => !tk.assigneeMemberId && isWorkloadOpen(tk.statusId))
+    .map((tk) => ({
+      id: tk.id,
+      title: tk.title,
+      estimateHours: Number(tk.estimateHours ?? 0),
+    }));
 
   const [health, schedule, burndown, milestoneRows, riskRows] = await Promise.all([
     computeHealthDetails(projectId),
@@ -74,11 +120,15 @@ export default async function ProjectAnalyticsPage({ params }: Props) {
       {/* Giant Unified White Shell Container */}
       <div className="rounded-3xl border border-border bg-surface p-5 sm:p-6 shadow-soft">
         <AnalyticsViewClient
+          slug={slug}
+          projectId={projectId}
           projectName={project.name}
           health={health}
           schedule={schedule}
           burndown={burndown}
           stakeholderMarkdown={stakeholderReport.markdown}
+          workloadRows={workloadRows}
+          workloadUnassigned={workloadUnassigned}
         />
       </div>
     </div>

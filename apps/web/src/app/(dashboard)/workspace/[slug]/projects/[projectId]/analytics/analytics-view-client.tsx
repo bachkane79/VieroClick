@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Button } from "@vieroc/ui";
+import { Button, cn } from "@vieroc/ui";
 import { toast } from "sonner";
 import {
   Activity,
@@ -12,16 +13,36 @@ import {
   Copy,
   Download,
   FileText,
+  Users,
 } from "lucide-react";
 import type { HealthDetails } from "@/modules/project/project.service";
 import type { ScheduleResult, BurndownResult } from "@/modules/project/project.analytics";
 
+interface WorkloadTask {
+  id: string;
+  title: string;
+  estimateHours: number;
+}
+
+interface WorkloadRow {
+  memberId: string;
+  fullName: string;
+  openTasks: WorkloadTask[];
+  load: number;
+  allocation: number;
+  capacity: number;
+}
+
 interface Props {
+  slug: string;
+  projectId: string;
   projectName: string;
   health: HealthDetails;
   schedule: ScheduleResult;
   burndown: BurndownResult;
   stakeholderMarkdown: string;
+  workloadRows: WorkloadRow[];
+  workloadUnassigned: WorkloadTask[];
 }
 
 function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
@@ -158,11 +179,15 @@ function BurndownChart({ burndown }: { burndown: BurndownResult }) {
 }
 
 export function AnalyticsViewClient({
+  slug,
+  projectId,
   projectName,
   health,
   schedule,
   burndown,
   stakeholderMarkdown,
+  workloadRows,
+  workloadUnassigned,
 }: Props) {
   const t = useTranslations();
   const [showReport, setShowReport] = useState(false);
@@ -331,6 +356,113 @@ export function AnalyticsViewClient({
             {stakeholderMarkdown}
           </pre>
         )}
+      </div>
+
+      {/* Workload / Khối lượng công việc (folded in from the former Workload tab) */}
+      <div className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+          <Users className="h-3.5 w-3.5" /> {t("project.team.workload")}
+        </h3>
+        <div className="space-y-3">
+          {workloadRows.map(({ memberId, fullName, openTasks, load, allocation, capacity }) => {
+            const pct = capacity > 0 ? Math.round((load / capacity) * 100) : 0;
+            const over = load > capacity;
+            return (
+              <div
+                key={memberId}
+                className="rounded-2xl border border-border bg-surface-subtle p-4 shadow-soft"
+              >
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-xs font-bold text-primary">
+                      {fullName
+                        .split(/\s+/)
+                        .map((p) => p[0])
+                        .slice(0, 2)
+                        .join("")
+                        .toUpperCase()}
+                    </span>
+                    <div>
+                      <p className="text-xs font-semibold">{fullName}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {t("project.workload.memberMeta", { count: openTasks.length, allocation })}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p
+                      className={cn(
+                        "text-xs font-bold",
+                        over ? "text-destructive" : "text-foreground"
+                      )}
+                    >
+                      {load}h / {capacity}h
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {t("project.workload.ofCapacity", { pct })}
+                    </p>
+                  </div>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+                  <div
+                    className={cn(
+                      "h-full rounded-full",
+                      over ? "bg-destructive" : pct > 80 ? "bg-amber-500" : "bg-primary"
+                    )}
+                    style={{ width: `${Math.min(100, pct)}%` }}
+                  />
+                </div>
+                {openTasks.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {openTasks.slice(0, 8).map((task) => (
+                      <Link
+                        key={task.id}
+                        href={`/workspace/${slug}/projects/${projectId}/tasks?task=${task.id}`}
+                        className="rounded-lg border border-border/80 bg-card px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
+                      >
+                        {task.title}
+                        {task.estimateHours ? ` · ${task.estimateHours}h` : ""}
+                      </Link>
+                    ))}
+                    {openTasks.length > 8 && (
+                      <span className="px-1 text-[11px] text-muted-foreground">
+                        {t("project.workload.more", { count: openTasks.length - 8 })}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {workloadRows.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-border/80 p-8 text-center text-xs text-muted-foreground">
+              {t("project.workload.empty")}
+            </div>
+          )}
+
+          {workloadUnassigned.length > 0 && (
+            <div className="rounded-2xl border border-dashed border-border/80 bg-surface-subtle p-4">
+              <p className="mb-2 text-xs font-semibold text-muted-foreground">
+                {t("project.workload.unassigned", {
+                  count: workloadUnassigned.length,
+                  hours: workloadUnassigned.reduce((s, task) => s + task.estimateHours, 0),
+                })}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {workloadUnassigned.slice(0, 10).map((task) => (
+                  <Link
+                    key={task.id}
+                    href={`/workspace/${slug}/projects/${projectId}/tasks?task=${task.id}`}
+                    className="rounded-lg border border-border/80 bg-card px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
+                  >
+                    {task.title}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

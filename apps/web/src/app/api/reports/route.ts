@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { db, leaderReports } from "@vieroc/db";
+import { and, eq } from "drizzle-orm";
+import { db, leaderReports, dailyUpdates } from "@vieroc/db";
 import { getUserId } from "@/server/lib/context";
 import { isAgentRequest } from "@/server/lib/agent-auth";
 import { invalidateCache } from "@/server/lib/cache";
@@ -33,6 +34,13 @@ export const POST = withApiLogging("api.reports.create", async (request) => {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
+    // Link the roll-up to the daily updates it summarizes (report ← updates).
+    const updateRows = await db
+      .select({ id: dailyUpdates.id })
+      .from(dailyUpdates)
+      .where(and(eq(dailyUpdates.projectId, projectId), eq(dailyUpdates.workDate, reportDate)));
+    const sourceUpdateIds = updateRows.map((r) => r.id);
+
     const [report] = await db
       .insert(leaderReports)
       .values({
@@ -44,6 +52,7 @@ export const POST = withApiLogging("api.reports.create", async (request) => {
         recommendedActions: recommendedActions || [],
         memberDemands: memberDemands || [],
         planDeviations: planDeviations || [],
+        sourceUpdateIds,
         generatedByAgent: true,
       })
       .onConflictDoUpdate({
@@ -55,6 +64,7 @@ export const POST = withApiLogging("api.reports.create", async (request) => {
           recommendedActions: recommendedActions || [],
           memberDemands: memberDemands || [],
           planDeviations: planDeviations || [],
+          sourceUpdateIds,
           generatedByAgent: true,
           approvedAt: null,
           approvedByMemberId: null,

@@ -17,6 +17,7 @@ import {
   wbsNodes,
   memberProfiles,
   taskAssignees,
+  taskStatuses,
 } from "@vieroc/db";
 import { eq } from "drizzle-orm";
 import { getUserId } from "@/server/lib/context";
@@ -72,6 +73,13 @@ export async function GET(request: Request) {
 
     // Get project items
     const allTasks = await db.select().from(tasks).where(eq(tasks.projectId, projectId));
+    // Status kinds per project — lets agents distinguish future (todo) tasks from
+    // in-progress/done ones (e.g. the reassign flow only touches future tasks).
+    const statusRows = await db
+      .select({ id: taskStatuses.id, type: taskStatuses.type, name: taskStatuses.name })
+      .from(taskStatuses)
+      .where(eq(taskStatuses.projectId, projectId));
+    const statusById = new Map(statusRows.map((s) => [s.id, s]));
     const allBlockers = await db.select().from(blockers).where(eq(blockers.projectId, projectId));
     const allRisks = await db.select().from(projectRisks).where(eq(projectRisks.projectId, projectId));
     const allMilestones = await db.select().from(milestones).where(eq(milestones.projectId, projectId));
@@ -98,11 +106,17 @@ export async function GET(request: Request) {
         assigneesByTask.set(r.taskId, list);
       }
     }
-    // Expose the full assignee set per task (agents split capacity across them).
-    const tasksWithAssignees = allTasks.map((t) => ({
-      ...t,
-      assignees: assigneesByTask.get(t.id) ?? (t.assigneeMemberId ? [t.assigneeMemberId] : []),
-    }));
+    // Expose the full assignee set per task (agents split capacity across them)
+    // plus the resolved status kind/name (statusId alone is opaque to agents).
+    const tasksWithAssignees = allTasks.map((t) => {
+      const st = t.statusId ? statusById.get(t.statusId) : undefined;
+      return {
+        ...t,
+        assignees: assigneesByTask.get(t.id) ?? (t.assigneeMemberId ? [t.assigneeMemberId] : []),
+        statusType: st?.type ?? null,
+        statusName: st?.name ?? null,
+      };
+    });
 
     return NextResponse.json({
       project,

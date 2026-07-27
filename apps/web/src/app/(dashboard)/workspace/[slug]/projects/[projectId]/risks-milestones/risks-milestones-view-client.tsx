@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { Button, Input, Textarea } from "@vieroc/ui";
 import { toast } from "sonner";
-import { Calendar, AlertTriangle, Plus, Trash2, ShieldAlert, Flag } from "lucide-react";
+import { Calendar, AlertTriangle, Plus, Trash2, ShieldAlert, Flag, ClipboardList } from "lucide-react";
 import {
   createMilestoneAction,
   deleteMilestoneAction,
@@ -13,6 +13,10 @@ import {
 import { createRiskAction, deleteRiskAction } from "@/modules/risk/risk.actions";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useActionError } from "@/i18n/use-action-error";
+import { ReportsViewClient } from "../reports/reports-view-client";
+
+type ReportRow = React.ComponentProps<typeof ReportsViewClient>["initialReports"][number];
+type DeviationRow = React.ComponentProps<typeof ReportsViewClient>["currentDeviations"][number];
 
 interface MilestoneRow {
   id: string;
@@ -51,6 +55,10 @@ interface Props {
   initialMilestones: MilestoneRow[];
   initialRisks: RiskRow[];
   members: MemberRow[];
+  /** Manager-only aggregated leader report ("Tổng hợp báo cáo") — redesign v2. */
+  canViewReports: boolean;
+  initialReports: ReportRow[];
+  currentDeviations: DeviationRow[];
 }
 
 export function RisksMilestonesViewClient({
@@ -60,12 +68,15 @@ export function RisksMilestonesViewClient({
   initialMilestones,
   initialRisks,
   members,
+  canViewReports,
+  initialReports,
+  currentDeviations,
 }: Props) {
   const t = useTranslations();
   const router = useRouter();
   const actionError = useActionError();
   const [submitting, setSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<"milestones" | "risks">("milestones");
+  const [activeTab, setActiveTab] = useState<"milestones" | "risks" | "reports">("milestones");
   const [deleteMilestoneCandidateId, setDeleteMilestoneCandidateId] = useState<string | null>(null);
   const [deleteRiskCandidateId, setDeleteRiskCandidateId] = useState<string | null>(null);
 
@@ -299,9 +310,32 @@ export function RisksMilestonesViewClient({
           <ShieldAlert className="h-4 w-4" />
           {t("risksMilestones.tab.risks")}
         </button>
+        {canViewReports && (
+          <button
+            onClick={() => setActiveTab("reports")}
+            className={`flex items-center gap-2 border-b-2 px-5 py-3 text-xs font-bold transition-all ${
+              activeTab === "reports"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <ClipboardList className="h-4 w-4" />
+            {t("risksMilestones.tab.reports")}
+          </button>
+        )}
       </div>
 
-      {activeTab === "milestones" ? (
+      {canViewReports && activeTab === "reports" ? (
+        <ReportsViewClient
+          workspaceId={workspaceId}
+          projectId={projectId}
+          workspaceSlug={workspaceSlug}
+          initialReports={initialReports}
+          members={members.map((m) => ({ id: m.id, fullName: m.fullName }))}
+          isManager={canViewReports}
+          currentDeviations={currentDeviations}
+        />
+      ) : activeTab === "milestones" ? (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
           {/* Milestones List */}
           <div className="space-y-4 xl:col-span-2">

@@ -1,18 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@vieroc/ui";
 import { useTranslations } from "next-intl";
-import { Bot, CheckCircle2, ChevronDown, ChevronUp, Loader2, XCircle } from "lucide-react";
+import { Bot, CheckCircle2, ChevronDown, ChevronUp, Loader2, X, XCircle } from "lucide-react";
 
 type StepStatus = "waiting" | "active" | "done" | "failed";
 
+/**
+ * One real `agent_jobs` row. `id` is the job UUID — the tray is a queue of
+ * whatever is actually running, not a fixed two-step Planner/Assigner strip.
+ */
 type ActivityStep = {
-  id: "planning" | "assignment";
-  label: string;
+  id: string;
+  jobType: string;
+  labelKey: string;
   status: StepStatus;
-  detail: string;
+  startedAt: string;
+  finishedAt: string | null;
+  error: string | null;
 };
 
 type ActivityState = {
@@ -20,14 +27,10 @@ type ActivityState = {
   completed: boolean;
   failed: boolean;
   visible: boolean;
-  summary: string;
-  counts: {
-    tasks: number;
-    assignedTasks: number;
-    wbs: number;
-    milestones: number;
-    risks: number;
-  };
+  runningCount: number;
+  queuedCount: number;
+  summaryKey: "running" | "done" | "attention" | "idle";
+  counts: { tasks: number; assignedTasks: number; wbs: number; milestones: number; risks: number };
   steps: ActivityStep[];
 };
 
@@ -36,10 +39,36 @@ const emptyActivity: ActivityState = {
   completed: false,
   failed: false,
   visible: false,
-  summary: "No active agent work",
+  runningCount: 0,
+  queuedCount: 0,
+  summaryKey: "idle",
   counts: { tasks: 0, assignedTasks: 0, wbs: 0, milestones: 0, risks: 0 },
   steps: [],
 };
+
+/** Tray view state (collapsed + per-job dismissals), shared across tabs. */
+type TrayPrefs = { collapsed: boolean; dismissedIds: string[] };
+
+const emptyPrefs: TrayPrefs = { collapsed: false, dismissedIds: [] };
+
+function storageKey(projectId: string) {
+  return `vc-agent-tray:${projectId}`;
+}
+
+function readPrefs(projectId: string): TrayPrefs {
+  if (typeof window === "undefined") return emptyPrefs;
+  try {
+    const raw = window.localStorage.getItem(storageKey(projectId));
+    if (!raw) return emptyPrefs;
+    const parsed = JSON.parse(raw) as Partial<TrayPrefs>;
+    return {
+      collapsed: Boolean(parsed.collapsed),
+      dismissedIds: Array.isArray(parsed.dismissedIds) ? parsed.dismissedIds.slice(-50) : [],
+    };
+  } catch {
+    return emptyPrefs;
+  }
+}
 
 function statusLabelKey(status: StepStatus) {
   if (status === "active") return "project.tray.running";
@@ -55,18 +84,51 @@ function StatusIcon({ status }: { status: StepStatus }) {
   return <span className="h-2 w-2 rounded-full bg-muted-foreground/35" />;
 }
 
+function formatElapsed(fromIso: string, toIso: string | null) {
+  const from = new Date(fromIso).getTime();
+  const to = toIso ? new Date(toIso).getTime() : Date.now();
+  const seconds = Math.max(0, Math.round((to - from) / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}m ${seconds % 60}s`;
+}
+
 export function AgentActivityTray({ projectId }: { projectId: string }) {
   const router = useRouter();
   const t = useTranslations();
   const [activity, setActivity] = useState<ActivityState>(emptyActivity);
-  const [collapsed, setCollapsed] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
-  const completedRef = useRef(false);
+  const [prefs, setPrefs] = useState<TrayPrefs>(emptyPrefs);
+  const [hydrated, setHydrated] = useState(false);
+  /** Ticks while work is in flight so the elapsed counter moves between polls. */
+  const [, setTick] = useState(0);
+  const seenCompletedRef = useRef<Set<string>>(new Set());
+
+  // Load view prefs, and keep them in sync when another tab changes them.
+  useEffect(() => {
+    setPrefs(readPrefs(projectId));
+    setHydrated(true);
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === storageKey(projectId)) setPrefs(readPrefs(projectId));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [projectId]);
+
+  const savePrefs = useCallback(
+    (next: TrayPrefs) => {
+      setPrefs(next);
+      try {
+        window.localStorage.setItem(storageKey(projectId), JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+    },
+    [projectId]
+  );
 
   useEffect(() => {
     setActivity(emptyActivity);
-    setDismissed(false);
-    completedRef.current = false;
+    seenCompletedRef.current = new Set();
   }, [projectId]);
 
   useEffect(() => {
@@ -84,8 +146,13 @@ export function AgentActivityTray({ projectId }: { projectId: string }) {
 
         setActivity(next);
 
-        if (next.completed && !completedRef.current) {
-          completedRef.current = true;
+        // Refresh server data once per job that just reached a terminal state,
+        // so applied plans/assignments show up without a manual reload.
+        const newlyDone = next.steps.filter(
+          (s) => s.status === "done" && !seenCompletedRef.current.has(s.id)
+        );
+        if (newlyDone.length > 0) {
+          newlyDone.forEach((s) => seenCompletedRef.current.add(s.id));
           router.refresh();
         }
 
@@ -97,29 +164,58 @@ export function AgentActivityTray({ projectId }: { projectId: string }) {
     }
 
     load();
-
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
   }, [projectId, router]);
 
-  const shouldShow = useMemo(
-    () => activity.visible && (!dismissed || activity.active),
-    [activity.active, activity.visible, dismissed]
+  // Smooth elapsed counter only while something is running.
+  useEffect(() => {
+    if (!activity.active) return;
+    const id = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [activity.active]);
+
+  const visibleSteps = useMemo(
+    () => activity.steps.filter((step) => !prefs.dismissedIds.includes(step.id)),
+    [activity.steps, prefs.dismissedIds]
   );
 
-  if (!shouldShow) return null;
+  const agentLabel = (step: ActivityStep) => {
+    const key = `project.tray.agent.${step.labelKey}`;
+    return t.has(key as Parameters<typeof t.has>[0])
+      ? t(key as Parameters<typeof t>[0])
+      : step.jobType;
+  };
+
+  if (!hydrated || !activity.visible || visibleSteps.length === 0) return null;
+
+  const runningCount = visibleSteps.filter((s) => s.status === "active").length;
+  const queuedCount = visibleSteps.filter((s) => s.status === "waiting").length;
+  const anyLive = runningCount + queuedCount > 0;
+  const summaryKey = anyLive
+    ? "running"
+    : visibleSteps.some((s) => s.status === "failed")
+      ? "attention"
+      : "done";
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 w-[min(calc(100vw-2rem),360px)] overflow-hidden rounded-lg border border-border bg-card shadow-elevated">
+    <div className="fixed bottom-4 right-4 z-40 w-[min(calc(100vw-2rem),380px)] overflow-hidden rounded-lg border border-border bg-card shadow-elevated">
       <div className="flex items-center justify-between gap-3 border-b bg-muted/35 px-3 py-2.5">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
             <Bot className="h-4 w-4" />
+            {anyLive && (
+              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-pulse rounded-full bg-primary" />
+            )}
           </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">{activity.summary}</p>
+            <p className="truncate text-sm font-semibold">
+              {t(`project.tray.summary.${summaryKey}` as Parameters<typeof t>[0], {
+                count: runningCount + queuedCount,
+              })}
+            </p>
             <p className="truncate text-xs text-muted-foreground">
               {t("project.tray.countsSummary", {
                 tasks: activity.counts.tasks,
@@ -133,34 +229,53 @@ export function AgentActivityTray({ projectId }: { projectId: string }) {
           <button
             type="button"
             className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            onClick={() => setCollapsed((value) => !value)}
-            aria-label={collapsed ? t("project.tray.expand") : t("project.tray.collapse")}
+            onClick={() => savePrefs({ ...prefs, collapsed: !prefs.collapsed })}
+            aria-label={prefs.collapsed ? t("project.tray.expand") : t("project.tray.collapse")}
           >
-            {collapsed ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {prefs.collapsed ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
           </button>
-          {!activity.active && (
+          {!anyLive && (
             <button
               type="button"
               className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              onClick={() => setDismissed(true)}
+              onClick={() =>
+                savePrefs({
+                  ...prefs,
+                  dismissedIds: [
+                    ...prefs.dismissedIds,
+                    ...visibleSteps.map((s) => s.id),
+                  ].slice(-50),
+                })
+              }
               aria-label={t("project.tray.dismiss")}
             >
-              <XCircle className="h-4 w-4" />
+              <X className="h-4 w-4" />
             </button>
           )}
         </div>
       </div>
 
-      {!collapsed && (
-        <div className="divide-y">
-          {activity.steps.map((step) => (
-            <div
+      {!prefs.collapsed && (
+        <ul className="max-h-64 divide-y overflow-y-auto">
+          {visibleSteps.map((step) => (
+            <li
               key={step.id}
-              className="grid grid-cols-[minmax(90px,0.8fr)_92px_minmax(0,1.2fr)] items-center gap-2 px-3 py-2.5 text-xs"
+              className="grid grid-cols-[minmax(0,1fr)_84px_58px] items-center gap-2 px-3 py-2.5 text-xs"
             >
               <div className="flex min-w-0 items-center gap-2">
                 <StatusIcon status={step.status} />
-                <span className="truncate font-medium">{step.label}</span>
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">{agentLabel(step)}</span>
+                  {step.error && (
+                    <span className="block truncate text-[11px] text-destructive">
+                      {step.error}
+                    </span>
+                  )}
+                </span>
               </div>
               <span
                 className={cn(
@@ -173,10 +288,12 @@ export function AgentActivityTray({ projectId }: { projectId: string }) {
               >
                 {t(statusLabelKey(step.status) as Parameters<typeof t>[0])}
               </span>
-              <span className="truncate text-muted-foreground">{step.detail}</span>
-            </div>
+              <span className="text-right tabular-nums text-muted-foreground">
+                {step.status === "waiting" ? "—" : formatElapsed(step.startedAt, step.finishedAt)}
+              </span>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

@@ -48,6 +48,7 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const threadRef = useRef<HTMLDivElement>(null);
 
   const memberById = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
   const memberByEmailLocal = useMemo(
@@ -69,6 +70,12 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
       cancelled = true;
     };
   }, [workspaceId, projectId, taskId]);
+
+  // Chat convention: newest message in view.
+  useEffect(() => {
+    const el = threadRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [comments]);
 
   async function refresh() {
     const res = await listCommentsAction({ workspaceId, projectId, taskId });
@@ -258,21 +265,27 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
     });
   }
 
+  const now = new Date();
+
   return (
-    <section className="grid gap-3 border-t pt-5">
-      <div className="flex items-center justify-between gap-3">
+    <section className="flex min-h-0 flex-1 flex-col">
+      {/* Panel header */}
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-3">
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <MessageSquare className="h-4 w-4" />
           {t("task.comments.title")}
         </h3>
-        <span className="text-xs text-muted-foreground">{comments.length}</span>
+        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+          {comments.length}
+        </span>
       </div>
 
-      <div className="space-y-2">
+      {/* Chat thread — the only part that scrolls */}
+      <div ref={threadRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {loading ? (
           <p className="text-xs text-muted-foreground">{t("task.comments.loading")}</p>
         ) : rows.length === 0 ? (
-          <div className="rounded-md border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
+          <div className="rounded-2xl border border-dashed border-border px-3 py-8 text-center text-sm text-muted-foreground">
             {t("task.comments.empty")}
           </div>
         ) : (
@@ -281,87 +294,96 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
             const assigned = comment.assignedMemberId
               ? memberById.get(comment.assignedMemberId)
               : null;
+            const createdAt = new Date(comment.createdAt);
             return (
               <article
                 key={comment.id}
                 id={`comment-${comment.id}`}
                 style={{ marginLeft: depth ? 24 : 0 }}
-                className={cn(
-                  "group rounded-md border bg-card p-3 transition-colors",
-                  comment.resolved && "border-green-500/30 bg-green-500/5"
-                )}
+                className="group flex gap-2"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-2">
+                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                  {memberInitials(author?.fullName ?? "?")}
+                </span>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
                     {depth > 0 && (
-                      <CornerDownRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <CornerDownRight className="h-3 w-3 shrink-0 text-muted-foreground" />
                     )}
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
-                      {memberInitials(author?.fullName ?? "?")}
+                    <span className="truncate text-xs font-semibold">
+                      {author?.fullName ?? t("task.comments.workspaceMember")}
                     </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium leading-4">
-                        {author?.fullName ?? t("task.comments.workspaceMember")}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {format.dateTime(new Date(comment.createdAt), "dayMonthTime")}
-                      </p>
-                    </div>
+                    <time
+                      dateTime={createdAt.toISOString()}
+                      title={format.dateTime(createdAt, "dayMonthTime")}
+                      className="shrink-0 text-[11px] text-muted-foreground"
+                    >
+                      {format.relativeTime(createdAt, now)}
+                    </time>
+                    <span className="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                      <button
+                        type="button"
+                        aria-label={
+                          comment.resolved ? t("task.comments.reopen") : t("task.comments.resolve")
+                        }
+                        onClick={() => toggleResolved(comment)}
+                        className={cn(
+                          "inline-flex h-6 w-6 items-center justify-center rounded hover:bg-accent",
+                          comment.resolved ? "text-green-600" : "text-muted-foreground"
+                        )}
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={t("task.comments.deleteComment")}
+                        onClick={() => remove(comment.id)}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-red-500"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
                   </div>
-                  <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                    <button
-                      type="button"
-                      aria-label={
-                        comment.resolved ? t("task.comments.reopen") : t("task.comments.resolve")
-                      }
-                      onClick={() => toggleResolved(comment)}
-                      className={cn(
-                        "inline-flex h-6 w-6 items-center justify-center rounded hover:bg-accent",
-                        comment.resolved ? "text-green-600" : "text-muted-foreground"
-                      )}
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={t("task.comments.deleteComment")}
-                      onClick={() => remove(comment.id)}
-                      className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-red-500"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+
+                  {/* Bubble */}
+                  <div
+                    className={cn(
+                      "mt-1 rounded-2xl rounded-tl-md border border-border bg-background px-3 py-2 transition-colors",
+                      comment.resolved && "border-green-500/30 bg-green-500/5"
+                    )}
+                  >
+                    <p className="whitespace-pre-wrap break-words text-sm leading-6">
+                      {renderBody(comment.body)}
+                    </p>
                   </div>
-                </div>
 
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-6">
-                  {renderBody(comment.body)}
-                </p>
-
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  {assigned && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
-                      <UserPlus className="h-3 w-3" />
-                      {assigned.fullName}
-                    </span>
-                  )}
-                  {comment.resolved && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:text-green-400">
-                      <Check className="h-3 w-3" />
-                      {t("task.comments.resolved")}
-                    </span>
-                  )}
-                  {depth === 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setReplyTo(comment);
-                        textareaRef.current?.focus();
-                      }}
-                      className="text-[11px] font-semibold text-primary hover:underline"
-                    >
-                      {t("task.comments.reply")}
-                    </button>
-                  )}
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    {assigned && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                        <UserPlus className="h-3 w-3" />
+                        {assigned.fullName}
+                      </span>
+                    )}
+                    {comment.resolved && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:text-green-400">
+                        <Check className="h-3 w-3" />
+                        {t("task.comments.resolved")}
+                      </span>
+                    )}
+                    {depth === 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReplyTo(comment);
+                          textareaRef.current?.focus();
+                        }}
+                        className="text-[11px] font-semibold text-primary hover:underline"
+                      >
+                        {t("task.comments.reply")}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </article>
             );
@@ -369,8 +391,8 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
         )}
       </div>
 
-      {/* Composer */}
-      <div className="relative grid gap-2 rounded-2xl border border-border bg-surface-subtle p-3">
+      {/* Composer — pinned to the bottom of the rail */}
+      <div className="relative grid shrink-0 gap-2 border-t border-border bg-background p-3">
         {replyTo && (
           <div className="flex items-center justify-between rounded bg-primary/5 px-2 py-1 text-[11px] text-primary">
             <span className="truncate">
@@ -400,7 +422,7 @@ export function TaskComments({ workspaceId, workspaceSlug, projectId, taskId, me
             placeholder={
               replyTo ? t("task.comments.replyPlaceholder") : t("task.comments.composerPlaceholder")
             }
-            className="min-h-20 bg-background"
+            className="min-h-[68px] resize-none bg-surface-subtle"
           />
           {mentionQuery !== null && mentionMatches.length > 0 && (
             <ul className="absolute bottom-full left-2 z-50 mb-1 w-64 overflow-hidden rounded-md border bg-popover p-1 shadow-md">

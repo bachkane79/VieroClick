@@ -24,7 +24,6 @@ import {
   BarChart3,
   BookText,
   CalendarCheck,
-  CalendarDays,
   CalendarRange,
   ChevronDown,
   ChevronRight,
@@ -82,7 +81,7 @@ type AutomationItem = {
 };
 
 /** Rail tab = the contextual panel currently shown (ClickUp model). */
-type RailTab = "home" | "planner" | "ai" | "teams" | "docs" | "automations";
+type RailTab = "home" | "ai" | "teams" | "docs" | "automations";
 
 const SIDEBAR_COLLAPSED_KEY = "vc-sidebar-collapsed";
 
@@ -98,12 +97,12 @@ const PROJECT_STATUS_DOT: Record<string, string> = {
 function deriveTab(pathname: string): RailTab | null {
   if (/\/docs(\/|$)/.test(pathname)) return "docs";
   if (/\/team(\/|$)/.test(pathname)) return "teams";
-  if (/\/my-tasks(\/|$)/.test(pathname)) return "planner";
   if (/\/projects\/[^/]+\/ai(\/|$)/.test(pathname)) return "ai";
   if (/\/automations(\/|$)/.test(pathname)) return "automations";
-  // Inbox and the all-projects page have no panel of their own — keep the Home
-  // navigator beside them (matches the rail link's onClick).
+  // Inbox, My Tasks and the all-projects page have no panel of their own — keep
+  // the Home navigator beside them (matches the rail link's onClick).
   if (/\/inbox(\/|$)/.test(pathname)) return "home";
+  if (/\/my-tasks(\/|$)/.test(pathname)) return "home";
   if (pathname.endsWith("/projects")) return "home";
   return null;
 }
@@ -119,7 +118,6 @@ export function AppSidebar({ workspaces }: Props) {
   const t = useTranslations();
   const panelTitles: Record<RailTab, string> = {
     home: t("sidebar.home"),
-    planner: t("sidebar.myTasks"),
     ai: t("sidebar.ai"),
     teams: t("sidebar.teams"),
     docs: t("sidebar.docs"),
@@ -326,14 +324,14 @@ export function AppSidebar({ workspaces }: Props) {
           t("sidebar.dashboards"),
           LayoutDashboard,
           "bg-primary/10 text-primary",
-          `${moreBase}/dashboard`,
+          `${moreBase}/overview`,
         ],
         ["Analytics", BarChart3, "bg-ai/10 text-ai", `${moreBase}/analytics`],
         [t("sidebar.timeline"), CalendarRange, "bg-sky/10 text-sky", `${moreBase}/timeline`],
         [t("sidebar.wbs"), Network, "bg-success/10 text-success", `${moreBase}/wbs`],
-        [t("sidebar.workload"), Gauge, "bg-warning/10 text-warning", `${moreBase}/workload`],
+        [t("sidebar.workload"), Gauge, "bg-warning/10 text-warning", `${moreBase}/analytics`],
         [t("sidebar.goals"), Target, "bg-primary/10 text-primary", `${moreBase}/risks-milestones`],
-        [t("sidebar.reports"), ClipboardList, "bg-ai/10 text-ai", `${moreBase}/reports`],
+        [t("sidebar.reports"), ClipboardList, "bg-ai/10 text-ai", `${moreBase}/risks-milestones`],
         [t("sidebar.table"), Table2, "bg-sky/10 text-sky", `${moreBase}/table`],
         [
           t("sidebar.blockers"),
@@ -347,10 +345,10 @@ export function AppSidebar({ workspaces }: Props) {
 
   // The rail is the single gateway: a personal cluster (Home · Inbox · My
   // Tasks) and a project cluster (Projects · Docs · AI · More), split by a
-  // divider. Inbox/Projects are plain nav links (the panel keeps the workspace
-  // navigator beside them); Home/My Tasks/Docs/AI own a contextual panel.
+  // divider. Inbox/My Tasks/Projects are plain nav links (the panel keeps the
+  // workspace navigator beside them); Home/Docs/AI own a contextual panel.
   const RAIL: Array<{
-    key: RailTab | "more" | "inbox" | "projects";
+    key: RailTab | "more" | "inbox" | "projects" | "myTasks";
     icon: LucideIcon;
     label: string;
     href?: string;
@@ -366,11 +364,11 @@ export function AppSidebar({ workspaces }: Props) {
     },
     { key: "inbox", icon: Inbox, label: t("sidebar.inbox"), href: `${wsBase}/inbox`, kind: "link" },
     {
-      key: "planner",
+      key: "myTasks",
       icon: ListTodo,
       label: t("sidebar.myTasks"),
       href: `${wsBase}/my-tasks`,
-      kind: "tab",
+      kind: "link",
     },
     {
       key: "projects",
@@ -396,8 +394,8 @@ export function AppSidebar({ workspaces }: Props) {
         return pathname.endsWith("/inbox");
       case "projects":
         return pathname.endsWith("/projects");
-      case "planner":
-        return pathname.endsWith("/my-tasks") || tab === "planner";
+      case "myTasks":
+        return pathname.endsWith("/my-tasks");
       case "docs":
         return tab === "docs";
       case "ai":
@@ -702,13 +700,6 @@ export function AppSidebar({ workspaces }: Props) {
                 currentProjectId={currentProjectId}
                 chatDir={chatDir}
               />
-            ) : tab === "planner" ? (
-              <PlannerPanel
-                projects={projects}
-                wsBase={wsBase}
-                pathname={pathname}
-                currentProjectId={currentProjectId}
-              />
             ) : tab === "ai" ? (
               <AiPanel
                 projects={projects}
@@ -815,7 +806,7 @@ function HomePanel({
                   )}
                 </button>
                 <Link
-                  href={`${base}/dashboard`}
+                  href={`${base}/overview`}
                   className={cn(
                     "flex min-w-0 flex-1 items-center gap-2.5 py-2 pr-1 text-sm",
                     isCurrent ? "font-semibold text-foreground" : "font-medium text-foreground/90"
@@ -930,55 +921,6 @@ function HomePanel({
             </div>
           )}
         </>
-      )}
-    </>
-  );
-}
-
-/* ── Planner panel ──────────────────────────────────────────────────────── */
-function PlannerPanel({
-  projects,
-  wsBase,
-  pathname,
-  currentProjectId,
-}: {
-  projects: SidebarProject[];
-  wsBase: string;
-  pathname: string;
-  currentProjectId?: string;
-}) {
-  const t = useTranslations();
-  return (
-    <>
-      {projects.length > 0 ? (
-        <>
-          <SectionTitle>{t("sidebar.plannerCalendars")}</SectionTitle>
-          <div className="space-y-px">
-            {projects.map((p) => (
-              <PanelLink
-                key={p.id}
-                href={`${wsBase}/projects/${p.id}/calendar`}
-                icon={CalendarDays}
-                label={p.name}
-                active={currentProjectId === p.id && pathname.endsWith("/calendar")}
-              />
-            ))}
-          </div>
-          <SectionTitle>{t("sidebar.plannerTimelines")}</SectionTitle>
-          <div className="space-y-px">
-            {projects.map((p) => (
-              <PanelLink
-                key={p.id}
-                href={`${wsBase}/projects/${p.id}/timeline`}
-                icon={CalendarRange}
-                label={p.name}
-                active={currentProjectId === p.id && pathname.endsWith("/timeline")}
-              />
-            ))}
-          </div>
-        </>
-      ) : (
-        <p className="px-2 py-2 text-xs text-muted-foreground">{t("sidebar.noProjects")}</p>
       )}
     </>
   );

@@ -10,6 +10,7 @@ import * as repo from "./report.repo";
 import * as events from "./report.events";
 
 import * as projectMemberRepo from "../project-member/project-member.repo";
+import * as dailyUpdateRepo from "../daily-update/daily-update.repo";
 import { enqueueNotifications } from "@/server/lib/notifications";
 
 /** Read: all leader reports for a project. Requires workspace membership. */
@@ -28,6 +29,13 @@ export async function createReport(p: {
   assertCanManageReports(ctx);
 
   return db.transaction(async (tx) => {
+    // Link the roll-up to the daily updates it summarizes (report ← updates).
+    const sourceUpdateIds = await dailyUpdateRepo.listUpdateIdsForDate(
+      p.projectId,
+      data.reportDate,
+      tx
+    );
+
     const report = await repo.create(
       {
         projectId: p.projectId,
@@ -38,6 +46,7 @@ export async function createReport(p: {
         recommendedActions: data.recommendedActions,
         memberDemands: data.memberDemands,
         planDeviations: data.planDeviations,
+        sourceUpdateIds,
         generatedByAgent: false,
       },
       tx

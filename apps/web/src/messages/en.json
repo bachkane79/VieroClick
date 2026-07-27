@@ -140,6 +140,8 @@
     },
     "reason": {
       "acceptanceCriteriaUnchecked": "Tick every required acceptance criterion before marking this done.",
+      "agentUnreachable": "Cannot reach the AI service (agent-api). Check that it is running and AGENT_API_URL is correct.",
+      "agentFailed": "The AI agent ran but returned an error. Technical detail below.",
       "blockerReasonRequired": "A blocker reason is required when a task is set to blocked.",
       "channelOwnerOnly": "Only the channel's creator or a workspace admin can delete this channel.",
       "contributorOnly": "You don't have permission to do that.",
@@ -298,12 +300,12 @@
     "unpin": "Unpin from bar",
     "assign": "AI Assign",
     "workload": "Workload",
-    "daily": "Daily Updates",
+    "daily": "Reports",
     "blockers": "Blockers",
     "risks": "Risks & Milestones",
     "docs": "Docs & Decisions",
     "reports": "Reports",
-    "analytics": "Analytics",
+    "analytics": "Advanced analytics",
     "team": "Team",
     "table": "Table",
     "dashboard": "Dashboard",
@@ -825,6 +827,41 @@
         "quality": "Quality",
         "communication": "Comms",
         "blockerHandling": "Blockers"
+      },
+      "manage": {
+        "add": "Add member",
+        "close": "Close",
+        "selectMember": "Select member",
+        "selectMemberPlaceholder": "— Select member —",
+        "role": "Role",
+        "allocation": "Allocation %",
+        "submit": "Add",
+        "submitting": "Adding…",
+        "allInProject": "All workspace members are already in this project.",
+        "selectMemberRequired": "Please select a member",
+        "added": "Member added to the project",
+        "addFailed": "Could not add member",
+        "remove": "Remove member",
+        "removed": "Member removed from the project",
+        "removeFailed": "Could not remove member",
+        "removeConfirm": "Remove {name} from this project?",
+        "removeConfirmLabel": "Remove"
+      },
+      "reassign": {
+        "button": "Reassign tasks",
+        "title": "Reassign tasks with AI",
+        "desc": "AI reads member profiles and the project plan and only reassigns not-started tasks — completed and in-progress work stays untouched.",
+        "keepExisting": "Keep existing members' tasks",
+        "keepExistingOn": "Only fill future tasks nobody owns yet; never take work away from anyone.",
+        "keepExistingOff": "Rebalance all future tasks across the team (owners may change).",
+        "instructions": "Extra instructions",
+        "instructionsPlaceholder": "e.g. prefer backend tasks to An; reduce Binh's load…",
+        "note": "Suggestions will appear in AI Manager › Assignment.",
+        "submit": "Reassign",
+        "submitting": "Working…",
+        "dispatched": "Reassigned {applied} task(s); {pending} suggestion(s) awaiting review in AI Manager › Assignment.",
+        "nothingToDo": "No future tasks needed reassigning (completed and in-progress work is left untouched).",
+        "failed": "Could not reassign tasks"
       }
     },
     "timeline": {
@@ -864,7 +901,24 @@
       "expand": "Expand agent activity",
       "collapse": "Collapse agent activity",
       "dismiss": "Dismiss agent activity",
-      "countsSummary": "{tasks} tasks · {wbs} WBS · {risks} risks"
+      "countsSummary": "{tasks} tasks · {wbs} WBS · {risks} risks",
+      "summary": {
+        "running": "{count} AI agent(s) running",
+        "done": "AI agents finished",
+        "attention": "An agent run needs attention",
+        "idle": "No active agent work"
+      },
+      "agent": {
+        "planning": "Planning",
+        "replan": "Replanning",
+        "assignment": "Assigning tasks",
+        "reassign": "Reassigning tasks",
+        "observer": "Observing project",
+        "healthCheck": "Health check",
+        "qa": "AI Q&A",
+        "dailyReport": "Daily report",
+        "generic": "AI job"
+      }
     },
     "deleted": "Project deleted",
     "restored": "Project restored",
@@ -1115,13 +1169,33 @@
     },
     "tabs": {
       "assistant": "AI Q&A Assistant",
-      "suggestions": "AI Suggestions ({count})"
+      "suggestions": "AI Suggestions ({count})",
+      "assign": "Assignment"
     },
     "chat": {
-      "greeting": "Hello! I am your AI Virtual Project Manager. Ask me anything about project tasks, active blockers, or risks.",
+      "greeting": "Hello! I am your AI Virtual Project Manager. Ask me anything about project tasks, active blockers, or risks. Type / for commands or @ to reference a document.",
       "error": "I encountered an error querying the project context. Please try again.",
       "scanning": "AI is scanning project database…",
-      "placeholder": "Ask a question about project blockers, overdue tasks…"
+      "placeholder": "Ask a question… type / for commands, @ for documents"
+    },
+    "composer": {
+      "slashButton": "Insert command",
+      "mentionButton": "Reference a document",
+      "mentionEmpty": "No documents in this project yet",
+      "slashHint": "Commands",
+      "mentionHint": "Documents",
+      "cmd": {
+        "overview": "Project overview",
+        "status": "Current status",
+        "health": "Health & issues",
+        "tasks": "Open tasks",
+        "blockers": "Active blockers",
+        "risks": "Key risks",
+        "milestones": "Upcoming milestones",
+        "updates": "Recent daily updates",
+        "report": "Latest report",
+        "team": "Team workload"
+      }
     },
     "agents": {
       "title": "Trigger AI Agents",
@@ -1371,7 +1445,8 @@
   "risksMilestones": {
     "tab": {
       "milestones": "Project Milestones",
-      "risks": "Project Risks Register"
+      "risks": "Project Risks Register",
+      "reports": "Report summary"
     },
     "milestonesTracker": "Milestones Tracker",
     "addMilestone": "Add Milestone",
@@ -1604,6 +1679,20 @@
   },
   "myTasksPage": {
     "title": "My tasks",
+    "filter": {
+      "all": "All",
+      "open": "Open",
+      "overdue": "Overdue",
+      "inReview": "In review",
+      "done": "Done"
+    },
+    "searchPlaceholder": "Search task or project…",
+    "allProjects": "All projects",
+    "count": "{count} tasks",
+    "empty": {
+      "filteredTitle": "No matching tasks",
+      "filteredHint": "Try another filter or clear your search."
+    },
     "stat": {
       "open": "Open tasks",
       "review": "In review",

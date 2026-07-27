@@ -140,6 +140,8 @@
     },
     "reason": {
       "acceptanceCriteriaUnchecked": "Bạn cần tích đủ các tiêu chí nghiệm thu bắt buộc trước khi đánh dấu hoàn thành.",
+      "agentUnreachable": "Không kết nối được dịch vụ AI (agent-api). Kiểm tra dịch vụ đã chạy và AGENT_API_URL đúng chưa.",
+      "agentFailed": "Trợ lý AI chạy nhưng gặp lỗi. Xem chi tiết kỹ thuật bên dưới.",
       "blockerReasonRequired": "Bạn cần nêu lý do vướng mắc khi chuyển công việc sang trạng thái bị chặn.",
       "channelOwnerOnly": "Chỉ người tạo kênh hoặc quản trị viên không gian làm việc mới xóa được kênh này.",
       "contributorOnly": "Bạn không có quyền thực hiện việc này.",
@@ -298,12 +300,12 @@
     "unpin": "Bỏ ghim khỏi thanh",
     "assign": "Giao việc AI",
     "workload": "Khối lượng công việc",
-    "daily": "Cập nhật hằng ngày",
+    "daily": "Báo cáo",
     "blockers": "Vướng mắc",
     "risks": "Rủi ro & Cột mốc",
     "docs": "Tài liệu & Quyết định",
     "reports": "Báo cáo",
-    "analytics": "Phân tích",
+    "analytics": "Phân tích nâng cao",
     "team": "Nhóm dự án",
     "table": "Dạng bảng",
     "dashboard": "Trang tổng quan",
@@ -825,6 +827,41 @@
         "quality": "Chất lượng",
         "communication": "Giao tiếp",
         "blockerHandling": "Vướng mắc"
+      },
+      "manage": {
+        "add": "Thêm thành viên",
+        "close": "Đóng",
+        "selectMember": "Chọn thành viên",
+        "selectMemberPlaceholder": "— Chọn thành viên —",
+        "role": "Vai trò",
+        "allocation": "Phân bổ %",
+        "submit": "Thêm",
+        "submitting": "Đang thêm…",
+        "allInProject": "Tất cả thành viên workspace đã ở trong dự án.",
+        "selectMemberRequired": "Vui lòng chọn thành viên",
+        "added": "Đã thêm thành viên vào dự án",
+        "addFailed": "Không thể thêm thành viên",
+        "remove": "Xóa thành viên",
+        "removed": "Đã xóa thành viên khỏi dự án",
+        "removeFailed": "Không thể xóa thành viên",
+        "removeConfirm": "Xóa {name} khỏi dự án này?",
+        "removeConfirmLabel": "Xóa"
+      },
+      "reassign": {
+        "button": "Giao việc lại",
+        "title": "Giao việc lại bằng AI",
+        "desc": "AI đọc hồ sơ thành viên và kế hoạch dự án, chỉ phân công lại các công việc chưa bắt đầu — giữ nguyên phần đã xong và việc đang làm.",
+        "keepExisting": "Giữ nguyên công việc thành viên cũ",
+        "keepExistingOn": "Chỉ lấp các việc tương lai chưa có người phụ trách; không lấy việc khỏi ai.",
+        "keepExistingOff": "Cân bằng lại toàn bộ việc tương lai trong nhóm (có thể đổi người phụ trách).",
+        "instructions": "Chỉ dẫn thêm",
+        "instructionsPlaceholder": "VD: ưu tiên giao việc backend cho An; giảm tải cho Bình…",
+        "note": "Đề xuất sẽ xuất hiện ở AI Manager › Phân công.",
+        "submit": "Giao việc lại",
+        "submitting": "Đang xử lý…",
+        "dispatched": "Đã giao lại {applied} việc, {pending} đề xuất chờ duyệt ở AI Manager › Phân công.",
+        "nothingToDo": "Không có việc tương lai nào cần giao lại (việc đã xong và đang làm được giữ nguyên).",
+        "failed": "Không thể giao việc lại"
       }
     },
     "timeline": {
@@ -864,7 +901,24 @@
       "expand": "Mở rộng hoạt động của trợ lý AI",
       "collapse": "Thu gọn hoạt động của trợ lý AI",
       "dismiss": "Ẩn hoạt động của trợ lý AI",
-      "countsSummary": "{tasks} công việc · {wbs} WBS · {risks} rủi ro"
+      "countsSummary": "{tasks} công việc · {wbs} WBS · {risks} rủi ro",
+      "summary": {
+        "running": "{count} trợ lý AI đang chạy",
+        "done": "Trợ lý AI đã chạy xong",
+        "attention": "Có trợ lý AI chạy lỗi",
+        "idle": "Không có trợ lý AI nào chạy"
+      },
+      "agent": {
+        "planning": "Lập kế hoạch",
+        "replan": "Lập lại kế hoạch",
+        "assignment": "Phân công việc",
+        "reassign": "Giao việc lại",
+        "observer": "Quan sát dự án",
+        "healthCheck": "Kiểm tra sức khỏe",
+        "qa": "Hỏi đáp AI",
+        "dailyReport": "Báo cáo hằng ngày",
+        "generic": "Tác vụ AI"
+      }
     },
     "deleted": "Đã xóa dự án",
     "restored": "Đã khôi phục dự án",
@@ -1115,13 +1169,33 @@
     },
     "tabs": {
       "assistant": "Trợ lý hỏi đáp AI",
-      "suggestions": "Gợi ý AI ({count})"
+      "suggestions": "Gợi ý AI ({count})",
+      "assign": "Phân công"
     },
     "chat": {
-      "greeting": "Xin chào! Tôi là trợ lý quản lý dự án AI của bạn. Hãy hỏi tôi bất cứ điều gì về công việc, vướng mắc đang mở hay rủi ro của dự án.",
+      "greeting": "Xin chào! Tôi là trợ lý quản lý dự án AI của bạn. Hãy hỏi tôi bất cứ điều gì về công việc, vướng mắc đang mở hay rủi ro của dự án. Gõ / để dùng lệnh, hoặc @ để tham chiếu tài liệu.",
       "error": "Tôi gặp lỗi khi truy vấn thông tin dự án. Vui lòng thử lại.",
       "scanning": "AI đang quét cơ sở dữ liệu dự án…",
-      "placeholder": "Đặt câu hỏi về vướng mắc, công việc quá hạn…"
+      "placeholder": "Đặt câu hỏi… gõ / để dùng lệnh, @ để chọn tài liệu"
+    },
+    "composer": {
+      "slashButton": "Chèn lệnh",
+      "mentionButton": "Tham chiếu tài liệu",
+      "mentionEmpty": "Dự án chưa có tài liệu nào",
+      "slashHint": "Lệnh",
+      "mentionHint": "Tài liệu",
+      "cmd": {
+        "overview": "Tổng quan dự án",
+        "status": "Tình trạng hiện tại",
+        "health": "Sức khỏe & vấn đề",
+        "tasks": "Công việc đang mở",
+        "blockers": "Vướng mắc đang mở",
+        "risks": "Rủi ro chính",
+        "milestones": "Cột mốc sắp tới",
+        "updates": "Cập nhật gần đây",
+        "report": "Báo cáo mới nhất",
+        "team": "Tải công việc nhóm"
+      }
     },
     "agents": {
       "title": "Kích hoạt trợ lý AI",
@@ -1371,7 +1445,8 @@
   "risksMilestones": {
     "tab": {
       "milestones": "Cột mốc dự án",
-      "risks": "Sổ rủi ro dự án"
+      "risks": "Sổ rủi ro dự án",
+      "reports": "Tổng hợp báo cáo"
     },
     "milestonesTracker": "Theo dõi cột mốc",
     "addMilestone": "Thêm cột mốc",
@@ -1604,6 +1679,20 @@
   },
   "myTasksPage": {
     "title": "Công việc của tôi",
+    "filter": {
+      "all": "Tất cả",
+      "open": "Đang mở",
+      "overdue": "Quá hạn",
+      "inReview": "Chờ duyệt",
+      "done": "Hoàn thành"
+    },
+    "searchPlaceholder": "Tìm theo tên việc hoặc dự án…",
+    "allProjects": "Tất cả dự án",
+    "count": "{count} việc",
+    "empty": {
+      "filteredTitle": "Không có việc nào khớp",
+      "filteredHint": "Thử đổi bộ lọc hoặc xóa từ khóa tìm kiếm."
+    },
     "stat": {
       "open": "Việc đang mở",
       "review": "Đang chờ duyệt",
