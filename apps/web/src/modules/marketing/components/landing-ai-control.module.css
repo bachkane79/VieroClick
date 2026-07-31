@@ -1,0 +1,91 @@
+@keyframes surface-enter {
+  from {
+    opacity: 0.55;
+    transform: translateY(18px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes proposal-enter {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes confidence-fill {
+  0%,
+  12% {
+    opacity: 0.45;
+    transform: scaleX(0.08);
+  }
+  42%,
+  82% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+  100% {
+    opacity: 0.45;
+    transform: scaleX(0.08);
+  }
+}
+
+@keyframes activity-signal {
+  0%,
+  10%,
+  100% {
+    opacity: 0;
+  }
+  3%,
+  7% {
+    opacity: 1;
+  }
+}
+
+.surfaceEnter {
+  animation: surface-enter 420ms cubic-bezier(0.165, 0.84, 0.44, 1) both;
+  will-change: transform, opacity;
+}
+
+.surfaceEnterLate {
+  animation-delay: 180ms;
+}
+
+.proposalEnter {
+  animation: proposal-enter 480ms 90ms cubic-bezier(0.165, 0.84, 0.44, 1) both;
+  will-change: transform, opacity;
+}
+
+.confidenceFill {
+  animation: confidence-fill 4.8s cubic-bezier(0.645, 0.045, 0.355, 1) infinite;
+  will-change: transform, opacity;
+}
+
+.activityRow::after {
+  position: absolute;
+  inset: -1px;
+  border: 1px solid hsl(var(--ai) / 0.45);
+  border-radius: inherit;
+  background: hsl(var(--ai) / 0.04);
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  animation: activity-signal 7.2s ease-in-out infinite;
+  animation-delay: calc(var(--activity-index) * 1.15s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .surfaceEnter,
+  .proposalEnter,
+  .confidenceFill,
+  .activityRow::after {
+    animation: none;
+  }
+}

@@ -32,6 +32,14 @@ export default auth((req) => {
     return withRequestId(NextResponse.next({ request: { headers: requestHeaders } }));
   }
 
+  // The marketing root is the product's only public page. Matched exactly —
+  // a `startsWith` here would expose every route under it. `app/page.tsx`
+  // sends signed-in visitors on to /dashboard itself, so this gate stays a
+  // pure "anonymous traffic may render `/`" exception and nothing more.
+  if (pathname === "/") {
+    return withRequestId(NextResponse.next({ request: { headers: requestHeaders } }));
+  }
+
   if (!isLoggedIn) {
     return withRequestId(NextResponse.redirect(new URL("/login", req.url)));
   }
