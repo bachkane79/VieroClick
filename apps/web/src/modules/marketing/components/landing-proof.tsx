@@ -33,7 +33,7 @@ export function LandingStats() {
             <SectionLead className="mt-5 max-w-[62ch] text-base">{t("lead")}</SectionLead>
           </Reveal>
           <Reveal delay={100} className="shrink-0">
-            <CtaDark href="/login">{t("cta")}</CtaDark>
+            <CtaDark href="/register">{t("cta")}</CtaDark>
           </Reveal>
         </div>
 
@@ -239,7 +239,7 @@ export function LandingCta() {
           </p>
 
           <div className="mt-8 flex flex-col items-center gap-3.5">
-            <CtaPrimary href="/login">{t("primary")}</CtaPrimary>
+            <CtaPrimary href="/register">{t("primary")}</CtaPrimary>
             <p className="text-xs text-muted-foreground">{t("note")}</p>
           </div>
         </div>

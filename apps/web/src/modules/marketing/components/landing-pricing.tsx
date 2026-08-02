@@ -157,11 +157,11 @@ export function LandingPricing() {
 
                 <div className="mt-auto pt-8">
                   {p.featured ? (
-                    <CtaPrimary href="/login" className="w-full">
+                    <CtaPrimary href="/register" className="w-full">
                       {p.cta}
                     </CtaPrimary>
                   ) : (
-                    <CtaGhost href="/login" className="w-full">
+                    <CtaGhost href="/register" className="w-full">
                       {p.cta}
                     </CtaGhost>
                   )}

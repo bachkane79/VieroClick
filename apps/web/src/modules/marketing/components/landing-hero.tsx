@@ -89,7 +89,7 @@ export function LandingHero() {
             </p>
 
             <div className="mt-9 flex flex-wrap items-center gap-3">
-              <CtaDark href="/login">{t("ctaPrimary")}</CtaDark>
+              <CtaDark href="/register">{t("ctaPrimary")}</CtaDark>
               <CtaGhost href="#views">{t("ctaSecondary")}</CtaGhost>
             </div>
 

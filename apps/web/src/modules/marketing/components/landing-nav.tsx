@@ -90,7 +90,7 @@ export function LandingNav() {
             >
               {t("login")}
             </Link>
-            <CtaPrimary href="/login" className="min-h-0 px-5 py-2.5 text-sm">
+            <CtaPrimary href="/register" className="min-h-0 px-5 py-2.5 text-sm">
               {t("cta")}
             </CtaPrimary>
           </div>
@@ -152,7 +152,7 @@ export function LandingNav() {
             >
               {t("login")}
             </Link>
-            <CtaPrimary href="/login" className="w-full">
+            <CtaPrimary href="/register" className="w-full">
               {t("cta")}
             </CtaPrimary>
           </div>

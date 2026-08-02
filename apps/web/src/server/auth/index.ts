@@ -1,7 +1,7 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { authConfig } from "./config";
-import { verifyCredentials } from "@/modules/auth/auth.service";
+import { verifyCredentials, userExists } from "@/modules/auth/auth.service";
 
 /**
  * Full (Node-runtime) auth instance. The only provider is email + password.
@@ -39,7 +39,13 @@ const authResult = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      if (token.userId) session.user.id = token.userId as string;
+      // Only surface an id for a user that actually still exists. A JWT can
+      // outlive its user (account deleted, DB wiped); without this check the
+      // stale token would read as signed-in and redirect the landing page into
+      // /dashboard → /onboarding. A missing id makes the session anonymous.
+      if (token.userId && (await userExists(token.userId as string))) {
+        session.user.id = token.userId as string;
+      }
       return session;
     },
   },

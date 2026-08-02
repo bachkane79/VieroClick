@@ -37,6 +37,19 @@ export async function registerUser(input: RegisterInput): Promise<{ id: string }
 }
 
 /**
+ * Does a user row still exist? The session is a stateless JWT with no DB
+ * adapter, so a token can outlive its user (e.g. after the account is deleted
+ * or the DB is wiped). The `session` callback calls this so a phantom session
+ * degrades to anonymous — otherwise the stale token reads as "logged in" and
+ * hijacks the public landing page into the app.
+ */
+export async function userExists(id: string): Promise<boolean> {
+  if (!id) return false;
+  const [row] = await db.select({ id: users.id }).from(users).where(eq(users.id, id)).limit(1);
+  return !!row;
+}
+
+/**
  * Verify email + password for the NextAuth Credentials `authorize` callback.
  * Returns the identity NextAuth stamps onto the JWT, or `null` on any failure
  * (unknown email, no password set, wrong password) — NextAuth renders a generic

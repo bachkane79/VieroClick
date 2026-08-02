@@ -25,12 +25,15 @@ export default auth((req) => {
   }
 
   const isLoggedIn = !!req.auth?.user?.id;
-  // /login and /register are the anonymous auth surfaces; a signed-in visitor
-  // on either is sent to /dashboard, an anonymous one may render them.
+  // /login and /register render for everyone. We do NOT bounce a "logged-in"
+  // visitor to /dashboard here: middleware runs at the edge and can only see
+  // the raw JWT, not whether its user still exists (a token can outlive its
+  // user after account deletion / a DB wipe). The pages themselves redirect a
+  // genuinely signed-in user using a DB-verified session, so a stale token can
+  // still reach the sign-in form instead of looping.
   const isAuthPage = pathname.startsWith("/login") || pathname.startsWith("/register");
 
   if (isAuthPage) {
-    if (isLoggedIn) return withRequestId(NextResponse.redirect(new URL("/dashboard", req.url)));
     return withRequestId(NextResponse.next({ request: { headers: requestHeaders } }));
   }
 
