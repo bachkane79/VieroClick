@@ -17,7 +17,7 @@ export async function reportBlockerAction(args: BaseArgs & { data: unknown }) {
       projectId: args.projectId,
       input: args.data,
     });
-    revalidatePath(`/workspace/${args.slug}/project/${args.projectId}`);
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}`, "layout");
     return blocker;
   });
 }
@@ -30,7 +30,7 @@ export async function updateBlockerAction(args: BaseArgs & { blockerId: string; 
       blockerId: args.blockerId,
       input: args.data,
     });
-    revalidatePath(`/workspace/${args.slug}/project/${args.projectId}`);
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}`, "layout");
     return blocker;
   });
 }

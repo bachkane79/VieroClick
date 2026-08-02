@@ -29,7 +29,7 @@ export async function updateProjectAction(args: {
 }) {
   return runAction(async () => {
     const project = await service.updateProject(args.workspaceId, args.projectId, args.data);
-    revalidatePath(`/workspace/${args.slug}/project/${args.projectId}`);
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}`, "layout");
     revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}/overview`);
     return project;
   });

@@ -6,6 +6,10 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   fullName: text("full_name").notNull(),
   avatarUrl: text("avatar_url"),
+  // bcrypt hash for email+password auth. Nullable so agent/system-created
+  // user rows (which never log in) and any legacy OAuth accounts remain valid;
+  // a null hash simply means the account cannot authenticate with a password.
+  passwordHash: text("password_hash"),
   // UI language preference (B2C spec: vi default, en optional). Cookie is the
   // pre-auth fallback; this column wins once the user record is loaded.
   locale: text("locale", { enum: ["vi", "en"] }).notNull().default("vi"),

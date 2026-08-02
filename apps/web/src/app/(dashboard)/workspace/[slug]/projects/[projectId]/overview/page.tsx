@@ -7,6 +7,7 @@ import { CheckCircle2, Kanban, ListChecks, Sparkles } from "lucide-react";
 import { getWorkspace, listWorkspaceMembers } from "@/modules/workspace/workspace.service";
 import { getProject } from "@/modules/project/project.service";
 import { computeProjectDashboard } from "@/modules/project/project.dashboard";
+import { computeBurndown } from "@/modules/project/project.analytics";
 import { requireActor } from "@/server/lib/context";
 import {
   AiLeaderBanner,
@@ -47,13 +48,25 @@ export default async function ProjectOverviewPage({ params }: Props) {
   }
   await requireActor(workspace.id, projectId);
 
-  const [workspaceMembers, data] = await Promise.all([
+  const [workspaceMembers, data, burndown] = await Promise.all([
     listWorkspaceMembers(workspace.id),
     computeProjectDashboard(projectId),
+    computeBurndown(projectId),
   ]);
 
   const base = `/workspace/${slug}/projects/${projectId}`;
   const completionPct = Math.round((data.health.completionPct || 0) * 100);
+
+  // Radial lobes + tiles — every value below comes from the dashboard/burndown
+  // aggregates; none of them are placeholders.
+  const totalTasks = data.health.totalTasks;
+  const share = (part: number, whole: number) =>
+    whole > 0 ? Math.round((part / whole) * 100) : 100;
+  const onTimePct = share(totalTasks - data.kpis.overdue, totalTasks);
+  const assignedPct = share(totalTasks - data.kpis.unassigned, totalTasks);
+  const healthScore = data.health.score;
+  const velocityHours = burndown.velocityHoursPerWeek;
+  const focusPct = share(data.kpis.inProgress + data.kpis.completed, totalTasks);
 
   return (
     <div className="mx-auto max-w-[1240px] px-4 py-5 lg:px-6">
@@ -175,18 +188,30 @@ export default async function ProjectOverviewPage({ params }: Props) {
                 <div className="relative flex h-36 w-36 items-center justify-center">
                   <div className="absolute inset-0 animate-pulse rounded-full bg-gradient-to-tr from-orange-400/20 via-amber-300/30 to-emerald-400/20 opacity-70 blur-xl" />
 
-                  <div className="absolute top-1 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-400/30 text-[10px] font-bold text-emerald-800 blur-md dark:text-emerald-200">
-                    <span className="translate-y-1">{completionPct}%</span>
-                  </div>
-                  <div className="absolute right-1 flex h-14 w-14 items-center justify-center rounded-full bg-amber-400/30 text-[10px] font-bold text-amber-800 blur-md dark:text-amber-200">
-                    <span className="-translate-x-1">94%</span>
-                  </div>
-                  <div className="absolute bottom-1 flex h-14 w-14 items-center justify-center rounded-full bg-orange-400/30 text-[10px] font-bold text-orange-800 blur-md dark:text-orange-200">
-                    <span className="-translate-y-1">88%</span>
-                  </div>
-                  <div className="absolute left-1 flex h-14 w-14 items-center justify-center rounded-full bg-purple-400/30 text-[10px] font-bold text-purple-800 blur-md dark:text-purple-200">
-                    <span className="translate-x-1">91%</span>
-                  </div>
+                  <Petal
+                    className="top-1 bg-emerald-400/30 text-emerald-900 dark:text-emerald-100"
+                    inner="translate-y-1"
+                    label={t("project.overview.petal.completion")}
+                    pct={completionPct}
+                  />
+                  <Petal
+                    className="right-1 bg-amber-400/30 text-amber-900 dark:text-amber-100"
+                    inner="-translate-x-1"
+                    label={t("project.overview.petal.health")}
+                    pct={healthScore}
+                  />
+                  <Petal
+                    className="bottom-1 bg-orange-400/30 text-orange-900 dark:text-orange-100"
+                    inner="-translate-y-1"
+                    label={t("project.overview.petal.onTime")}
+                    pct={onTimePct}
+                  />
+                  <Petal
+                    className="left-1 bg-purple-400/30 text-purple-900 dark:text-purple-100"
+                    inner="translate-x-1"
+                    label={t("project.overview.petal.assigned")}
+                    pct={assignedPct}
+                  />
 
                   <div className="relative z-10 grid h-10 w-10 place-items-center rounded-full border border-border/80 bg-card shadow-md">
                     <CheckCircle2 className="h-5 w-5 text-primary" />
@@ -200,14 +225,16 @@ export default async function ProjectOverviewPage({ params }: Props) {
                     {t("project.overview.velocityLabel")}
                   </p>
                   <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                    {t("project.overview.velocityStable")}
+                    {t("project.overview.velocityPerWeek", { hours: velocityHours })}
                   </p>
                 </div>
                 <div className="rounded-xl bg-surface-subtle p-2">
                   <p className="text-[10px] font-medium text-muted-foreground">
                     {t("project.overview.focusLabel")}
                   </p>
-                  <p className="text-xs font-bold text-primary">{t("project.overview.focusValue")}</p>
+                  <p className="text-xs font-bold text-primary">
+                    {t("project.overview.focusPct", { pct: focusPct })}
+                  </p>
                 </div>
               </div>
             </div>
@@ -232,6 +259,35 @@ export default async function ProjectOverviewPage({ params }: Props) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * One lobe of the Health & Velocity radial. Every lobe is a computed metric, so
+ * the numbers are legible rather than `blur-md`, and the hover title names the
+ * metric the percentage belongs to.
+ */
+function Petal({
+  className,
+  inner,
+  label,
+  pct,
+}: {
+  className: string;
+  inner: string;
+  label: string;
+  pct: number;
+}) {
+  return (
+    <div
+      title={`${label}: ${pct}%`}
+      className={cn(
+        "absolute flex h-14 w-14 items-center justify-center rounded-full text-[11px] font-bold tabular-nums backdrop-blur-[2px]",
+        className
+      )}
+    >
+      <span className={inner}>{pct}%</span>
     </div>
   );
 }

@@ -11,7 +11,7 @@ interface BaseArgs {
 }
 
 function revalidateBoard(slug: string, projectId: string) {
-  revalidatePath(`/workspace/${slug}/project/${projectId}`);
+  revalidatePath(`/workspace/${slug}/projects/${projectId}`, "layout");
 }
 
 export async function createTaskStatusAction(args: BaseArgs & { data: unknown }) {

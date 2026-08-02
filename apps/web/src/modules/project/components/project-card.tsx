@@ -6,6 +6,9 @@ import { ArrowUpRight, CalendarClock } from "lucide-react";
 interface Props {
   project: Project;
   workspaceSlug: string;
+  /** Real task counts for this project (from `getWorkspaceProjectStats`). The
+   *  bar used to be a hardcoded 65%, which read as progress but was decoration. */
+  stats?: { total: number; done: number };
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -19,8 +22,11 @@ const STATUS_COLORS: Record<string, string> = {
 /** Server Component: its only consumer (`workspace/[slug]/projects/page.tsx`)
  *  is one too, so the status label resolves from the catalog here rather than
  *  rendering the raw DB enum. */
-export async function ProjectCard({ project, workspaceSlug }: Props) {
+export async function ProjectCard({ project, workspaceSlug, stats }: Props) {
   const t = await getTranslations();
+  const total = stats?.total ?? 0;
+  const done = stats?.done ?? 0;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
     <Link
       href={`/workspace/${workspaceSlug}/projects/${project.id}/overview`}
@@ -39,12 +45,14 @@ export async function ProjectCard({ project, workspaceSlug }: Props) {
         </p>
       )}
 
-      {/* Progress bar accent */}
-      <div className="mt-3.5 h-1.5 w-full overflow-hidden rounded-full bg-secondary/80">
-        <div
-          className="h-full rounded-full bg-tone-progress"
-          style={{ width: project.status === "completed" ? "100%" : "65%" }}
-        />
+      {/* Task completion */}
+      <div className="mt-3.5 flex items-center gap-2">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-secondary/80">
+          <div className="h-full rounded-full bg-tone-progress" style={{ width: `${pct}%` }} />
+        </div>
+        <span className="shrink-0 text-[11px] font-semibold tabular-nums text-muted-foreground">
+          {total > 0 ? `${done}/${total}` : t("projectsPage.noTasks")}
+        </span>
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/60 pt-2.5">

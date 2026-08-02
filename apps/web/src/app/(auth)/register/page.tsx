@@ -1,16 +1,15 @@
 import { redirect } from "next/navigation";
-import { Suspense } from "react";
 import Image from "next/image";
 import { getTranslations } from "next-intl/server";
 import { Check, Globe, Sparkles } from "lucide-react";
 import { auth } from "@/server/auth";
-import { LoginForm } from "@/modules/auth/components/login-form";
+import { RegisterForm } from "@/modules/auth/components/register-form";
 
 /**
- * Sign-in (B2C spec §5.1): brand-gradient panel on the left (desktop only),
- * form on the right. First screen of the 5-minute journey.
+ * Sign-up (B2C spec §5.1): same split layout as /login. Creating an account
+ * returns to /login for an explicit sign-in; onboarding then runs on first login.
  */
-export default async function LoginPage() {
+export default async function RegisterPage() {
   const session = await auth();
   if (session?.user?.id) redirect("/dashboard");
 
@@ -18,8 +17,7 @@ export default async function LoginPage() {
 
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
-      {/* Brand panel — solid primary (login is a marketing surface, not the
-          application shell; a single flat brand fill keeps white text legible). */}
+      {/* Brand panel */}
       <div className="relative hidden overflow-hidden bg-primary p-12 text-white lg:flex lg:flex-col lg:justify-between">
         <div className="pointer-events-none absolute -right-16 -top-16 h-72 w-72 rounded-full bg-white/10 blur-2xl" />
         <div className="pointer-events-none absolute -left-12 bottom-16 h-52 w-52 rounded-full bg-white/5 blur-2xl" />
@@ -72,19 +70,13 @@ export default async function LoginPage() {
               </span>
             </div>
             <h1 className="text-[26px] font-bold leading-tight tracking-tight">
-              {t("auth.getStartedTitle")}
+              {t("auth.createAccountTitle")}
             </h1>
             <p className="mt-1.5 text-[15px] text-muted-foreground">
-              {t("auth.getStartedSubtitle")}
+              {t("auth.createAccountSubtitle")}
             </p>
           </div>
-          <Suspense fallback={null}>
-            <LoginForm />
-          </Suspense>
-          <p className="mt-8 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
-            <Check className="h-3.5 w-3.5 text-mint" />
-            {t("auth.securityNote")}
-          </p>
+          <RegisterForm />
         </div>
       </div>
     </div>

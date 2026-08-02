@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { buttonVariants, cn } from "@vieroc/ui";
 import { Activity, CheckCircle2, FolderKanban, Layers, Plus } from "lucide-react";
 import { getWorkspace } from "@/modules/workspace/workspace.service";
-import { listProjects } from "@/modules/project/project.service";
+import { getWorkspaceProjectStats, listProjects } from "@/modules/project/project.service";
 import { ProjectCard } from "@/modules/project/components/project-card";
 import { getTranslations } from "next-intl/server";
 import { NotFoundError } from "@/server/lib/errors";
@@ -24,7 +24,10 @@ export default async function ProjectsPage({ params }: Props) {
     throw err;
   }
 
-  const projects = await listProjects(workspace.id);
+  const [projects, stats] = await Promise.all([
+    listProjects(workspace.id),
+    getWorkspaceProjectStats(workspace.id),
+  ]);
   const t = await getTranslations();
 
   const activeCount = projects.filter((p) => p.status === "active").length;
@@ -103,6 +106,7 @@ export default async function ProjectsPage({ params }: Props) {
                 key={project.id}
                 project={project as unknown as Project}
                 workspaceSlug={slug}
+                stats={stats.get(project.id)}
               />
             ))}
           </div>

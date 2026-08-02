@@ -17,7 +17,7 @@ export async function createRiskAction(args: BaseArgs & { data: unknown }) {
       projectId: args.projectId,
       input: args.data,
     });
-    revalidatePath(`/workspace/${args.slug}/project/${args.projectId}`);
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}`, "layout");
     return risk;
   });
 }
@@ -30,7 +30,7 @@ export async function updateRiskAction(args: BaseArgs & { riskId: string; data: 
       riskId: args.riskId,
       input: args.data,
     });
-    revalidatePath(`/workspace/${args.slug}/project/${args.projectId}`);
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}`, "layout");
     return risk;
   });
 }
@@ -42,7 +42,7 @@ export async function deleteRiskAction(args: BaseArgs & { riskId: string }) {
       projectId: args.projectId,
       riskId: args.riskId,
     });
-    revalidatePath(`/workspace/${args.slug}/project/${args.projectId}`);
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}`, "layout");
     return result;
   });
 }

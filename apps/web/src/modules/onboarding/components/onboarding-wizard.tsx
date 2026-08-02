@@ -12,35 +12,12 @@ import {
   ArrowRight,
   ArrowLeft,
   Check,
-  House,
-  GraduationCap,
-  Zap,
-  Plus,
   Loader2,
   type LucideIcon,
 } from "lucide-react";
-import type { OnboardingTemplate } from "@vieroc/validators";
 import { completeOnboardingAction } from "../onboarding.actions";
-import { TEMPLATES, AI_TEMPLATE, TEMPLATE_ORDER, type TemplateDef } from "../templates";
 
-const ICONS: Record<string, LucideIcon> = {
-  House,
-  GraduationCap,
-  Zap,
-  Plus,
-  Users,
-  Sparkles,
-};
-
-const TONE: Record<string, string> = {
-  emerald: "bg-mint",
-  sky: "bg-sky",
-  amber: "bg-peach",
-  rose: "bg-coral",
-  violet: "bg-lavender",
-};
-
-type Step = "mode" | "template" | "ai" | "name";
+type Step = "mode" | "name";
 type Mode = "personal" | "team";
 
 const RESUME_KEY = "vc-onboarding-state";
@@ -51,8 +28,6 @@ export function OnboardingWizard() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("mode");
   const [mode, setMode] = useState<Mode>("personal");
-  const [template, setTemplate] = useState<OnboardingTemplate>("blank");
-  const [aiPrompt, setAiPrompt] = useState("");
   const [wsName, setWsName] = useState("");
   const [projName, setProjName] = useState("");
   const [invites, setInvites] = useState("");
@@ -66,10 +41,8 @@ export function OnboardingWizard() {
       const raw = localStorage.getItem(RESUME_KEY);
       if (raw) {
         const s = JSON.parse(raw);
-        if (s.step) setStep(s.step);
+        if (s.step === "mode" || s.step === "name") setStep(s.step);
         if (s.mode) setMode(s.mode);
-        if (s.template) setTemplate(s.template);
-        if (typeof s.aiPrompt === "string") setAiPrompt(s.aiPrompt);
         if (typeof s.wsName === "string") setWsName(s.wsName);
         if (typeof s.projName === "string") setProjName(s.projName);
         if (typeof s.invites === "string") setInvites(s.invites);
@@ -83,16 +56,13 @@ export function OnboardingWizard() {
   useEffect(() => {
     if (!hydrated) return;
     try {
-      localStorage.setItem(
-        RESUME_KEY,
-        JSON.stringify({ step, mode, template, aiPrompt, wsName, projName, invites })
-      );
+      localStorage.setItem(RESUME_KEY, JSON.stringify({ step, mode, wsName, projName, invites }));
     } catch {
       /* ignore */
     }
-  }, [hydrated, step, mode, template, aiPrompt, wsName, projName, invites]);
+  }, [hydrated, step, mode, wsName, projName, invites]);
 
-  const stepIndex = step === "mode" ? 0 : step === "name" ? 2 : 1;
+  const stepIndex = step === "mode" ? 0 : 1;
 
   function pickMode(m: Mode) {
     setMode(m);
@@ -101,19 +71,8 @@ export function OnboardingWizard() {
         ? t("onboarding.defaults.personalWorkspace")
         : t("onboarding.defaults.teamWorkspace")
     );
-    setStep("template");
-  }
-
-  function pickTemplate(id: keyof typeof TEMPLATES) {
-    setTemplate(id);
-    setProjName(TEMPLATES[id].projectName);
+    if (!projName.trim()) setProjName(t("onboarding.defaults.firstProject"));
     setStep("name");
-  }
-
-  function pickAi() {
-    setTemplate("ai-generated");
-    setProjName(AI_TEMPLATE.projectName);
-    setStep("ai");
   }
 
   async function create() {
@@ -125,10 +84,8 @@ export function OnboardingWizard() {
       .filter((e) => e.includes("@"));
     const res = await completeOnboardingAction({
       mode,
-      template,
       workspaceName: wsName.trim(),
       projectName: projName.trim(),
-      aiPrompt: aiPrompt.trim() || undefined,
       invites: emails,
     });
     if (res.ok) {
@@ -177,7 +134,7 @@ export function OnboardingWizard() {
         <div className="w-full max-w-[520px]">
           {/* progress dots */}
           <div className="mb-7 flex gap-1.5">
-            {[0, 1, 2].map((i) => (
+            {[0, 1].map((i) => (
               <span
                 key={i}
                 className={`h-1.5 flex-1 rounded-full transition-colors ${
@@ -188,22 +145,6 @@ export function OnboardingWizard() {
           </div>
 
           {step === "mode" && <StepMode onPick={pickMode} />}
-          {step === "template" && (
-            <StepTemplate
-              mode={mode}
-              onPick={pickTemplate}
-              onAi={pickAi}
-              onBack={() => setStep("mode")}
-            />
-          )}
-          {step === "ai" && (
-            <StepAi
-              value={aiPrompt}
-              onChange={setAiPrompt}
-              onNext={() => setStep("name")}
-              onBack={() => setStep("template")}
-            />
-          )}
           {step === "name" && (
             <StepName
               mode={mode}
@@ -215,7 +156,7 @@ export function OnboardingWizard() {
               onProj={setProjName}
               onInvites={setInvites}
               onCreate={create}
-              onBack={() => setStep(template === "ai-generated" ? "ai" : "template")}
+              onBack={() => setStep("mode")}
             />
           )}
         </div>
@@ -279,134 +220,6 @@ function ChoiceCard({
       </span>
       <ArrowRight className="h-4 w-4 flex-none text-muted-foreground opacity-50 transition group-hover:translate-x-0.5" />
     </button>
-  );
-}
-
-function StepTemplate({
-  mode,
-  onPick,
-  onAi,
-  onBack,
-}: {
-  mode: Mode;
-  onPick: (id: keyof typeof TEMPLATES) => void;
-  onAi: () => void;
-  onBack: () => void;
-}) {
-  const t = useTranslations();
-  const order = TEMPLATE_ORDER[mode];
-  return (
-    <div>
-      <h2 className="text-2xl font-bold tracking-tight">{t("onboarding.template.title")}</h2>
-      <p className="mt-2 text-[15px] text-muted-foreground">{t("onboarding.template.subtitle")}</p>
-      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {order.map((id) => (
-          <TemplateCard key={id} def={TEMPLATES[id]} onClick={() => onPick(id)} />
-        ))}
-        <button
-          onClick={onAi}
-          className="relative col-span-full overflow-hidden rounded-lg border border-transparent bg-gradient-to-br from-lavender-soft to-peach-soft p-4 text-left shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-elevated"
-        >
-          <span className="absolute right-3 top-3 text-[11px] font-bold text-lavender">
-            {t("onboarding.template.newBadge")}
-          </span>
-          <span className="mb-2.5 grid h-8 w-8 place-items-center rounded-lg bg-lavender text-white">
-            <Sparkles className="h-4 w-4" />
-          </span>
-          <span className="block text-[15px] font-semibold">
-            ✨ {t(AI_TEMPLATE.nameKey as Parameters<typeof t>[0])}
-          </span>
-          <span className="mt-0.5 block text-[12.5px] text-muted-foreground">
-            {t(AI_TEMPLATE.descKey as Parameters<typeof t>[0])}
-          </span>
-        </button>
-      </div>
-      <button
-        onClick={onBack}
-        className="mt-4 flex items-center gap-1 text-[13px] font-medium text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" /> {t("onboarding.actions.back")}
-      </button>
-    </div>
-  );
-}
-
-function TemplateCard({ def, onClick }: { def: TemplateDef; onClick: () => void }) {
-  const t = useTranslations();
-  const Icon = ICONS[def.icon] ?? Plus;
-  const first = def.seed[0];
-  return (
-    <button
-      onClick={onClick}
-      className="overflow-hidden rounded-lg border border-border bg-card p-3.5 text-left shadow-soft transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-elevated"
-    >
-      <span
-        className={`mb-2.5 grid h-8 w-8 place-items-center rounded-lg text-white ${TONE[def.tone] ?? "bg-primary"}`}
-      >
-        <Icon className="h-4 w-4" />
-      </span>
-      <span className="block text-[15px] font-semibold">
-        {t(def.nameKey as Parameters<typeof t>[0])}
-      </span>
-      <span className="mt-0.5 block text-[12.5px] leading-snug text-muted-foreground">
-        {t(def.descKey as Parameters<typeof t>[0])}
-      </span>
-      {first && (
-        <span className="mt-2.5 block">
-          <span className="block text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
-            {first.phase}
-          </span>
-          {first.tasks.slice(0, 2).map((tk, i) => (
-            <span key={i} className="mt-1 flex items-center gap-1.5 text-[12px] text-foreground/80">
-              <span className="h-2.5 w-2.5 flex-none rounded-[3px] border border-muted-foreground/60" />
-              {tk.title}
-            </span>
-          ))}
-        </span>
-      )}
-    </button>
-  );
-}
-
-function StepAi({
-  value,
-  onChange,
-  onNext,
-  onBack,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  onNext: () => void;
-  onBack: () => void;
-}) {
-  const t = useTranslations();
-  return (
-    <div>
-      <h2 className="text-2xl font-bold tracking-tight">{t("onboarding.ai.title")}</h2>
-      <p className="mt-2 text-[15px] text-muted-foreground">{t("onboarding.ai.subtitle")}</p>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        rows={3}
-        placeholder={t("onboarding.ai.placeholder")}
-        className="mt-4 w-full rounded-lg border border-input bg-background/50 px-3.5 py-3 text-[15px] leading-relaxed focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-      />
-      <div className="mt-4 flex items-center gap-3">
-        <button
-          onClick={onNext}
-          disabled={!value.trim()}
-          className="inline-flex h-11 items-center gap-2 rounded-lg bg-primary px-5 text-[15px] font-semibold text-primary-foreground shadow-soft transition hover:bg-primary/90 disabled:opacity-50"
-        >
-          <Sparkles className="h-4 w-4" /> {t("onboarding.actions.continue")}
-        </button>
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1 text-[13px] font-medium text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" /> {t("onboarding.actions.back")}
-        </button>
-      </div>
-    </div>
   );
 }
 

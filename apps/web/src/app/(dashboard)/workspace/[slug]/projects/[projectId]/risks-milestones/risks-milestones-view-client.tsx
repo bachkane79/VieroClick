@@ -9,8 +9,9 @@ import { Calendar, AlertTriangle, Plus, Trash2, ShieldAlert, Flag, ClipboardList
 import {
   createMilestoneAction,
   deleteMilestoneAction,
+  updateMilestoneAction,
 } from "@/modules/milestone/milestone.actions";
-import { createRiskAction, deleteRiskAction } from "@/modules/risk/risk.actions";
+import { createRiskAction, deleteRiskAction, updateRiskAction } from "@/modules/risk/risk.actions";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useActionError } from "@/i18n/use-action-error";
 import { ReportsViewClient } from "../reports/reports-view-client";
@@ -47,6 +48,28 @@ interface MemberRow {
   fullName: string;
   email: string;
 }
+
+/**
+ * Lifecycle vocabularies. Both columns are free text in the DB (the planner
+ * agent seeds "planned"/"open"), so the picker — not the schema — is what keeps
+ * hand-edited values inside a known set.
+ */
+const MILESTONE_STATUSES = ["planned", "in_progress", "achieved", "missed"] as const;
+const RISK_STATUSES = ["open", "mitigated", "accepted", "closed"] as const;
+
+const MILESTONE_STATUS_STYLE: Record<string, string> = {
+  planned: "border-border bg-muted/40 text-muted-foreground",
+  in_progress: "border-sky-500/30 bg-sky-500/10 text-sky-600",
+  achieved: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600",
+  missed: "border-red-500/30 bg-red-500/10 text-red-500",
+};
+
+const RISK_STATUS_STYLE: Record<string, string> = {
+  open: "border-amber-500/30 bg-amber-500/10 text-amber-600",
+  mitigated: "border-sky-500/30 bg-sky-500/10 text-sky-600",
+  accepted: "border-border bg-muted/40 text-muted-foreground",
+  closed: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600",
+};
 
 interface Props {
   workspaceId: string;
@@ -132,7 +155,7 @@ export function RisksMilestonesViewClient({
       title: titleVal,
       description: descVal,
       targetDate: targetVal,
-      status: "pending",
+      status: "planned",
       createdAt: new Date(),
     };
     setMilestones((current) => [...current, newMilestone]);
@@ -162,6 +185,31 @@ export function RisksMilestonesViewClient({
 
   function handleDeleteMilestone(milestoneId: string) {
     setDeleteMilestoneCandidateId(milestoneId);
+  }
+
+  async function handleMilestoneStatus(milestoneId: string, status: string) {
+    const previous = milestones;
+    setMilestones((current) =>
+      current.map((m) => (m.id === milestoneId ? { ...m, status } : m))
+    );
+
+    setSubmitting(true);
+    const res = await updateMilestoneAction({
+      workspaceId,
+      projectId,
+      slug: workspaceSlug,
+      milestoneId,
+      data: { status },
+    });
+    setSubmitting(false);
+
+    if (!res.ok) {
+      toast.error(actionError(res));
+      setMilestones(previous);
+      return;
+    }
+    toast.success(t("risksMilestones.toast.milestoneUpdated"));
+    router.refresh();
   }
 
   async function executeDeleteMilestone(milestoneId: string) {
@@ -202,6 +250,8 @@ export function RisksMilestonesViewClient({
     setShowAddRisk(false);
     setRTitle("");
     setRDescription("");
+    setRProbability(3);
+    setRImpact(3);
     setROwnerMemberId("");
     setRMitigation("");
     setREscalation("");
@@ -252,6 +302,29 @@ export function RisksMilestonesViewClient({
 
   function handleDeleteRisk(riskId: string) {
     setDeleteRiskCandidateId(riskId);
+  }
+
+  async function handleRiskStatus(riskId: string, status: string) {
+    const previous = risks;
+    setRisks((current) => current.map((r) => (r.id === riskId ? { ...r, status } : r)));
+
+    setSubmitting(true);
+    const res = await updateRiskAction({
+      workspaceId,
+      projectId,
+      slug: workspaceSlug,
+      riskId,
+      data: { status },
+    });
+    setSubmitting(false);
+
+    if (!res.ok) {
+      toast.error(actionError(res));
+      setRisks(previous);
+      return;
+    }
+    toast.success(t("risksMilestones.toast.riskUpdated"));
+    router.refresh();
   }
 
   async function executeDeleteRisk(riskId: string) {
@@ -384,9 +457,14 @@ export function RisksMilestonesViewClient({
                       </div>
 
                       <div className="flex shrink-0 items-center gap-2">
-                        <span className="rounded border bg-muted/40 px-2 py-0.5 text-[9px] font-bold capitalize text-muted-foreground">
-                          {m.status}
-                        </span>
+                        <StatusSelect
+                          value={m.status}
+                          options={MILESTONE_STATUSES}
+                          styles={MILESTONE_STATUS_STYLE}
+                          labelPrefix="risksMilestones.milestoneStatus"
+                          disabled={submitting || m.id.startsWith("temp-")}
+                          onChange={(next) => handleMilestoneStatus(m.id, next)}
+                        />
 
                         <Button
                           type="button"
@@ -525,6 +603,14 @@ export function RisksMilestonesViewClient({
                                 impact: r.impact ?? 0,
                               })}
                             </span>
+                            <StatusSelect
+                              value={r.status}
+                              options={RISK_STATUSES}
+                              styles={RISK_STATUS_STYLE}
+                              labelPrefix="risksMilestones.riskStatus"
+                              disabled={submitting || r.id.startsWith("temp-")}
+                              onChange={(next) => handleRiskStatus(r.id, next)}
+                            />
                             <Button
                               type="button"
                               variant="ghost"
@@ -743,5 +829,53 @@ export function RisksMilestonesViewClient({
         }}
       />
     </div>
+  );
+}
+
+/**
+ * Colored status pill that is also the picker — the badge used to be read-only
+ * even though `updateMilestone`/`updateRisk` existed, so a milestone could never
+ * be closed from the UI. An unknown value (agent-written) is kept as an extra
+ * option so selecting away from it is possible without losing what it was.
+ */
+function StatusSelect({
+  value,
+  options,
+  styles,
+  labelPrefix,
+  disabled,
+  onChange,
+}: {
+  value: string;
+  options: readonly string[];
+  styles: Record<string, string>;
+  labelPrefix: string;
+  disabled: boolean;
+  onChange: (next: string) => void;
+}) {
+  const t = useTranslations();
+  const known = options.includes(value);
+  const label = (status: string) =>
+    options.includes(status)
+      ? t(`${labelPrefix}.${status}` as Parameters<typeof t>[0])
+      : status;
+
+  return (
+    <select
+      value={value}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value)}
+      aria-label={t("risksMilestones.statusAria")}
+      className={`cursor-pointer rounded border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-default disabled:opacity-60 ${
+        styles[value] ?? "border-border bg-muted/40 text-muted-foreground"
+      }`}
+    >
+      {!known && <option value={value}>{value}</option>}
+      {options.map((status) => (
+        <option key={status} value={status}>
+          {label(status)}
+        </option>
+      ))}
+    </select>
   );
 }

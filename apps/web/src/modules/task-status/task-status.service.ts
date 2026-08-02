@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@vieroc/db";
 import { requireActor } from "@/server/lib/context";
-import { NotFoundError } from "@/server/lib/errors";
+import { NotFoundError, ValidationError } from "@/server/lib/errors";
 import { createTaskStatusSchema, updateTaskStatusSchema } from "./task-status.schema";
 import { assertCanManageStatuses } from "./task-status.policy";
 import { getOrSetCache, invalidateCache } from "@/server/lib/cache";
@@ -35,6 +35,8 @@ export async function createStatus(p: {
       tx
     );
 
+    if (data.isDefault) await repo.clearDefaults(p.projectId, status.id, tx);
+
     await events.statusCreated(tx, ctx, status);
     await invalidateCache(`statuses:${p.projectId}`);
     await invalidateCache(`board:${p.projectId}`);
@@ -67,6 +69,11 @@ export async function updateStatus(p: {
     const updated = await repo.update(p.statusId, values, tx);
     if (!updated) throw new NotFoundError("Task status");
 
+    // Exactly one default per project.
+    if (values.isDefault === true) {
+      await repo.clearDefaults(p.projectId, p.statusId, tx);
+    }
+
     await events.statusUpdated(tx, ctx, existing, updated);
     await invalidateCache(`statuses:${p.projectId}`);
     await invalidateCache(`board:${p.projectId}`);
@@ -86,6 +93,20 @@ export async function deleteStatus(p: {
   const existing = await repo.findById(p.statusId);
   // Scope check (WP-C2): entity must belong to the actor's authorized project.
   if (!existing || existing.projectId !== p.projectId) throw new NotFoundError("Task status");
+
+  const [taskCount, all] = await Promise.all([
+    repo.countTasks(p.statusId),
+    repo.listByProject(p.projectId),
+  ]);
+  if (taskCount > 0) {
+    throw new ValidationError(
+      "Move the tasks out of this status before deleting it",
+      "statusHasTasks"
+    );
+  }
+  if (all.length <= 1) {
+    throw new ValidationError("A project needs at least one status", "lastStatus");
+  }
 
   return db.transaction(async (tx) => {
     await events.statusDeleted(tx, ctx, existing);

@@ -11,7 +11,7 @@ interface BaseArgs {
 }
 
 function revalidateBoard(slug: string, projectId: string) {
-  revalidatePath(`/workspace/${slug}/project/${projectId}`);
+  revalidatePath(`/workspace/${slug}/projects/${projectId}`, "layout");
   revalidatePath(`/workspace/${slug}/projects/${projectId}/tasks`);
   revalidatePath(`/workspace/${slug}/projects/${projectId}/board`);
   revalidatePath(`/workspace/${slug}/my-tasks`);

@@ -9,6 +9,7 @@ import { Button, cn, Input, Textarea } from "@vieroc/ui";
 import { Check, ChevronDown, Download, FileUp, Paperclip, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { ShareDialog } from "@/modules/permission/components/share-dialog";
 import { useActionError } from "@/i18n/use-action-error";
 import { uploadTaskAttachmentAction } from "@/modules/file/file.actions";
 import type { TaskAttachmentView } from "@/modules/file/file.view";
@@ -48,6 +49,9 @@ interface Props {
   members: MemberOptionView[];
   dependencies: TaskDependencyView[];
   attachments: TaskAttachmentView[];
+  /** Project manager. The blocked-override escape hatch is manager-only on the
+   *  server (`updateTask` → §4.3 blocker guard), so non-managers never see it. */
+  canManage: boolean;
   onSelectTask: (task: TaskView) => void;
 }
 
@@ -87,6 +91,7 @@ export function TaskDetailDrawer({
   members,
   dependencies,
   attachments,
+  canManage,
 }: Props) {
   const t = useTranslations();
   const format = useFormatter();
@@ -233,9 +238,19 @@ export function TaskDetailDrawer({
     }
 
     // Sync the full multi-assignee set (the base payload only carried the
-    // primary). Only when 2+ assignees, since a single primary is already set.
+    // primary). Needed whenever the set changed and either side is multi — a
+    // reduction from 2+ down to 1/0 has to clear the join rows too, otherwise
+    // the removed assignees come straight back on refresh.
     const savedId = task ? task.id : result.data.id;
-    if (savedId && assigneeMemberIds.length > 1) {
+    const previousAssignees = task?.assigneeMemberIds ?? [];
+    const assigneesChanged =
+      assigneeMemberIds.length !== previousAssignees.length ||
+      assigneeMemberIds.some((id, i) => id !== previousAssignees[i]);
+    if (
+      savedId &&
+      assigneesChanged &&
+      (assigneeMemberIds.length > 1 || previousAssignees.length > 1)
+    ) {
       await setTaskAssigneesAction({
         workspaceId,
         projectId,
@@ -348,11 +363,25 @@ export function TaskDetailDrawer({
                 {task ? task.title : t("task.detail.newTask")}
               </Dialog.Description>
             </div>
-            <Dialog.Close asChild>
-              <Button type="button" variant="ghost" size="icon" aria-label={t("common.close")}>
-                <X className="h-4 w-4" />
-              </Button>
-            </Dialog.Close>
+            <div className="flex items-center gap-2">
+              {/* Per-item sharing (§4.2 layer 2). Task grants are resolved by
+                  `updateTask` via resolveGrantLevel, so this is enforced. */}
+              {task && (
+                <ShareDialog
+                  workspaceId={workspaceId}
+                  resourceType="task"
+                  resourceId={task.id}
+                  resourceName={task.title}
+                  members={members}
+                  triggerClassName="h-8 px-2.5 text-xs"
+                />
+              )}
+              <Dialog.Close asChild>
+                <Button type="button" variant="ghost" size="icon" aria-label={t("common.close")}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </Dialog.Close>
+            </div>
           </div>
 
           {/* Two columns on lg+ (form | chat), stacked and page-scrolled below that. */}
@@ -758,15 +787,17 @@ export function TaskDetailDrawer({
                   </section>
                 )}
 
-                <label className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={allowBlockedOverride}
-                    onChange={(e) => setAllowBlockedOverride(e.target.checked)}
-                    className="h-4 w-4 rounded border-input"
-                  />
-                  {t("task.detail.overrideBlocker")}
-                </label>
+                {canManage && (
+                  <label className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={allowBlockedOverride}
+                      onChange={(e) => setAllowBlockedOverride(e.target.checked)}
+                      className="h-4 w-4 rounded border-input"
+                    />
+                    {t("task.detail.overrideBlocker")}
+                  </label>
+                )}
               </div>
             </form>
 

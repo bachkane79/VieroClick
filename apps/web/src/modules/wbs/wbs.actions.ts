@@ -28,7 +28,7 @@ export async function createWbsNodeAction(args: BaseArgs & { data: unknown }) {
       projectId: args.projectId,
       input: args.data,
     });
-    revalidatePath(`/workspace/${args.slug}/project/${args.projectId}`);
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}`, "layout");
     return node;
   });
 }
@@ -41,7 +41,7 @@ export async function updateWbsNodeAction(args: BaseArgs & { nodeId: string; dat
       nodeId: args.nodeId,
       input: args.data,
     });
-    revalidatePath(`/workspace/${args.slug}/project/${args.projectId}`);
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}`, "layout");
     return node;
   });
 }
@@ -53,7 +53,7 @@ export async function deleteWbsNodeAction(args: BaseArgs & { nodeId: string }) {
       projectId: args.projectId,
       nodeId: args.nodeId,
     });
-    revalidatePath(`/workspace/${args.slug}/project/${args.projectId}`);
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}`, "layout");
     return result;
   });
 }

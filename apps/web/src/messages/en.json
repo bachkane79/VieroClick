@@ -83,9 +83,19 @@
     "thisWeek": "This week",
     "focus": "Focus",
     "onTime": "On time",
-    "focusValue": "92% High",
-    "onTimeValue": "89% Good",
-    "greetingFallbackName": "there"
+    "greetingFallbackName": "there",
+    "pctQuality": "{pct}% {quality}",
+    "quality": {
+      "good": "Good",
+      "ok": "Fair",
+      "low": "Needs work"
+    },
+    "petal": {
+      "myDone": "My tasks completed",
+      "onTime": "On time",
+      "wsProgress": "Workspace progress",
+      "unblocked": "Unblocked"
+    }
   },
   "permissions": {
     "denied": {
@@ -140,6 +150,7 @@
     },
     "reason": {
       "acceptanceCriteriaUnchecked": "Tick every required acceptance criterion before marking this done.",
+      "emailTaken": "This email is already registered. Please sign in.",
       "agentUnreachable": "Cannot reach the AI service (agent-api). Check that it is running and AGENT_API_URL is correct.",
       "agentFailed": "The AI agent ran but returned an error. Technical detail below.",
       "blockerReasonRequired": "A blocker reason is required when a task is set to blocked.",
@@ -187,7 +198,9 @@
       "telegramNoChatLinked": "No chat is linked yet. Send /start to your bot first.",
       "telegramTokenRejected": "Telegram rejected that token. Double-check it with @BotFather.",
       "workspaceAdminOnly": "Only a workspace owner or admin can do that.",
-      "workspaceOwnerOnly": "Only the workspace owner can do that."
+      "workspaceOwnerOnly": "Only the workspace owner can do that.",
+      "statusHasTasks": "Move the tasks out of this column before deleting it.",
+      "lastStatus": "A project needs at least one status column."
     },
     "zod": {
       "required": "{field} is required.",
@@ -662,7 +675,28 @@
     "disconnect": "Disconnect",
     "disconnectConfirm": "Disconnect this Telegram bot? Notifications will stop being forwarded.",
     "disconnected": "Bot disconnected",
-    "disconnectFailed": "Failed to disconnect"
+    "disconnectFailed": "Failed to disconnect",
+    "channels": {
+      "title": "Per-project channels",
+      "subtitle": "Route one project's notifications to its own Telegram group instead of the default chat.",
+      "empty": "No channels yet. Every notification goes to the bot's default chat.",
+      "wholeWorkspace": "Whole workspace",
+      "chatIdLabel": "Chat ID",
+      "projectLabel": "Project",
+      "nameLabel": "Label",
+      "namePlaceholder": "e.g. Project A group",
+      "link": "Link",
+      "unlink": "Unlink",
+      "pause": "Pause",
+      "resume": "Resume",
+      "hint": "Add the bot to the group and send a message, then use “Auto-detect” above to read the chat ID.",
+      "linked": "Channel linked",
+      "linkFailed": "Couldn't link the channel",
+      "updated": "Channel updated",
+      "updateFailed": "Couldn't update the channel",
+      "unlinked": "Channel unlinked",
+      "unlinkFailed": "Couldn't unlink the channel"
+    }
   },
   "project": {
     "createdWithAi": "Project created — AI Leader is planning it",
@@ -774,12 +808,18 @@
       "healthVelocityTitle": "Health & Velocity",
       "liveSync": "Live Sync",
       "velocityLabel": "Velocity",
-      "velocityStable": "Stable",
       "focusLabel": "Focus",
-      "focusValue": "94% Good",
       "projectMembers": "Project members",
       "workspaceMemberFallback": "Workspace member",
-      "notSet": "Not set"
+      "notSet": "Not set",
+      "velocityPerWeek": "{hours}h/week",
+      "focusPct": "{pct}% started",
+      "petal": {
+        "completion": "Completion",
+        "health": "Health score",
+        "onTime": "On time",
+        "assigned": "Assigned"
+      }
     },
     "daily": {
       "submitTitle": "Submit Daily Standup Update",
@@ -845,7 +885,9 @@
         "removed": "Member removed from the project",
         "removeFailed": "Could not remove member",
         "removeConfirm": "Remove {name} from this project?",
-        "removeConfirmLabel": "Remove"
+        "removeConfirmLabel": "Remove",
+        "updated": "Member updated",
+        "updateFailed": "Couldn't update the member"
       },
       "reassign": {
         "button": "Reassign tasks",
@@ -1501,7 +1543,22 @@
       "milestoneCreated": "Milestone created",
       "milestoneDeleted": "Milestone deleted",
       "riskReported": "Risk reported",
-      "riskDeleted": "Risk deleted"
+      "riskDeleted": "Risk deleted",
+      "milestoneUpdated": "Milestone updated",
+      "riskUpdated": "Risk updated"
+    },
+    "statusAria": "Status",
+    "milestoneStatus": {
+      "planned": "Planned",
+      "in_progress": "In progress",
+      "achieved": "Achieved",
+      "missed": "Missed"
+    },
+    "riskStatus": {
+      "open": "Open",
+      "mitigated": "Mitigated",
+      "accepted": "Accepted",
+      "closed": "Closed"
     }
   },
   "onboarding": {
@@ -1513,7 +1570,8 @@
     },
     "defaults": {
       "personalWorkspace": "Your workspace",
-      "teamWorkspace": "Your team"
+      "teamWorkspace": "Your team",
+      "firstProject": "First project"
     },
     "toast": {
       "createFailed": "Couldn't create the workspace, please try again"
@@ -1530,16 +1588,6 @@
         "desc": "Work with others, assign tasks, and track progress."
       }
     },
-    "template": {
-      "title": "Choose a starting point",
-      "subtitle": "Each template comes with ready-made phases and sample tasks so you don't start from a blank page.",
-      "newBadge": "NEW"
-    },
-    "ai": {
-      "title": "Describe your project",
-      "subtitle": "A sentence or two is enough. AI will draft a plan (phases + tasks) right after you create it — you review before applying.",
-      "placeholder": "e.g. I need to launch an online store in 6 weeks"
-    },
     "name": {
       "title": "Name it and get started",
       "subtitle": "Almost there. You can change everything later.",
@@ -1551,7 +1599,6 @@
     },
     "actions": {
       "back": "Back",
-      "continue": "Continue",
       "createAndStart": "Create and get started"
     }
   },
@@ -1570,7 +1617,21 @@
     "featurePlanning": "AI planning",
     "getStartedTitle": "Let's get started",
     "getStartedSubtitle": "Sign in to create your workspace. No card, no setup required.",
-    "noPasswordNote": "We don't store passwords — sign in securely via a provider."
+    "noPasswordNote": "We don't store passwords — sign in securely via a provider.",
+    "securityNote": "Your password is securely encrypted.",
+    "passwordLabel": "Password",
+    "fullNameLabel": "Full name",
+    "passwordHint": "At least 8 characters.",
+    "signIn": "Sign in",
+    "createAccount": "Create account",
+    "createAccountTitle": "Create your account",
+    "createAccountSubtitle": "Sign up to start your workspace. No card, no setup required.",
+    "creatingAccount": "Creating account…",
+    "noAccount": "Don't have an account?",
+    "haveAccount": "Already have an account?",
+    "invalidCredentials": "Incorrect email or password.",
+    "registerFailed": "Couldn't create your account. Please try again.",
+    "registeredNotice": "Account created. Please sign in."
   },
   "profile": {
     "title": "My Profile & Workspace Telemetry",
@@ -1649,32 +1710,6 @@
     "teamSuffix": "{name} · team",
     "toast": {
       "granted": "Access granted"
-    }
-  },
-  "templates": {
-    "personal": {
-      "name": "Personal planning",
-      "desc": "Life tasks, goals and habits."
-    },
-    "study": {
-      "name": "Study",
-      "desc": "Deadlines, courses and group projects."
-    },
-    "freelance": {
-      "name": "Freelance / client work",
-      "desc": "Run a job from brief to payment."
-    },
-    "smallTeam": {
-      "name": "Small team project",
-      "desc": "Set up a shared workspace for your team."
-    },
-    "blank": {
-      "name": "Start blank",
-      "desc": "An empty project with one starter task."
-    },
-    "ai": {
-      "name": "Let AI build it",
-      "desc": "Describe your project in one sentence — AI drafts a plan for you to review."
     }
   },
   "myTasksPage": {
@@ -1760,7 +1795,8 @@
     "empty": {
       "title": "No projects yet",
       "sub": "Create the first project intake for this workspace."
-    }
+    },
+    "noTasks": "No tasks"
   },
   "organization": {
     "label": "Organization",
@@ -2149,5 +2185,34 @@
     "save": "Save profile",
     "saving": "Saving…",
     "saved": "Profile updated"
+  },
+  "board": {
+    "columns": {
+      "trigger": "Columns",
+      "title": "Manage board columns",
+      "description": "Rename, retype, reorder and add or remove the project's status columns.",
+      "nameLabel": "Column name",
+      "typeLabel": "Status type",
+      "newPlaceholder": "New column name…",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "makeDefault": "Make default column",
+      "deleteBlocked": "Column still holds tasks — move them out first",
+      "deleteLast": "At least one column must remain",
+      "type": {
+        "todo": "To do",
+        "in_progress": "In progress",
+        "in_review": "In review",
+        "blocked": "Blocked",
+        "done": "Done",
+        "cancelled": "Cancelled"
+      },
+      "toast": {
+        "created": "Column added",
+        "updated": "Column updated",
+        "deleted": "Column deleted",
+        "defaultSet": "Default column set"
+      }
+    }
   }
 }

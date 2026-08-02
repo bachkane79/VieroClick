@@ -89,12 +89,22 @@ export function groupTasks(tasks: TaskView[], groupBy: GroupBy, ctx: GroupingCon
       list.push(t);
       byStatus.set(t.statusId, list);
     }
-    return ctx.statuses.map((s) => ({
+    const groups: TaskGroup[] = ctx.statuses.map((s) => ({
       key: s.id,
       label: s.name,
       statusType: s.type,
       tasks: byStatus.get(s.id) ?? [],
     }));
+    // Groups are built from the status list, so a task pointing at a status the
+    // project no longer lists used to be dropped with no bucket at all —
+    // invisible in the list while the header tiles still counted it. Phase and
+    // assignee grouping below both already keep a bucket for the leftovers.
+    const known = new Set(ctx.statuses.map((s) => s.id));
+    const orphaned = tasks.filter((t) => !known.has(t.statusId));
+    if (orphaned.length > 0) {
+      groups.push({ key: UNGROUPED_KEY, label: "No status", tasks: orphaned });
+    }
+    return groups;
   }
 
   if (groupBy === "phase") {

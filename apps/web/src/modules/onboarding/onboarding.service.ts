@@ -1,14 +1,10 @@
 import "server-only";
-import { and, eq } from "drizzle-orm";
-import { db, taskStatuses } from "@vieroc/db";
 import { completeOnboardingSchema } from "@vieroc/validators";
 import { getUserId } from "@/server/lib/context";
 import { track } from "@/server/lib/analytics";
 import * as workspaceService from "@/modules/workspace/workspace.service";
 import * as workspaceRepo from "@/modules/workspace/workspace.repo";
 import * as projectService from "@/modules/project/project.service";
-import * as taskService from "@/modules/task/task.service";
-import { TEMPLATES } from "./templates";
 
 function slugify(input: string): string {
   return (
@@ -31,18 +27,13 @@ async function uniqueSlug(base: string): Promise<string> {
   return `${base}-${crypto.randomUUID().slice(0, 6)}`;
 }
 
-function dueDateStr(offsetDays: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + offsetDays);
-  return d.toISOString().slice(0, 10); // YYYY-MM-DD
-}
-
 /**
- * The single onboarding orchestration: create the workspace (with kind), its
- * first project, seed the chosen template's tasks (or hand off to the AI
- * planner), optionally invite teammates, and stamp onboarding as complete.
+ * The single onboarding orchestration: create the workspace (with kind) and its
+ * first (empty) project, optionally invite teammates, and stamp onboarding as
+ * complete. No template seeding — the project starts empty and the user adds
+ * work themselves (or asks the AI planner from inside the project).
  *
- * Steps commit sequentially (createWorkspace → createProject → tasks) because
+ * Steps commit sequentially (createWorkspace → createProject) because
  * requireActor reads committed membership; each step is individually atomic.
  */
 export async function completeOnboarding(input: unknown) {
@@ -57,48 +48,12 @@ export async function completeOnboarding(input: unknown) {
     kind: data.mode,
   });
 
-  const isAi = data.template === "ai-generated";
-
-  // 2. First project. AI path enables the planner (dispatched by createProject)
-  //    and passes the user's description; template path is manual + seeded.
+  // 2. First project — empty, default statuses only.
   const project = await projectService.createProject(workspace.id, {
     name: data.projectName,
-    description: isAi ? data.aiPrompt : undefined,
-    initialContext: isAi ? data.aiPrompt : undefined,
-    aiEnabled: isAi,
   });
 
-  // 3. Seed template tasks (skip for AI — the planner will populate the plan).
-  if (!isAi && data.template !== "ai-generated") {
-    const def = TEMPLATES[data.template];
-    const [todo] = await db
-      .select({ id: taskStatuses.id })
-      .from(taskStatuses)
-      .where(and(eq(taskStatuses.projectId, project.id), eq(taskStatuses.type, "todo")))
-      .limit(1);
-
-    if (todo) {
-      let position = 0;
-      for (const phase of def.seed) {
-        for (const task of phase.tasks) {
-          await taskService.createTask({
-            workspaceId: workspace.id,
-            projectId: project.id,
-            input: {
-              title: task.title,
-              statusId: todo.id,
-              priority: task.priority ?? "medium",
-              dueDate: dueDateStr(task.dueOffset),
-              labels: [phase.phase],
-              position: position++,
-            },
-          });
-        }
-      }
-    }
-  }
-
-  // 4. Team mode: fire off invites (skippable — empty array is fine).
+  // 3. Team mode: fire off invites (skippable — empty array is fine).
   if (data.mode === "team") {
     for (const email of data.invites) {
       try {
@@ -110,11 +65,10 @@ export async function completeOnboarding(input: unknown) {
     }
   }
 
-  // 5. Mark onboarding complete (analytics/funnel; gate keys off workspace count).
+  // 4. Mark onboarding complete (analytics/funnel; gate keys off workspace count).
   await workspaceRepo.updateUserDetails(userId, { onboardingCompletedAt: new Date() });
   track("onboarding_completed", {
     mode: data.mode,
-    template: data.template,
     invites: data.invites.length,
   });
 

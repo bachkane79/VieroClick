@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Trash2, UserPlus, Users, Wand2, X } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
@@ -11,6 +11,7 @@ import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import {
   addProjectMemberAction,
   removeProjectMemberAction,
+  updateProjectMemberAction,
 } from "@/modules/project-member/project-member.actions";
 import { reassignTasksAction } from "@/modules/agent-job/agent-job.actions";
 import type { TeamMemberMetrics } from "@/modules/member-score/member-score.service";
@@ -177,6 +178,30 @@ export function TeamViewClient({
       router.refresh();
     } else {
       toast.error(actionError(res, t("project.team.manage.addFailed")));
+    }
+  }
+
+  /** Inline edit of an existing membership — role and allocation were settable
+   *  only at add-time before, leaving both read-only for the rest of the
+   *  project's life even though `updateProjectMember` was already there. */
+  async function saveMember(
+    projectMemberId: string,
+    data: { role?: (typeof PROJECT_ROLES)[number]; allocationPercent?: number }
+  ) {
+    setBusyId(projectMemberId);
+    const res = await updateProjectMemberAction({
+      workspaceId,
+      projectId,
+      slug,
+      memberId: projectMemberId,
+      data,
+    });
+    setBusyId(null);
+    if (res.ok) {
+      toast.success(t("project.team.manage.updated"));
+      router.refresh();
+    } else {
+      toast.error(actionError(res, t("project.team.manage.updateFailed")));
     }
   }
 
@@ -394,14 +419,24 @@ export function TeamViewClient({
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <div>
+                  <div className="min-w-0">
                     <div className="text-sm font-semibold">{m.fullName}</div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {t("project.team.roleAllocation", {
-                        role: m.role.replace(/_/g, " "),
-                        percent: m.allocationPercent,
-                      })}
-                    </div>
+                    {canManage && pmId ? (
+                      <MembershipEditor
+                        role={m.role as (typeof PROJECT_ROLES)[number]}
+                        allocationPercent={m.allocationPercent}
+                        disabled={busyId === pmId}
+                        roleLabel={roleLabel}
+                        onSave={(data) => void saveMember(pmId, data)}
+                      />
+                    ) : (
+                      <div className="text-[11px] text-muted-foreground">
+                        {t("project.team.roleAllocation", {
+                          role: m.role.replace(/_/g, " "),
+                          percent: m.allocationPercent,
+                        })}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     {m.overloaded && (
@@ -492,6 +527,80 @@ export function TeamViewClient({
           if (toRemove) void executeRemove(toRemove);
         }}
       />
+    </div>
+  );
+}
+
+/** Role picker + allocation stepper on a roster card. The select commits on
+ *  change; the number commits on blur/Enter, and only when it actually moved. */
+function MembershipEditor({
+  role,
+  allocationPercent,
+  disabled,
+  roleLabel,
+  onSave,
+}: {
+  role: (typeof PROJECT_ROLES)[number];
+  allocationPercent: number;
+  disabled: boolean;
+  roleLabel: (r: string) => string;
+  onSave: (data: {
+    role?: (typeof PROJECT_ROLES)[number];
+    allocationPercent?: number;
+  }) => void;
+}) {
+  const t = useTranslations();
+  const [allocation, setAllocation] = useState(String(allocationPercent));
+
+  useEffect(() => {
+    setAllocation(String(allocationPercent));
+  }, [allocationPercent]);
+
+  function commitAllocation() {
+    const next = Math.max(0, Math.min(100, Number(allocation) || 0));
+    if (next === allocationPercent) {
+      setAllocation(String(allocationPercent));
+      return;
+    }
+    setAllocation(String(next));
+    onSave({ allocationPercent: next });
+  }
+
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+      <select
+        value={role}
+        disabled={disabled}
+        aria-label={t("project.team.manage.role")}
+        onChange={(e) => onSave({ role: e.target.value as (typeof PROJECT_ROLES)[number] })}
+        className="h-6 rounded-md border border-input bg-card px-1.5 text-[11px] text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/25 disabled:opacity-50"
+      >
+        {PROJECT_ROLES.map((r) => (
+          <option key={r} value={r}>
+            {roleLabel(r)}
+          </option>
+        ))}
+      </select>
+      <span className="inline-flex items-center gap-1 rounded-md border border-input bg-card px-1.5 text-[11px] text-muted-foreground">
+        <input
+          type="number"
+          min={0}
+          max={100}
+          value={allocation}
+          disabled={disabled}
+          aria-label={t("project.team.manage.allocation")}
+          onChange={(e) => setAllocation(e.target.value)}
+          onBlur={commitAllocation}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              e.currentTarget.blur();
+            }
+          }}
+          className="h-6 w-10 bg-transparent text-right tabular-nums text-foreground focus:outline-none disabled:opacity-50"
+        />
+        %
+      </span>
     </div>
   );
 }

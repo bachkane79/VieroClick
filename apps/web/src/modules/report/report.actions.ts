@@ -17,7 +17,7 @@ export async function createReportAction(args: BaseArgs & { data: unknown }) {
       projectId: args.projectId,
       input: args.data,
     });
-    revalidatePath(`/workspace/${args.slug}/project/${args.projectId}`);
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}`, "layout");
     return report;
   });
 }
@@ -29,7 +29,7 @@ export async function approveReportAction(args: BaseArgs & { reportId: string })
       projectId: args.projectId,
       reportId: args.reportId,
     });
-    revalidatePath(`/workspace/${args.slug}/project/${args.projectId}`);
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}`, "layout");
     return report;
   });
 }

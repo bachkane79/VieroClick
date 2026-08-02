@@ -7,6 +7,7 @@ import { Button, Input, Textarea } from "@vieroc/ui";
 import { toast } from "sonner";
 import { FileText, Plus, Trash2, BookOpen, AlertCircle, Sparkles } from "lucide-react";
 import { createDocAction, deleteDocAction } from "@/modules/project-doc/project-doc.actions";
+import { ShareDialog } from "@/modules/permission/components/share-dialog";
 import {
   logDecisionAction,
   deleteDecisionAction,
@@ -39,6 +40,7 @@ interface DecisionRow {
 interface MemberRow {
   id: string;
   fullName: string;
+  email: string;
 }
 
 interface TaskRow {
@@ -343,16 +345,26 @@ export function DocsDecisionsClient({
                           </span>
                         </div>
 
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 shrink-0 text-red-500 hover:bg-red-500/10"
-                          disabled={submitting}
-                          onClick={() => handleDeleteDoc(doc.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <ShareDialog
+                            workspaceId={workspaceId}
+                            resourceType="doc"
+                            resourceId={doc.id}
+                            resourceName={doc.title}
+                            members={members}
+                            triggerClassName="h-8 px-2.5 text-[11px]"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0 text-red-500 hover:bg-red-500/10"
+                            disabled={submitting}
+                            onClick={() => handleDeleteDoc(doc.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </div>
 
                       <div className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-2xl border border-border bg-surface-subtle p-3 text-xs font-normal leading-relaxed text-foreground">

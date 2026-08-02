@@ -4,6 +4,7 @@ import { cn } from "@vieroc/ui";
 import { CheckCircle2, Kanban, Layers, Timer } from "lucide-react";
 import { TaskBoard } from "@/modules/task/components/task-board";
 import { DeletedTasksPanel } from "@/modules/task/components/deleted-tasks-panel";
+import { ColumnManager } from "@/modules/task-status/components/column-manager";
 import { loadProjectViewData } from "@/modules/task/task-page-data";
 import { NotFoundError } from "@/server/lib/errors";
 
@@ -39,6 +40,12 @@ export default async function ProjectBoardPage({ params }: Props) {
 
   const totalTasks = data.tasks.length;
   const completionPct = totalTasks ? Math.round((doneCount / totalTasks) * 100) : 0;
+
+  // Per-column task counts — the column manager blocks deleting a used column.
+  const taskCounts = data.tasks.reduce<Record<string, number>>((acc, task) => {
+    acc[task.statusId] = (acc[task.statusId] ?? 0) + 1;
+    return acc;
+  }, {});
 
   const t = await getTranslations();
 
@@ -87,12 +94,24 @@ export default async function ProjectBoardPage({ params }: Props) {
           members={data.members}
           dependencies={data.dependencies}
           attachments={data.attachments}
+          canManage={data.canManage}
           actions={
-            <DeletedTasksPanel
-              workspaceId={data.workspace.id}
-              workspaceSlug={slug}
-              projectId={projectId}
-            />
+            <>
+              {data.canManage && (
+                <ColumnManager
+                  workspaceId={data.workspace.id}
+                  workspaceSlug={slug}
+                  projectId={projectId}
+                  statuses={data.statuses}
+                  taskCounts={taskCounts}
+                />
+              )}
+              <DeletedTasksPanel
+                workspaceId={data.workspace.id}
+                workspaceSlug={slug}
+                projectId={projectId}
+              />
+            </>
           }
         />
       </div>

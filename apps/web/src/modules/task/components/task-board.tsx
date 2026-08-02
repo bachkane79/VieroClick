@@ -42,6 +42,7 @@ interface Props {
   members: MemberOptionView[];
   dependencies: TaskDependencyView[];
   attachments: TaskAttachmentView[];
+  canManage: boolean;
   actions?: React.ReactNode;
 }
 
@@ -54,6 +55,7 @@ export function TaskBoard({
   members,
   dependencies,
   attachments,
+  canManage,
   actions,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -63,7 +65,13 @@ export function TaskBoard({
   const t = useTranslations();
   const actionError = useActionError();
 
-  const api = useViewPrefs(projectId, "status");
+  // Lets the hook discard filter ids this project doesn't have, instead of
+  // silently matching nothing and rendering an empty board.
+  const knownIds = useMemo(
+    () => ({ statusIds: statuses.map((s) => s.id), memberIds: members.map((m) => m.id) }),
+    [statuses, members]
+  );
+  const api = useViewPrefs(projectId, "status", knownIds);
   const { effectiveTasks, applyOptimistic } = useOptimisticTasks(tasks);
 
   const currentSelectedTask = useMemo(() => {
@@ -212,6 +220,7 @@ export function TaskBoard({
         members={members}
         dependencies={dependencies}
         attachments={attachments}
+        canManage={canManage}
         onSelectTask={setSelectedTask}
       />
     </>

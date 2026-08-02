@@ -83,6 +83,7 @@ export default async function ProjectTasksPage({ params }: Props) {
           dependencies={data.dependencies}
           attachments={data.attachments}
           phases={data.phases}
+          canManage={data.canManage}
         />
       </div>
     </div>

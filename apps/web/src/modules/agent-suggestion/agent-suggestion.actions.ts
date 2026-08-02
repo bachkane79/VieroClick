@@ -20,7 +20,7 @@ export async function reviewSuggestionAction(
       suggestionId: args.suggestionId,
       input: args.data,
     });
-    revalidatePath(`/workspace/${args.slug}/project/${args.projectId}`);
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}`, "layout");
     return suggestion;
   });
 }

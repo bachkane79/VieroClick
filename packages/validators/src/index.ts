@@ -42,26 +42,14 @@ export const createWorkspaceSchema = z.object({
 export const updateWorkspaceSchema = createWorkspaceSchema.partial();
 
 // ─── Onboarding ───────────────────────────────────────────────────────────────
-// The first-run wizard: mode (personal/team) + a starter template (or the AI
-// path) + a name, optionally inviting teammates. One action creates the
-// workspace, its first project, seeds the template tasks and marks onboarding
-// done. Template ids mirror modules/onboarding/templates.ts.
-export const onboardingTemplateSchema = z.enum([
-  "personal-planning",
-  "study",
-  "freelance-client",
-  "small-team-project",
-  "blank",
-  "ai-generated",
-]);
-
+// The first-run wizard: mode (personal/team) + a workspace name + the first
+// project name, optionally inviting teammates. One action creates the
+// workspace and its (empty) first project, then marks onboarding done. There
+// are no starter templates — the project starts blank.
 export const completeOnboardingSchema = z.object({
   mode: workspaceKindSchema,
-  template: onboardingTemplateSchema,
   workspaceName: nfcText(z.string().trim().min(1).max(100)),
   projectName: nfcText(z.string().trim().min(1).max(200)),
-  // AI path only: the free-text project description the planner works from.
-  aiPrompt: nfcText(z.string().max(2000)).optional(),
   // Team mode only: emails to invite (optional, skippable).
   invites: z.array(z.string().email()).max(50).default([]),
 });
@@ -323,7 +311,6 @@ export const paginationSchema = z.object({
 
 export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>;
 export type WorkspaceKind = z.infer<typeof workspaceKindSchema>;
-export type OnboardingTemplate = z.infer<typeof onboardingTemplateSchema>;
 export type CompleteOnboardingInput = z.infer<typeof completeOnboardingSchema>;
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;

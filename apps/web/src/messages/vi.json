@@ -83,9 +83,19 @@
     "thisWeek": "Tuần này",
     "focus": "Tập trung",
     "onTime": "Đúng hạn",
-    "focusValue": "92% Cao",
-    "onTimeValue": "89% Tốt",
-    "greetingFallbackName": "bạn"
+    "greetingFallbackName": "bạn",
+    "pctQuality": "{pct}% {quality}",
+    "quality": {
+      "good": "Tốt",
+      "ok": "Khá",
+      "low": "Cần cải thiện"
+    },
+    "petal": {
+      "myDone": "Việc của tôi đã xong",
+      "onTime": "Đúng hạn",
+      "wsProgress": "Tiến độ không gian làm việc",
+      "unblocked": "Không bị chặn"
+    }
   },
   "permissions": {
     "denied": {
@@ -140,6 +150,7 @@
     },
     "reason": {
       "acceptanceCriteriaUnchecked": "Bạn cần tích đủ các tiêu chí nghiệm thu bắt buộc trước khi đánh dấu hoàn thành.",
+      "emailTaken": "Email này đã được đăng ký. Vui lòng đăng nhập.",
       "agentUnreachable": "Không kết nối được dịch vụ AI (agent-api). Kiểm tra dịch vụ đã chạy và AGENT_API_URL đúng chưa.",
       "agentFailed": "Trợ lý AI chạy nhưng gặp lỗi. Xem chi tiết kỹ thuật bên dưới.",
       "blockerReasonRequired": "Bạn cần nêu lý do vướng mắc khi chuyển công việc sang trạng thái bị chặn.",
@@ -187,7 +198,9 @@
       "telegramNoChatLinked": "Chưa có cuộc trò chuyện nào được liên kết. Hãy gửi /start cho bot trước.",
       "telegramTokenRejected": "Telegram từ chối token này. Hãy kiểm tra lại với @BotFather.",
       "workspaceAdminOnly": "Chỉ chủ sở hữu hoặc quản trị viên không gian làm việc mới thực hiện được việc này.",
-      "workspaceOwnerOnly": "Chỉ chủ sở hữu không gian làm việc mới thực hiện được việc này."
+      "workspaceOwnerOnly": "Chỉ chủ sở hữu không gian làm việc mới thực hiện được việc này.",
+      "statusHasTasks": "Hãy chuyển hết công việc khỏi cột này trước khi xóa.",
+      "lastStatus": "Dự án cần giữ ít nhất một cột trạng thái."
     },
     "zod": {
       "required": "{field} là bắt buộc.",
@@ -662,7 +675,28 @@
     "disconnect": "Ngắt kết nối",
     "disconnectConfirm": "Ngắt kết nối bot Telegram? Thông báo sẽ ngừng được chuyển tiếp.",
     "disconnected": "Đã ngắt kết nối bot",
-    "disconnectFailed": "Ngắt kết nối thất bại"
+    "disconnectFailed": "Ngắt kết nối thất bại",
+    "channels": {
+      "title": "Kênh theo dự án",
+      "subtitle": "Định tuyến thông báo của một dự án sang nhóm Telegram riêng thay vì chat mặc định.",
+      "empty": "Chưa có kênh nào. Mọi thông báo đều gửi về chat mặc định của bot.",
+      "wholeWorkspace": "Cả không gian làm việc",
+      "chatIdLabel": "Chat ID",
+      "projectLabel": "Dự án",
+      "nameLabel": "Tên gợi nhớ",
+      "namePlaceholder": "VD: Nhóm dự án A",
+      "link": "Liên kết",
+      "unlink": "Gỡ liên kết",
+      "pause": "Tạm dừng",
+      "resume": "Bật lại",
+      "hint": "Thêm bot vào nhóm rồi gửi một tin nhắn, sau đó dùng “Tự dò” ở trên để lấy chat ID.",
+      "linked": "Đã liên kết kênh",
+      "linkFailed": "Không liên kết được kênh",
+      "updated": "Đã cập nhật kênh",
+      "updateFailed": "Không cập nhật được kênh",
+      "unlinked": "Đã gỡ liên kết kênh",
+      "unlinkFailed": "Không gỡ được kênh"
+    }
   },
   "project": {
     "createdWithAi": "Đã tạo dự án — AI Leader đang lập kế hoạch",
@@ -774,12 +808,18 @@
       "healthVelocityTitle": "Sức khỏe & Vận tốc",
       "liveSync": "Đồng bộ trực tiếp",
       "velocityLabel": "Tốc độ (Velocity)",
-      "velocityStable": "Ổn định",
       "focusLabel": "Độ tập trung",
-      "focusValue": "94% Tốt",
       "projectMembers": "Thành viên dự án",
       "workspaceMemberFallback": "Thành viên không gian làm việc",
-      "notSet": "Chưa đặt"
+      "notSet": "Chưa đặt",
+      "velocityPerWeek": "{hours}h/tuần",
+      "focusPct": "{pct}% đã khởi động",
+      "petal": {
+        "completion": "Hoàn thành",
+        "health": "Điểm sức khỏe",
+        "onTime": "Đúng hạn",
+        "assigned": "Đã có người nhận"
+      }
     },
     "daily": {
       "submitTitle": "Gửi cập nhật standup hằng ngày",
@@ -845,7 +885,9 @@
         "removed": "Đã xóa thành viên khỏi dự án",
         "removeFailed": "Không thể xóa thành viên",
         "removeConfirm": "Xóa {name} khỏi dự án này?",
-        "removeConfirmLabel": "Xóa"
+        "removeConfirmLabel": "Xóa",
+        "updated": "Đã cập nhật thành viên",
+        "updateFailed": "Không cập nhật được thành viên"
       },
       "reassign": {
         "button": "Giao việc lại",
@@ -1501,7 +1543,22 @@
       "milestoneCreated": "Đã tạo cột mốc",
       "milestoneDeleted": "Đã xóa cột mốc",
       "riskReported": "Đã ghi nhận rủi ro",
-      "riskDeleted": "Đã xóa rủi ro"
+      "riskDeleted": "Đã xóa rủi ro",
+      "milestoneUpdated": "Đã cập nhật cột mốc",
+      "riskUpdated": "Đã cập nhật rủi ro"
+    },
+    "statusAria": "Trạng thái",
+    "milestoneStatus": {
+      "planned": "Đã lên kế hoạch",
+      "in_progress": "Đang chạy",
+      "achieved": "Đã đạt",
+      "missed": "Lỡ hẹn"
+    },
+    "riskStatus": {
+      "open": "Đang mở",
+      "mitigated": "Đã giảm thiểu",
+      "accepted": "Chấp nhận",
+      "closed": "Đã đóng"
     }
   },
   "onboarding": {
@@ -1513,7 +1570,8 @@
     },
     "defaults": {
       "personalWorkspace": "Không gian làm việc của bạn",
-      "teamWorkspace": "Nhóm của bạn"
+      "teamWorkspace": "Nhóm của bạn",
+      "firstProject": "Dự án đầu tiên"
     },
     "toast": {
       "createFailed": "Không tạo được không gian làm việc, thử lại nhé"
@@ -1530,16 +1588,6 @@
         "desc": "Làm việc cùng người khác, giao việc và theo dõi tiến độ."
       }
     },
-    "template": {
-      "title": "Chọn điểm bắt đầu",
-      "subtitle": "Mỗi mẫu tạo sẵn các phase và việc mẫu để bạn không phải bắt đầu từ trang trắng.",
-      "newBadge": "MỚI"
-    },
-    "ai": {
-      "title": "Tả dự án của bạn",
-      "subtitle": "Một hai câu là đủ. AI sẽ lập kế hoạch (phase + việc) ngay sau khi bạn tạo — bạn duyệt trước khi áp dụng.",
-      "placeholder": "VD: Tôi cần ra mắt website bán hàng trong 6 tuần"
-    },
     "name": {
       "title": "Đặt tên và bắt đầu",
       "subtitle": "Gần xong rồi. Bạn sửa được mọi thứ sau.",
@@ -1551,7 +1599,6 @@
     },
     "actions": {
       "back": "Quay lại",
-      "continue": "Tiếp tục",
       "createAndStart": "Tạo và bắt đầu"
     }
   },
@@ -1570,7 +1617,21 @@
     "featurePlanning": "AI lập kế hoạch",
     "getStartedTitle": "Bắt đầu nào",
     "getStartedSubtitle": "Đăng nhập để tạo không gian làm việc của bạn. Không cần thẻ, không cần cài đặt.",
-    "noPasswordNote": "Chúng tôi không lưu mật khẩu — đăng nhập an toàn qua nhà cung cấp."
+    "noPasswordNote": "Chúng tôi không lưu mật khẩu — đăng nhập an toàn qua nhà cung cấp.",
+    "securityNote": "Mật khẩu của bạn được mã hoá an toàn.",
+    "passwordLabel": "Mật khẩu",
+    "fullNameLabel": "Họ và tên",
+    "passwordHint": "Tối thiểu 8 ký tự.",
+    "signIn": "Đăng nhập",
+    "createAccount": "Tạo tài khoản",
+    "createAccountTitle": "Tạo tài khoản",
+    "createAccountSubtitle": "Đăng ký để bắt đầu không gian làm việc của bạn. Không cần thẻ, không cần cài đặt.",
+    "creatingAccount": "Đang tạo tài khoản…",
+    "noAccount": "Chưa có tài khoản?",
+    "haveAccount": "Đã có tài khoản?",
+    "invalidCredentials": "Email hoặc mật khẩu không đúng.",
+    "registerFailed": "Không thể tạo tài khoản. Vui lòng thử lại.",
+    "registeredNotice": "Tạo tài khoản thành công. Vui lòng đăng nhập."
   },
   "profile": {
     "title": "Hồ sơ của tôi & thông số không gian làm việc",
@@ -1649,32 +1710,6 @@
     "teamSuffix": "{name} · nhóm",
     "toast": {
       "granted": "Đã cấp quyền"
-    }
-  },
-  "templates": {
-    "personal": {
-      "name": "Kế hoạch cá nhân",
-      "desc": "Việc đời sống, mục tiêu và thói quen."
-    },
-    "study": {
-      "name": "Học tập",
-      "desc": "Hạn nộp, môn học và dự án nhóm."
-    },
-    "freelance": {
-      "name": "Freelance / khách hàng",
-      "desc": "Chạy một job từ brief đến thanh toán."
-    },
-    "smallTeam": {
-      "name": "Dự án nhóm nhỏ",
-      "desc": "Dựng chỗ làm việc chung cho nhóm."
-    },
-    "blank": {
-      "name": "Bắt đầu trống",
-      "desc": "Một dự án trống với một việc mở đầu."
-    },
-    "ai": {
-      "name": "Để AI dựng giúp",
-      "desc": "Tả dự án bằng một câu — AI phác kế hoạch cho bạn duyệt."
     }
   },
   "myTasksPage": {
@@ -1760,7 +1795,8 @@
     "empty": {
       "title": "Chưa có dự án nào",
       "sub": "Tạo dự án đầu tiên cho không gian làm việc này."
-    }
+    },
+    "noTasks": "Chưa có việc"
   },
   "organization": {
     "label": "Tổ chức",
@@ -2149,5 +2185,34 @@
     "save": "Lưu hồ sơ",
     "saving": "Đang lưu…",
     "saved": "Đã cập nhật hồ sơ"
+  },
+  "board": {
+    "columns": {
+      "trigger": "Cột",
+      "title": "Quản lý cột bảng",
+      "description": "Đổi tên, đổi loại, sắp xếp và thêm/xóa cột trạng thái của dự án.",
+      "nameLabel": "Tên cột",
+      "typeLabel": "Loại trạng thái",
+      "newPlaceholder": "Tên cột mới…",
+      "moveUp": "Lên trên",
+      "moveDown": "Xuống dưới",
+      "makeDefault": "Đặt làm cột mặc định",
+      "deleteBlocked": "Cột đang có việc — chuyển việc đi trước",
+      "deleteLast": "Phải giữ lại ít nhất một cột",
+      "type": {
+        "todo": "Cần làm",
+        "in_progress": "Đang làm",
+        "in_review": "Chờ duyệt",
+        "blocked": "Bị chặn",
+        "done": "Hoàn thành",
+        "cancelled": "Đã hủy"
+      },
+      "toast": {
+        "created": "Đã thêm cột",
+        "updated": "Đã cập nhật cột",
+        "deleted": "Đã xóa cột",
+        "defaultSet": "Đã đặt cột mặc định"
+      }
+    }
   }
 }

@@ -20,6 +20,7 @@ import {
   groupTasks,
   sortTasks,
   taskPhaseMap,
+  UNGROUPED_KEY,
   type PhaseNode,
   type TaskGroup,
 } from "../task-grouping";
@@ -41,6 +42,7 @@ interface Props {
   dependencies: TaskDependencyView[];
   attachments: TaskAttachmentView[];
   phases: PhaseNode[];
+  canManage: boolean;
 }
 
 export function TaskList({
@@ -53,6 +55,7 @@ export function TaskList({
   dependencies,
   attachments,
   phases,
+  canManage,
 }: Props) {
   const t = useTranslations();
   const router = useRouter();
@@ -64,7 +67,13 @@ export function TaskList({
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const { effectiveTasks, applyOptimistic } = useOptimisticTasks(tasks);
-  const api = useViewPrefs(projectId, "status");
+  // Lets the hook discard filter ids this project doesn't have, instead of
+  // silently matching nothing and rendering an empty list.
+  const knownIds = useMemo(
+    () => ({ statusIds: statuses.map((s) => s.id), memberIds: members.map((m) => m.id) }),
+    [statuses, members]
+  );
+  const api = useViewPrefs(projectId, "status", knownIds);
   const { prefs } = api;
 
   const taskPhase = useMemo(() => taskPhaseMap(phases), [phases]);
@@ -153,8 +162,11 @@ export function TaskList({
               }
               onOpenTask={(task) => openTask(task)}
               onOptimistic={applyOptimistic}
-              // Inline "+ Add Task" only creates in a status group (status is known).
-              inlineAddStatusId={prefs.groupBy === "status" ? group.key : undefined}
+              // Inline "+ Add Task" only creates in a status group (status is
+              // known) — never in the leftover bucket, whose key is not a status.
+              inlineAddStatusId={
+                prefs.groupBy === "status" && group.key !== UNGROUPED_KEY ? group.key : undefined
+              }
             />
           ))}
           {groups.length === 0 && (
@@ -178,6 +190,7 @@ export function TaskList({
         members={members}
         dependencies={dependencies}
         attachments={attachments}
+        canManage={canManage}
         onSelectTask={setSelectedTask}
       />
     </>

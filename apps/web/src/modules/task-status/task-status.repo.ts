@@ -1,6 +1,6 @@
 import "server-only";
-import { asc, eq } from "drizzle-orm";
-import { db, taskStatuses, type Executor } from "@vieroc/db";
+import { and, asc, count, eq, ne } from "drizzle-orm";
+import { db, taskStatuses, tasks, type Executor } from "@vieroc/db";
 
 export type TaskStatusInsert = typeof taskStatuses.$inferInsert;
 export type TaskStatusRow = typeof taskStatuses.$inferSelect;
@@ -44,4 +44,27 @@ export async function update(
 
 export async function remove(id: string, exec: Executor = db): Promise<void> {
   await exec.delete(taskStatuses).where(eq(taskStatuses.id, id));
+}
+
+/** Demote every other status in the project — `isDefault` is read as "the first
+ *  one flagged", so two defaults would make the pick non-deterministic. */
+export async function clearDefaults(
+  projectId: string,
+  exceptId: string,
+  exec: Executor = db
+): Promise<void> {
+  await exec
+    .update(taskStatuses)
+    .set({ isDefault: false })
+    .where(and(eq(taskStatuses.projectId, projectId), ne(taskStatuses.id, exceptId)));
+}
+
+/** `tasks.status_id` has no ON DELETE rule, so deleting a used status would be a
+ *  raw FK violation. The service checks this first and fails with a real reason. */
+export async function countTasks(statusId: string, exec: Executor = db): Promise<number> {
+  const [row] = await exec
+    .select({ value: count() })
+    .from(tasks)
+    .where(eq(tasks.statusId, statusId));
+  return row?.value ?? 0;
 }

@@ -17,7 +17,7 @@ export async function logDecisionAction(args: BaseArgs & { data: unknown }) {
       projectId: args.projectId,
       input: args.data,
     });
-    revalidatePath(`/workspace/${args.slug}/project/${args.projectId}`);
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}`, "layout");
     return decision;
   });
 }
@@ -29,7 +29,7 @@ export async function deleteDecisionAction(args: BaseArgs & { decisionId: string
       projectId: args.projectId,
       decisionId: args.decisionId,
     });
-    revalidatePath(`/workspace/${args.slug}/project/${args.projectId}`);
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}`, "layout");
     return result;
   });
 }

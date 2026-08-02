@@ -31,6 +31,7 @@ interface Props {
   dependencies: TaskDependencyView[];
   attachments: TaskAttachmentView[];
   phases: PhaseNode[];
+  canManage: boolean;
 }
 
 const COLUMNS: {
@@ -59,10 +60,17 @@ export function TableViewClient({
   dependencies,
   attachments,
   phases,
+  canManage,
 }: Props) {
   const t = useTranslations();
   const { effectiveTasks, applyOptimistic } = useOptimisticTasks(tasks);
-  const api = useViewPrefs(projectId, "none");
+  // Lets the hook discard filter ids this project doesn't have, instead of
+  // silently matching nothing and rendering an empty table.
+  const knownIds = useMemo(
+    () => ({ statusIds: statuses.map((s) => s.id), memberIds: members.map((m) => m.id) }),
+    [statuses, members]
+  );
+  const api = useViewPrefs(projectId, "none", knownIds);
   const { prefs } = api;
 
   const [open, setOpen] = useState(false);
@@ -283,6 +291,7 @@ export function TableViewClient({
         members={members}
         dependencies={dependencies}
         attachments={attachments}
+        canManage={canManage}
         onSelectTask={setSelectedTask}
       />
     </>

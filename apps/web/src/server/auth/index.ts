@@ -1,63 +1,41 @@
 import NextAuth from "next-auth";
-import { db, users } from "@vieroc/db";
+import Credentials from "next-auth/providers/credentials";
 import { authConfig } from "./config";
+import { verifyCredentials } from "@/modules/auth/auth.service";
 
+/**
+ * Full (Node-runtime) auth instance. The only provider is email + password.
+ * Its `authorize` runs the DB lookup + bcrypt compare — Node-only work that
+ * must not leak into the edge middleware, which is why the provider lives here
+ * and `./config.ts` (imported by middleware) keeps an empty provider list.
+ *
+ * Sessions are JWT (no DB adapter), so our `users` table is the source of truth.
+ * `authorize` already resolves the real internal user id, so the `jwt` callback
+ * only needs to carry it onto the token.
+ */
 const authResult = NextAuth({
   ...authConfig,
+  providers: [
+    Credentials({
+      name: "Email & Password",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        return verifyCredentials({
+          email: String(credentials?.email ?? ""),
+          password: String(credentials?.password ?? ""),
+        });
+      },
+    }),
+  ],
   callbacks: {
     ...authConfig.callbacks,
-    /**
-     * On initial sign-in, upsert the OAuth profile into our own `users` table
-     * (mapping name → full_name, picture → avatar_url) and stamp our internal
-     * user id onto the JWT. We do not use a database session adapter, so this
-     * keeps the design's `users` schema as the source of truth without needing
-     * Auth.js's accounts/sessions tables.
-     */
-    async jwt({ token, profile, account, user }) {
-      if (account && account.provider === "credentials" && user?.email) {
-        const email = user.email;
-        const fullName = user.name ?? email;
-        const avatarUrl = null;
-
-        try {
-          const [row] = await db
-            .insert(users)
-            .values({ email, fullName, avatarUrl })
-            .onConflictDoUpdate({
-              target: users.email,
-              set: { fullName, updatedAt: new Date() },
-            })
-            .returning({ id: users.id });
-
-          if (row) token.userId = row.id;
-        } catch (dbError) {
-          console.error("[NextAuth JWT Callback] Failed to insert/update credentials user in database. Ensure your database is running and schema has been pushed:", dbError);
-          throw dbError;
-        }
-      } else if (account && profile?.email) {
-        const email = profile.email;
-        const fullName = (profile.name as string | undefined) ?? email;
-        const avatarUrl =
-          (profile.picture as string | undefined) ??
-          (profile.avatar_url as string | undefined) ??
-          null;
-
-        try {
-          const [row] = await db
-            .insert(users)
-            .values({ email, fullName, avatarUrl })
-            .onConflictDoUpdate({
-              target: users.email,
-              set: { fullName, avatarUrl, updatedAt: new Date() },
-            })
-            .returning({ id: users.id });
-
-          if (row) token.userId = row.id;
-        } catch (dbError) {
-          console.error("[NextAuth JWT Callback] Failed to insert/update OAuth user in database. Ensure your database is running and schema has been pushed:", dbError);
-          throw dbError;
-        }
-      }
+    async jwt({ token, user }) {
+      // On sign-in, `user` is the object returned by `authorize` (id is our
+      // internal users.id). Persist it so subsequent requests carry the id.
+      if (user?.id) token.userId = user.id;
       return token;
     },
     async session({ session, token }) {

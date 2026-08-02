@@ -99,6 +99,26 @@ export async function findByChatId(
   return row ?? null;
 }
 
+/** The active channel a project's notifications should be routed to, if any. */
+export async function findActiveChannelForProject(
+  workspaceId: string,
+  projectId: string,
+  exec: Executor = db
+): Promise<TelegramChannelRow | null> {
+  const [row] = await exec
+    .select()
+    .from(telegramChannels)
+    .where(
+      and(
+        eq(telegramChannels.workspaceId, workspaceId),
+        eq(telegramChannels.projectId, projectId),
+        eq(telegramChannels.isActive, true)
+      )
+    )
+    .limit(1);
+  return row ?? null;
+}
+
 export async function createChannel(
   values: TelegramChannelInsert,
   exec: Executor = db

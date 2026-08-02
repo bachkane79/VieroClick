@@ -75,6 +75,7 @@ export default async function ProjectCalendarPage({ params }: Props) {
           dependencies={data.dependencies}
           attachments={data.attachments}
           phases={data.phases}
+          canManage={data.canManage}
         />
       </div>
     </div>

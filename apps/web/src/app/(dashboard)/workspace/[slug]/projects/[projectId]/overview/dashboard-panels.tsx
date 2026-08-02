@@ -353,7 +353,7 @@ export async function ProjectDashboardPanels({
               {data.dueSoon.map((task) => (
                 <Link
                   key={task.id}
-                  href={`${base}/tasks`}
+                  href={`${base}/tasks?task=${task.id}`}
                   className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 transition-colors hover:bg-surface-subtle"
                 >
                   <span

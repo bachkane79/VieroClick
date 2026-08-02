@@ -11,7 +11,7 @@ interface BaseArgs {
 }
 
 function revalidate(slug: string, projectId: string) {
-  revalidatePath(`/workspace/${slug}/project/${projectId}`);
+  revalidatePath(`/workspace/${slug}/projects/${projectId}`, "layout");
 }
 
 export async function addProjectMemberAction(args: BaseArgs & { data: unknown }) {

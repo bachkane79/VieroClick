@@ -8,6 +8,8 @@ import { listProjectAttachments } from "@/modules/file/file.service";
 import { toDependencyView, toStatusView, toTaskView } from "@/modules/task/task.view";
 import { toTaskAttachmentView } from "@/modules/file/file.view";
 import type { PhaseNode } from "@/modules/task/task-grouping";
+import { requireActor } from "@/server/lib/context";
+import { isProjectManager } from "@/server/lib/permissions";
 
 /**
  * Shared loader for the task view surfaces (List/Board/Calendar/Table). Keeps
@@ -18,14 +20,21 @@ export async function loadProjectViewData(slug: string, projectId: string) {
   const workspace = await getWorkspace(slug);
   const project = await getProject(workspace.id, projectId);
 
-  const [{ tasks, statuses, dependencies }, workspaceMembers, projectMembers, attachments, wbsNodes] =
-    await Promise.all([
-      listBoard(workspace.id, projectId),
-      listWorkspaceMembers(workspace.id),
-      listProjectMembers(workspace.id, projectId),
-      listProjectAttachments(workspace.id, projectId),
-      listWbsNodes(workspace.id, projectId),
-    ]);
+  const [
+    { tasks, statuses, dependencies },
+    workspaceMembers,
+    projectMembers,
+    attachments,
+    wbsNodes,
+    ctx,
+  ] = await Promise.all([
+    listBoard(workspace.id, projectId),
+    listWorkspaceMembers(workspace.id),
+    listProjectMembers(workspace.id, projectId),
+    listProjectAttachments(workspace.id, projectId),
+    listWbsNodes(workspace.id, projectId),
+    requireActor(workspace.id, projectId),
+  ]);
 
   const projectMemberIds = new Set(projectMembers.map((m) => m.workspaceMemberId));
   const members = workspaceMembers
@@ -44,6 +53,9 @@ export async function loadProjectViewData(slug: string, projectId: string) {
   return {
     workspace,
     project,
+    // Manager-only affordances (e.g. the blocked-override checkbox) are hidden
+    // for everyone else — the server ignores them anyway.
+    canManage: isProjectManager(ctx),
     tasks: tasks.map(toTaskView),
     statuses: statuses.map(toStatusView),
     dependencies: dependencies.map(toDependencyView),

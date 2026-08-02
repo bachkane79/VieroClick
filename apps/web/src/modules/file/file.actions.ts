@@ -5,7 +5,7 @@ import { runAction } from "@/server/lib/action";
 import * as service from "./file.service";
 
 function revalidateProject(slug: string, projectId: string) {
-  revalidatePath(`/workspace/${slug}/project/${projectId}`);
+  revalidatePath(`/workspace/${slug}/projects/${projectId}`, "layout");
   revalidatePath(`/workspace/${slug}/projects/${projectId}/tasks`);
   revalidatePath(`/workspace/${slug}/projects/${projectId}/board`);
 }

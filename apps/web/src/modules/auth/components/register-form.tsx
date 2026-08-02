@@ -1,22 +1,23 @@
 "use client";
 
-import { signIn } from "next-auth/react";
 import { useTranslations } from "next-intl";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState } from "react";
+import { registerAction } from "../auth.actions";
+import { useActionError } from "@/i18n/use-action-error";
 
 /**
- * Email + password sign-in — the only auth method. On success NextAuth sets the
- * session cookie and we push to /dashboard, which routes a brand-new account
- * (no workspace yet) into onboarding.
+ * Create account (email + password). On success we send the user to /login with
+ * a ?registered=1 flag so they sign in explicitly — registration never
+ * auto-authenticates. Onboarding then runs as usual on first sign-in.
  */
-export function LoginForm() {
+export function RegisterForm() {
   const t = useTranslations();
   const router = useRouter();
-  const params = useSearchParams();
-  const registered = params.get("registered") === "1";
+  const actionError = useActionError();
 
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -24,22 +25,16 @@ export function LoginForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) return;
+    if (!fullName || !email || !password) return;
     setLoading(true);
     setError(null);
-    try {
-      const res = await signIn("credentials", { email, password, redirect: false });
-      if (res?.error) {
-        setError(t("auth.invalidCredentials"));
-        setLoading(false);
-        return;
-      }
-      router.push("/dashboard");
-      router.refresh();
-    } catch {
-      setError(t("auth.invalidCredentials"));
+    const res = await registerAction({ fullName, email, password });
+    if (!res.ok) {
+      setError(actionError(res, t("auth.registerFailed")));
       setLoading(false);
+      return;
     }
+    router.push("/login?registered=1");
   };
 
   return (
@@ -47,11 +42,25 @@ export function LoginForm() {
       onSubmit={handleSubmit}
       className="space-y-4 rounded-xl border border-border bg-card p-6 shadow-soft"
     >
-      {registered && (
-        <div className="rounded-lg border border-mint/40 bg-mint/10 px-3 py-2 text-sm text-emerald-700">
-          {t("auth.registeredNotice")}
-        </div>
-      )}
+      <div className="space-y-1">
+        <label
+          htmlFor="fullName"
+          className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+        >
+          {t("auth.fullNameLabel")}
+        </label>
+        <input
+          id="fullName"
+          type="text"
+          required
+          autoComplete="name"
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+          placeholder="Nguyễn Văn A"
+          disabled={loading}
+          className="w-full rounded-full border border-input bg-card px-4 py-2.5 text-sm transition-all placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/25"
+        />
+      </div>
 
       <div className="space-y-1">
         <label
@@ -84,36 +93,38 @@ export function LoginForm() {
           id="password"
           type="password"
           required
-          autoComplete="current-password"
+          minLength={8}
+          autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="••••••••"
           disabled={loading}
           className="w-full rounded-full border border-input bg-card px-4 py-2.5 text-sm transition-all placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/25"
         />
+        <p className="text-xs text-muted-foreground">{t("auth.passwordHint")}</p>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <button
         type="submit"
-        disabled={!email || !password || loading}
+        disabled={!fullName || !email || !password || loading}
         className="flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-soft transition-all duration-150 hover:bg-primary-hover active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50"
       >
         {loading ? (
           <span className="flex items-center gap-2">
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-            {t("auth.signingIn")}
+            {t("auth.creatingAccount")}
           </span>
         ) : (
-          t("auth.signIn")
+          t("auth.createAccount")
         )}
       </button>
 
       <p className="pt-1 text-center text-sm text-muted-foreground">
-        {t("auth.noAccount")}{" "}
-        <Link href="/register" className="font-semibold text-primary hover:underline">
-          {t("auth.createAccount")}
+        {t("auth.haveAccount")}{" "}
+        <Link href="/login" className="font-semibold text-primary hover:underline">
+          {t("auth.signIn")}
         </Link>
       </p>
     </form>

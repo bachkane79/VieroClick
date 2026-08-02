@@ -45,7 +45,7 @@ export async function requestAgentJobAction(args: BaseArgs & { data: unknown }) 
       projectId: args.projectId,
       input: args.data,
     });
-    revalidatePath(`/workspace/${args.slug}/project/${args.projectId}`);
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}`, "layout");
     return job;
   });
 }

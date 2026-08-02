@@ -95,8 +95,24 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
     .slice(0, 6);
 
   let wsBlocked = 0;
-  for (const s of stats.values()) wsBlocked += s.blocked;
+  let wsTotal = 0;
+  let wsDone = 0;
+  for (const s of stats.values()) {
+    wsBlocked += s.blocked;
+    wsTotal += s.total;
+    wsDone += s.done;
+  }
   const activeCount = projects.filter((p) => p.status === "active").length;
+
+  // Petal metrics — all four are computed, never placeholders.
+  const share = (part: number, whole: number) =>
+    whole > 0 ? Math.round((part / whole) * 100) : 0;
+  const myTotal = myOpen + myDone;
+  const myDonePct = share(myDone, myTotal);
+  const myOnTimePct = myOpen > 0 ? share(myOpen - myOverdue, myOpen) : 100;
+  const wsDonePct = share(wsDone, wsTotal);
+  const wsFlowPct = wsTotal > 0 ? share(wsTotal - wsBlocked, wsTotal) : 100;
+  const qualityKey = (pct: number) => (pct >= 80 ? "good" : pct >= 50 ? "ok" : "low");
 
   const todayLabel = format.dateTime(now, "weekdayDate");
 
@@ -196,7 +212,7 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
                     return (
                       <Link
                         key={task.id}
-                        href={`/workspace/${slug}/projects/${task.projectId}/tasks`}
+                        href={`/workspace/${slug}/projects/${task.projectId}/tasks?task=${task.id}`}
                         className="flex items-center gap-3 border-b border-border/60 px-4 py-3 transition-colors last:border-b-0 hover:bg-surface-hover/80"
                       >
                         <Circle className="h-4 w-4 shrink-0 text-muted-foreground/50" />
@@ -379,18 +395,30 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
                 <div className="relative flex h-36 w-36 items-center justify-center">
                   <div className="absolute inset-0 animate-pulse rounded-full bg-gradient-to-tr from-orange-400/20 via-amber-300/30 to-emerald-400/20 opacity-70 blur-xl" />
 
-                  <div className="absolute top-1 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-400/30 text-[10px] font-bold text-emerald-800 blur-md dark:text-emerald-200">
-                    <span className="translate-y-1">87%</span>
-                  </div>
-                  <div className="absolute right-1 flex h-14 w-14 items-center justify-center rounded-full bg-amber-400/30 text-[10px] font-bold text-amber-800 blur-md dark:text-amber-200">
-                    <span className="-translate-x-1">89%</span>
-                  </div>
-                  <div className="absolute bottom-1 flex h-14 w-14 items-center justify-center rounded-full bg-orange-400/30 text-[10px] font-bold text-orange-800 blur-md dark:text-orange-200">
-                    <span className="-translate-y-1">92%</span>
-                  </div>
-                  <div className="absolute left-1 flex h-14 w-14 items-center justify-center rounded-full bg-purple-400/30 text-[10px] font-bold text-purple-800 blur-md dark:text-purple-200">
-                    <span className="translate-x-1">78%</span>
-                  </div>
+                  <Petal
+                    className="top-1 bg-emerald-400/30 text-emerald-900 dark:text-emerald-100"
+                    inner="translate-y-1"
+                    label={t("home.petal.myDone")}
+                    pct={myDonePct}
+                  />
+                  <Petal
+                    className="right-1 bg-amber-400/30 text-amber-900 dark:text-amber-100"
+                    inner="-translate-x-1"
+                    label={t("home.petal.onTime")}
+                    pct={myOnTimePct}
+                  />
+                  <Petal
+                    className="bottom-1 bg-orange-400/30 text-orange-900 dark:text-orange-100"
+                    inner="-translate-y-1"
+                    label={t("home.petal.wsProgress")}
+                    pct={wsDonePct}
+                  />
+                  <Petal
+                    className="left-1 bg-purple-400/30 text-purple-900 dark:text-purple-100"
+                    inner="translate-x-1"
+                    label={t("home.petal.unblocked")}
+                    pct={wsFlowPct}
+                  />
 
                   <div className="relative z-10 grid h-10 w-10 place-items-center rounded-full border border-border/80 bg-card shadow-md">
                     <CheckCircle2 className="h-5 w-5 text-primary" />
@@ -402,14 +430,22 @@ export default async function WorkspaceOverviewPage({ params }: Props) {
                 <div className="rounded-xl bg-surface-subtle p-2">
                   <p className="text-[10px] font-medium text-muted-foreground">{t("home.focus")}</p>
                   <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                    {t("home.focusValue")}
+                    {t("home.pctQuality", {
+                      pct: myDonePct,
+                      quality: t(`home.quality.${qualityKey(myDonePct)}`),
+                    })}
                   </p>
                 </div>
                 <div className="rounded-xl bg-surface-subtle p-2">
                   <p className="text-[10px] font-medium text-muted-foreground">
                     {t("home.onTime")}
                   </p>
-                  <p className="text-xs font-bold text-primary">{t("home.onTimeValue")}</p>
+                  <p className="text-xs font-bold text-primary">
+                    {t("home.pctQuality", {
+                      pct: myOnTimePct,
+                      quality: t(`home.quality.${qualityKey(myOnTimePct)}`),
+                    })}
+                  </p>
                 </div>
               </div>
             </div>
@@ -593,6 +629,35 @@ function Stat({
       <p className={cn("mt-2 text-2xl font-bold tabular-nums tracking-tight", style.text)}>
         {value}
       </p>
+    </div>
+  );
+}
+
+/**
+ * One lobe of the radial widget. The numbers are real now, so the lobes are no
+ * longer `blur-md` — a blurred metric is decoration, and it also carries a
+ * `title` so hovering says which metric it is.
+ */
+function Petal({
+  className,
+  inner,
+  label,
+  pct,
+}: {
+  className: string;
+  inner: string;
+  label: string;
+  pct: number;
+}) {
+  return (
+    <div
+      title={`${label}: ${pct}%`}
+      className={cn(
+        "absolute flex h-14 w-14 items-center justify-center rounded-full text-[11px] font-bold tabular-nums backdrop-blur-[2px]",
+        className
+      )}
+    >
+      <span className={inner}>{pct}%</span>
     </div>
   );
 }

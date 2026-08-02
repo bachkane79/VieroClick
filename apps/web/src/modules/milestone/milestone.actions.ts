@@ -17,7 +17,7 @@ export async function createMilestoneAction(args: BaseArgs & { data: unknown }) 
       projectId: args.projectId,
       input: args.data,
     });
-    revalidatePath(`/workspace/${args.slug}/project/${args.projectId}`);
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}`, "layout");
     return milestone;
   });
 }
@@ -32,7 +32,7 @@ export async function updateMilestoneAction(
       milestoneId: args.milestoneId,
       input: args.data,
     });
-    revalidatePath(`/workspace/${args.slug}/project/${args.projectId}`);
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}`, "layout");
     return milestone;
   });
 }
@@ -44,7 +44,7 @@ export async function deleteMilestoneAction(args: BaseArgs & { milestoneId: stri
       projectId: args.projectId,
       milestoneId: args.milestoneId,
     });
-    revalidatePath(`/workspace/${args.slug}/project/${args.projectId}`);
+    revalidatePath(`/workspace/${args.slug}/projects/${args.projectId}`, "layout");
     return result;
   });
 }

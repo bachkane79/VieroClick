@@ -55,6 +55,7 @@ export default async function ProjectDocsDecisionsPage({ params }: Props) {
           members={workspaceMembers.map((m) => ({
             id: m.id,
             fullName: m.fullName,
+            email: m.email,
           }))}
           tasks={tasks.map((t) => ({ id: t.id, title: t.title }))}
         />

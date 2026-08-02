@@ -63,14 +63,16 @@ export async function enqueueNotifications(
     }))
   );
 
-  // Forward to Telegram once per distinct (workspace, title, body) so multiple
-  // recipients of the same event don't produce duplicate messages.
+  // Forward to Telegram once per distinct (workspace, project, title, body) so
+  // multiple recipients of the same event don't produce duplicate messages.
+  // `projectId` is part of the key — and passed on — because a project can route
+  // to its own linked chat instead of the workspace default.
   const seen = new Set<string>();
   for (const n of items) {
-    const key = `${n.workspaceId}|${n.title}|${n.body ?? ""}`;
+    const key = `${n.workspaceId}|${n.projectId ?? ""}|${n.title}|${n.body ?? ""}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    void notifyWorkspaceBot(n.workspaceId, n.title, n.body).catch(() => {
+    void notifyWorkspaceBot(n.workspaceId, n.title, n.body, n.projectId).catch(() => {
       // best-effort: never surface Telegram delivery failures to the caller
     });
   }
