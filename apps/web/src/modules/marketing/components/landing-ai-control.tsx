@@ -85,7 +85,7 @@ export function LandingAiControl() {
       ref={sectionRef}
       id="ai-control"
       aria-labelledby="ai-control-title"
-      className="bg-canvas py-20 md:py-28"
+      className="bg-canvas py-16 md:py-20"
     >
       <Container className="max-w-[1168px]">
         <Reveal className="mx-auto mb-14 max-w-2xl px-4 text-center">

@@ -109,7 +109,7 @@ export function LandingLogos() {
   const t = useTranslations("landing.logos");
 
   return (
-    <section className="bg-canvas py-14">
+    <section className="bg-canvas py-10 md:py-12">
       <Container>
         <MicroLabel className="text-center lg:text-left">{t("title")}</MicroLabel>
         <ul className="mt-7 flex flex-wrap items-center justify-center gap-x-8 gap-y-5 lg:flex-nowrap lg:justify-between lg:gap-x-4">
@@ -145,7 +145,10 @@ export function LandingProblem() {
   const t = useTranslations("landing.problem");
 
   return (
-    <section aria-labelledby="problem-title" className="overflow-hidden bg-canvas py-20 md:py-28">
+    <section
+      aria-labelledby="problem-title"
+      className="overflow-hidden border-t border-border bg-canvas py-16 md:py-20"
+    >
       <Container>
         <div className="grid items-start gap-6 lg:grid-cols-2 lg:gap-16">
           <Reveal>

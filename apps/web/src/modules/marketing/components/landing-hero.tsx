@@ -28,7 +28,7 @@ export function LandingHero() {
   const t = useTranslations("landing.hero");
 
   return (
-    <section className="relative overflow-hidden bg-canvas pb-16 pt-28 lg:pb-0 lg:pt-32">
+    <section className="relative overflow-hidden bg-canvas pb-12 pt-28 lg:pb-0 lg:pt-32">
       {/* Warm bloom behind the product — Grainient "Spectral Gradient (Lights)".
           Source art is 3840×2400 / 7.3 MB; what ships is a cropped, mirrored,
           1200px re-encode at 75 KB (AVIF, with a 131 KB WebP fallback). Format

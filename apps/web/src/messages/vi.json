@@ -2274,17 +2274,6 @@
     "logos": {
       "title": "Tích hợp với"
     },
-    "views": {
-      "eyebrow": "GIAO DIỆN",
-      "title": "Một dự án, năm góc nhìn.",
-      "lead": "Chuyển góc nhìn theo cách đội bạn làm việc — không phải ngược lại.",
-      "tablistLabel": "Các góc nhìn dự án",
-      "overview": "Tổng quan",
-      "list": "Danh sách",
-      "board": "Bảng",
-      "calendar": "Lịch",
-      "report": "Báo cáo"
-    },
     "problem": {
       "eyebrow": "VẤN ĐỀ",
       "title": "Bạn mất cả ngày chỉ để theo sát dự án.",
@@ -2303,6 +2292,9 @@
       "title": "Quản lý dự án xuyên suốt, từ kế hoạch đến báo cáo",
       "lead": "VieroClick đưa kế hoạch, phân công, tiến độ, rủi ro và báo cáo về cùng một luồng làm việc. Bạn chọn để AI tự áp dụng khi đủ tin cậy hoặc chuyển đề xuất sang bước phê duyệt.",
       "railLabel": "Các bước quản lý dự án",
+      "sliderLabel": "Vòng đời quản lý dự án",
+      "previous": "Giai đoạn trước",
+      "next": "Giai đoạn tiếp theo",
       "stages": {
         "planning": {
           "nav": "Kế hoạch",
@@ -2561,6 +2553,20 @@
       "enterpriseF5": "SLA cam kết 99.9%",
       "lead": "Bắt đầu miễn phí. Nâng cấp khi đội bạn sẵn sàng."
     },
+    "faq": {
+      "title": "Câu hỏi thường gặp.",
+      "lead": "Những điều cần biết trước khi đưa VieroClick vào công việc hằng ngày của đội bạn.",
+      "freeQuestion": "Đội của tôi có thể bắt đầu miễn phí không?",
+      "freeAnswer": "Có. Gói Khởi đầu có giá 0₫, hỗ trợ tối đa năm thành viên và ba dự án, đồng thời bao gồm Agent Báo cáo và Agent Chào buổi sáng.",
+      "agentsQuestion": "Sáu AI Agent thực sự làm những gì?",
+      "agentsAnswer": "Các Agent phụ trách lập kế hoạch, phân công, quan sát tiến độ, báo cáo ngày, bản tin buổi sáng và hỏi đáp dự án. Mỗi Agent đều đọc trạng thái dự án hiện tại trước khi phản hồi.",
+      "approvalQuestion": "AI có tự thay đổi công việc khi chưa được duyệt không?",
+      "approvalAnswer": "Bạn chọn mức kiểm soát cho từng dự án. Chế độ cần xem xét giữ đề xuất để một người phê duyệt, còn chế độ tự động có thể áp dụng các hành động đủ điều kiện.",
+      "teamsQuestion": "Nhiều phòng ban có thể dùng chung một workspace không?",
+      "teamsAnswer": "Có. Đội dự án, marketing, sản phẩm và kỹ thuật, vận hành, nhân sự và lãnh đạo có thể giữ quy trình riêng trong khi cùng chia sẻ workspace và dữ liệu dự án.",
+      "telegramQuestion": "Tích hợp Telegram hoạt động như thế nào?",
+      "telegramAnswer": "Đội ngũ có thể hỏi trạng thái và yêu cầu báo cáo dự án từ Telegram. Các cập nhật và báo cáo trở ngại được đề xuất sẽ qua bước phê duyệt trước khi ghi vào dự án."
+    },
     "security": {
       "dataResidency": "Dữ liệu đặt tại Việt Nam",
       "encryption": "Mã hóa TLS 1.3 & AES-256",
@@ -2568,8 +2574,8 @@
       "audit": "Nhật ký kiểm toán đầy đủ"
     },
     "cta": {
-      "title": "Mọi công việc, mọi con người, đều được AI hỗ trợ",
-      "lead": "Thiết lập trong 5 phút. Để đội ngũ tập trung vào chuyên môn.",
+      "title": "Một cú nhấp. Dự án tiếp tục vận hành.",
+      "lead": "Lập kế hoạch, phân công theo khối lượng, phát hiện rủi ro và gửi báo cáo với các AI Agent cùng hoạt động trong một quy trình.",
       "primary": "Dùng thử miễn phí",
       "secondary": "Đặt lịch demo",
       "note": "Không cần thẻ tín dụng · Hủy bất cứ lúc nào"
@@ -2660,6 +2666,26 @@
       "lead": "Quy trình quen thuộc của bạn, vận hành bởi các AI Agent của VieroClick.",
       "tablistLabel": "Chọn đội nhóm",
       "cta": "Khám phá giải pháp",
+      "workspace": "Không gian {team}",
+      "mockAiRunning": "AI Agent đang điều phối kế hoạch",
+      "mockOnTrack": "Đúng tiến độ",
+      "mockPlan": "Kế hoạch trực tiếp",
+      "mockActivity": "Hoạt động Agent",
+      "mockReports": "Báo cáo",
+      "mockWorkstreams": "Luồng công việc",
+      "mockTimeline": "Tuần này",
+      "mockCalendar": "Lịch chiến dịch",
+      "mockBoard": "Bảng sprint",
+      "mockPipeline": "Luồng tiếp nhận",
+      "mockOnboarding": "Kế hoạch onboarding",
+      "mockPortfolio": "Tổng quan danh mục",
+      "mockBacklog": "Backlog",
+      "mockInProgress": "Đang thực hiện",
+      "mockReview": "Cần xem xét",
+      "mockComplete": "Đúng tiến độ",
+      "mockHealth": "Sức khỏe",
+      "mockOwner": "Phụ trách",
+      "mockStatus": "Trạng thái",
       "projectsTab": "Dự án",
       "projectsHeadA": "Bàn giao đúng hạn,",
       "projectsHeadB": "không cần",

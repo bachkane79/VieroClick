@@ -1,9 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, BarChart3, Bot } from "lucide-react";
+import { useRef, useState, type KeyboardEvent } from "react";
+import { AlertTriangle, ArrowLeft, ArrowRight, BarChart3, Bot } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { cn } from "@vieroc/ui";
 import { Reveal } from "./landing-ui";
 
 const STAGES = ["planning", "assignment", "tracking", "risk", "reporting"] as const;
@@ -19,45 +20,84 @@ const IMAGES: Record<Stage, string> = {
 };
 
 const canvasClass =
-  "relative aspect-[4/4.8] w-full overflow-hidden rounded-shell bg-surface-subtle shadow-[0_3px_3px_rgba(0,0,0,0.03),0_12px_18px_rgba(0,0,0,0.06),0_36px_64px_rgba(0,0,0,0.12)] min-[380px]:aspect-[4/4.2] sm:aspect-square";
+  "relative h-[390px] w-full overflow-hidden rounded-shell bg-surface-subtle shadow-[0_3px_3px_rgba(0,0,0,0.03),0_12px_18px_rgba(0,0,0,0.06),0_36px_64px_rgba(0,0,0,0.12)] sm:h-[460px] lg:h-[520px]";
 
 const panelClass =
   "border border-border bg-surface shadow-[0_1px_1px_rgba(0,0,0,0.04),0_6px_12px_rgba(0,0,0,0.06),0_20px_32px_rgba(0,0,0,0.08)]";
 
 export function LandingAgentsDark() {
   const t = useTranslations("landing.agents");
-  const sectionRef = useRef<HTMLElement>(null);
+  const railRef = useRef<HTMLDivElement>(null);
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [activeStage, setActiveStage] = useState<Stage>("planning");
+  const activeIndex = STAGES.indexOf(activeStage);
 
-  useEffect(() => {
-    const root = sectionRef.current;
-    if (!root) return;
+  function goToStage(stage: Stage, behavior: ScrollBehavior = "smooth") {
+    const rail = railRef.current;
+    const slide = rail?.querySelector<HTMLElement>(`#lifecycle-${stage}`);
+    if (!rail || !slide) return;
 
-    const sections = root.querySelectorAll<HTMLElement>("[data-lifecycle-stage]");
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting)
-            setActiveStage(entry.target.id.replace("lifecycle-", "") as Stage);
-        }
-      },
-      { rootMargin: "-25% 0px -50% 0px" }
-    );
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    rail.scrollTo({ left: slide.offsetLeft, behavior: reduceMotion ? "auto" : behavior });
+    setActiveStage(stage);
+  }
 
-    sections.forEach((section) => observer.observe(section));
-    return () => observer.disconnect();
-  }, []);
+  function moveBy(offset: number, behavior: ScrollBehavior = "smooth") {
+    const nextIndex = Math.min(Math.max(activeIndex + offset, 0), STAGES.length - 1);
+    const nextStage = STAGES[nextIndex];
+    if (nextStage) goToStage(nextStage, behavior);
+  }
+
+  function handleRailScroll() {
+    const rail = railRef.current;
+    if (!rail || rail.clientWidth === 0) return;
+
+    const nextStage = STAGES[Math.round(rail.scrollLeft / rail.clientWidth)];
+    if (nextStage) setActiveStage(nextStage);
+  }
+
+  function handleRailKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      moveBy(1, "auto");
+    } else if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      moveBy(-1, "auto");
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      goToStage(STAGES[0], "auto");
+    } else if (event.key === "End") {
+      event.preventDefault();
+      const lastStage = STAGES[STAGES.length - 1];
+      if (lastStage) goToStage(lastStage, "auto");
+    }
+  }
+
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    let nextIndex: number | undefined;
+
+    if (event.key === "ArrowRight") nextIndex = (index + 1) % STAGES.length;
+    if (event.key === "ArrowLeft") nextIndex = (index - 1 + STAGES.length) % STAGES.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = STAGES.length - 1;
+    if (nextIndex === undefined) return;
+
+    event.preventDefault();
+    const nextStage = STAGES[nextIndex];
+    if (!nextStage) return;
+    tabRefs.current[nextIndex]?.focus();
+    goToStage(nextStage, "auto");
+  }
 
   return (
     <section
-      ref={sectionRef}
       aria-labelledby="agents-title"
       id="agents"
-      className="bg-canvas pb-32 pt-28 md:pb-48 md:pt-48"
+      className="border-y border-border bg-surface-subtle py-16 md:py-20"
     >
-      <div className="mx-auto w-full max-w-[1090px] px-4 md:px-6 xl:px-0">
-        <div className="pb-28 md:pb-48">
-          <Reveal className="w-full">
+      <div className="mx-auto w-full max-w-[1168px] px-4 md:px-6 xl:px-0">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+          <Reveal className="max-w-[860px]">
             <h2
               id="agents-title"
               className="text-balance text-3xl font-bold leading-[1.15] tracking-[-0.02em] text-foreground sm:text-4xl lg:text-5xl"
@@ -68,62 +108,104 @@ export function LandingAgentsDark() {
               {t("lead")}
             </p>
           </Reveal>
+
+          <Reveal delay={100} className="flex items-center gap-3 lg:pb-1">
+            <span aria-live="polite" className="mr-1 min-w-12 text-sm font-semibold text-foreground">
+              {activeIndex + 1} / {STAGES.length}
+            </span>
+            <button
+              type="button"
+              onClick={() => moveBy(-1)}
+              disabled={activeIndex === 0}
+              aria-label={t("previous")}
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-canvas text-foreground transition-colors duration-150 ease-out hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-not-allowed disabled:opacity-35 motion-reduce:transition-none"
+            >
+              <ArrowLeft aria-hidden className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => moveBy(1)}
+              disabled={activeIndex === STAGES.length - 1}
+              aria-label={t("next")}
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-canvas text-foreground transition-colors duration-150 ease-out hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-not-allowed disabled:opacity-35 motion-reduce:transition-none"
+            >
+              <ArrowRight aria-hidden className="h-4 w-4" />
+            </button>
+          </Reveal>
         </div>
 
-        <div className="relative flex flex-col justify-between md:flex-row">
-          <nav aria-label={t("railLabel")} className="relative hidden w-40 shrink-0 md:block">
-            <ol className="sticky top-32">
-              {STAGES.map((stage) => {
-                const active = activeStage === stage;
-                return (
-                  <li key={stage}>
-                    <a
-                      href={`#lifecycle-${stage}`}
-                      aria-current={active ? "step" : undefined}
-                      className={`relative block rounded-sm py-3.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 ${
-                        active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {t(`stages.${stage}.nav`)}
-                      <span aria-hidden className="absolute inset-x-0 bottom-0 h-px bg-border" />
-                      <span
-                        aria-hidden
-                        className={`absolute inset-x-0 bottom-0 h-0.5 origin-left bg-primary transition-transform duration-500 ease-out motion-reduce:transition-none ${
-                          active ? "scale-x-100" : "scale-x-0"
-                        }`}
-                      />
-                    </a>
-                  </li>
-                );
-              })}
-            </ol>
+        <Reveal delay={140}>
+          <nav
+            aria-label={t("railLabel")}
+            className="no-scrollbar mt-10 flex overflow-x-auto border-b border-border"
+          >
+            {STAGES.map((stage, index) => {
+              const active = activeStage === stage;
+              return (
+                <button
+                  key={stage}
+                  ref={(node) => {
+                    tabRefs.current[index] = node;
+                  }}
+                  type="button"
+                  tabIndex={active ? 0 : -1}
+                  aria-current={active ? "step" : undefined}
+                  onClick={() => goToStage(stage)}
+                  onKeyDown={(event) => handleTabKeyDown(event, index)}
+                  className={cn(
+                    "relative min-h-12 shrink-0 px-5 text-sm font-semibold transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring motion-reduce:transition-none first:pl-0",
+                    active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {t(`stages.${stage}.nav`)}
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "absolute bottom-0 h-0.5 origin-left bg-primary transition-transform duration-200 ease-in-out motion-reduce:transition-none",
+                      index === 0 ? "left-0 right-5" : "inset-x-5",
+                      active ? "scale-x-100" : "scale-x-0"
+                    )}
+                  />
+                </button>
+              );
+            })}
           </nav>
+        </Reveal>
 
-          <div className="w-full md:max-w-[546px] md:shrink-0">
-            {STAGES.map((stage, index) => (
+        <Reveal delay={180} className="mt-8">
+          <div
+            ref={railRef}
+            tabIndex={0}
+            onScroll={handleRailScroll}
+            onKeyDown={handleRailKeyDown}
+            aria-label={t("sliderLabel")}
+            className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto rounded-shell border border-border bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-4 focus-visible:ring-offset-[hsl(var(--surface-subtle))]"
+          >
+            {STAGES.map((stage) => (
               <article
                 key={stage}
                 id={`lifecycle-${stage}`}
-                data-lifecycle-stage
-                className={`${index === STAGES.length - 1 ? "" : "mb-32 md:mb-40"} scroll-mt-32`}
+                className="grid w-full shrink-0 snap-start snap-always lg:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)]"
               >
-                <div className="mb-8 pr-2 sm:pr-4">
+                <div className="flex flex-col justify-center px-7 py-9 sm:px-10 sm:py-12 lg:px-12 lg:py-14">
                   <p className="mb-3 text-xs font-bold uppercase tracking-[0.08em] text-[#B9380E]">
                     {t(`stages.${stage}.eyebrow`)}
                   </p>
-                  <h3 className="mb-3 text-2xl font-bold leading-[1.2] tracking-[-0.02em] text-foreground md:text-3xl">
+                  <h3 className="text-balance text-2xl font-bold leading-[1.2] tracking-[-0.02em] text-foreground md:text-3xl">
                     {t(`stages.${stage}.title`)}
                   </h3>
-                  <p className="text-base leading-relaxed text-muted-foreground">
+                  <p className="mt-4 max-w-[52ch] text-base leading-relaxed text-muted-foreground">
                     {t(`stages.${stage}.body`)}
                   </p>
                 </div>
 
-                <LifecycleVisual stage={stage} />
+                <div className="min-w-0 border-t border-border bg-canvas p-4 sm:p-6 lg:border-l lg:border-t-0 lg:p-8">
+                  <LifecycleVisual stage={stage} />
+                </div>
               </article>
             ))}
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   );

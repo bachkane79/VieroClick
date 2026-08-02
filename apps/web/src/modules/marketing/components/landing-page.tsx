@@ -6,16 +6,16 @@ import { LandingFooter } from "./landing-footer";
 import { LandingAgentsDark } from "./landing-agents";
 import { LandingAiControl } from "./landing-ai-control";
 import { LandingLogos, LandingProblem } from "./landing-sections";
-import { LandingViews } from "./landing-views";
 import { LandingSolutions } from "./landing-solutions";
-import { LandingCta, LandingSecurity, LandingStats, LandingTestimonials } from "./landing-proof";
+import { LandingFaq } from "./landing-faq";
+import { LandingCta } from "./landing-proof";
 
 /**
  * The public marketing page, served at `/` to signed-out visitors.
  *
  * Section order follows one continuous argument: promise → the manager's
  * problem → the lifecycle that resolves it → human control over AI → the
- * product itself → fit and proof → price → one last ask.
+ * team fit → price → common questions → one last ask.
  */
 export function LandingPage() {
   const t = useTranslations("landing.nav");
@@ -37,12 +37,9 @@ export function LandingPage() {
         <LandingProblem />
         <LandingAgentsDark />
         <LandingAiControl />
-        <LandingViews />
         <LandingSolutions />
-        <LandingStats />
-        <LandingTestimonials />
         <LandingPricing />
-        <LandingSecurity />
+        <LandingFaq />
         <LandingCta />
       </main>
 

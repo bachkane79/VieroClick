@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { Award, FileClock, Lock, MapPin, ShieldCheck, Star } from "lucide-react";
 import { cn } from "@vieroc/ui";
@@ -5,11 +6,11 @@ import {
   Container,
   CtaDark,
   CtaGhost,
+  CtaPrimary,
   DisplayTitle,
   Reveal,
   SectionLead,
 } from "./landing-ui";
-import { CtaAppMock } from "./mocks/cta-app-mock";
 
 /* ------------------------------------------------------------------ stats */
 
@@ -45,7 +46,7 @@ export function LandingStats() {
                   i > 0 && "sm:border-l sm:border-border",
                   // The 4-up row resets the divider at the wrap point, or the
                   // third column picks up a stray rule at sm.
-                  i === 2 && "lg:border-l sm:border-l-0",
+                  i === 2 && "sm:border-l-0 lg:border-l",
                   i === 0 && "sm:pl-0"
                 )}
               >
@@ -139,9 +140,7 @@ export function LandingTestimonials() {
 
                 <figcaption className="relative mt-5 flex items-end justify-between gap-4">
                   <div className="text-xs leading-relaxed text-white/75">
-                    <span className="block font-semibold text-white/90">
-                      {t(`author${q.k}`)}
-                    </span>
+                    <span className="block font-semibold text-white/90">{t(`author${q.k}`)}</span>
                     {t(`role${q.k}`)}
                   </div>
                   <span className="shrink-0 text-sm font-bold tracking-tight text-white">
@@ -191,7 +190,7 @@ export function LandingSecurity() {
               className={cn(
                 "flex flex-col items-center gap-2.5 text-center sm:px-6",
                 i > 0 && "sm:border-l sm:border-border",
-                i === 2 && "lg:border-l sm:border-l-0"
+                i === 2 && "sm:border-l-0 lg:border-l"
               )}
             >
               <Icon className="h-5 w-5 text-muted-foreground" />
@@ -206,69 +205,45 @@ export function LandingSecurity() {
 
 /* -------------------------------------------------------------------- cta */
 
-/**
- * Closing band. A saturated gradient with the product mock clipped by the
- * band's bottom edge — the page's one big colour moment, deliberately held
- * back until the end.
- */
+/** Closing ask: one VieroClick action coordinating the six product agents. */
 export function LandingCta() {
   const t = useTranslations("landing.cta");
 
   return (
-    <section aria-labelledby="cta-title" className="bg-canvas pb-16 pt-6">
-      <Container>
-        <div
-          className="relative overflow-hidden rounded-shell px-6 pt-16 md:pt-20"
-          style={{
-            background:
-              "linear-gradient(135deg, #FF6835 0%, #F0455F 38%, #C43A9B 68%, #7C55D6 100%)",
-          }}
-        >
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 opacity-40"
-            style={{
-              background:
-                "radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.45) 0%, transparent 60%)",
-            }}
+    <section
+      id="cta"
+      aria-labelledby="cta-title"
+      className="relative isolate flex min-h-[520px] items-center justify-center overflow-hidden bg-surface px-4 py-16 md:min-h-[556px] md:px-6 md:py-20"
+    >
+      <Reveal className="relative z-10 w-full max-w-[720px] text-center">
+        <div className="mx-auto flex h-32 w-[300px] items-center justify-center overflow-hidden sm:h-36">
+          <Image
+            src="/logo_transparent.png"
+            alt=""
+            width={230}
+            height={230}
+            className="h-[230px] w-[230px] object-contain"
           />
+        </div>
 
-          <div className="relative mx-auto max-w-[800px] text-center">
-            <Reveal>
-              <span className="inline-flex h-16 w-16 items-center justify-center rounded-[18px] bg-white shadow-elevated">
-                <span className="text-2xl font-bold tracking-tight text-primary">V</span>
-              </span>
-            </Reveal>
+        <div className="mt-5">
+          <h2
+            id="cta-title"
+            className="text-balance text-[30px] font-bold leading-[1.05] tracking-[-0.035em] text-foreground sm:text-[40px] lg:text-[48px]"
+          >
+            {t("title")}
+          </h2>
 
-            <Reveal delay={100}>
-              <h2
-                id="cta-title"
-                className="mt-7 text-balance text-[30px] font-bold leading-[1.1] tracking-[-0.03em] text-white sm:text-[40px] lg:text-[50px]"
-              >
-                {t("title")}
-              </h2>
-            </Reveal>
+          <p className="mx-auto mt-5 max-w-[500px] text-sm leading-relaxed text-muted-foreground sm:text-base">
+            {t("lead")}
+          </p>
 
-            <Reveal delay={150}>
-              <div className="mt-8 flex flex-col items-center gap-3.5">
-                <CtaGhost
-                  href="/login"
-                  className="border-transparent bg-white text-foreground hover:border-transparent hover:bg-white/90"
-                >
-                  {t("primary")}
-                </CtaGhost>
-                <p className="text-xs text-white/75">{t("note")}</p>
-              </div>
-            </Reveal>
-          </div>
-
-          {/* Mock runs into the band's bottom edge and is cropped by it. There
-              is intentionally no bottom padding here. */}
-          <div aria-hidden className="relative mt-14 flex justify-center">
-            <CtaAppMock />
+          <div className="mt-8 flex flex-col items-center gap-3.5">
+            <CtaPrimary href="/login">{t("primary")}</CtaPrimary>
+            <p className="text-xs text-muted-foreground">{t("note")}</p>
           </div>
         </div>
-      </Container>
+      </Reveal>
     </section>
   );
 }

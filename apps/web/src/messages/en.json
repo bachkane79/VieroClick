@@ -2274,17 +2274,6 @@
     "logos": {
       "title": "Works with"
     },
-    "views": {
-      "eyebrow": "THE INTERFACE",
-      "title": "One project, five ways to see it.",
-      "lead": "Switch the view to match how your team works — not the other way round.",
-      "tablistLabel": "Project views",
-      "overview": "Overview",
-      "list": "List",
-      "board": "Board",
-      "calendar": "Calendar",
-      "report": "Report"
-    },
     "problem": {
       "eyebrow": "THE PROBLEM",
       "title": "You spend all day just keeping up with the project.",
@@ -2303,6 +2292,9 @@
       "title": "Manage every project from plan to report",
       "lead": "VieroClick brings plans, assignments, progress, risks, and reports into one workflow. Choose whether confident AI suggestions apply automatically or move to review.",
       "railLabel": "Project management stages",
+      "sliderLabel": "Project management lifecycle",
+      "previous": "Previous stage",
+      "next": "Next stage",
       "stages": {
         "planning": {
           "nav": "Plan",
@@ -2561,6 +2553,20 @@
       "enterpriseF5": "99.9% SLA",
       "lead": "Start free. Upgrade when your team is ready."
     },
+    "faq": {
+      "title": "Questions, answered.",
+      "lead": "The essentials before you bring VieroClick into your team's daily work.",
+      "freeQuestion": "Can my team start for free?",
+      "freeAnswer": "Yes. The Starter plan costs 0₫ and supports up to five members and three projects, with daily report and morning briefing agents included.",
+      "agentsQuestion": "What do the six AI agents actually do?",
+      "agentsAnswer": "They cover planning, assignment, progress observation, daily reporting, morning briefings, and project Q&A. Each agent reads the current project state before it responds.",
+      "approvalQuestion": "Will AI change project work without approval?",
+      "approvalAnswer": "You choose the control level per project. Review-required mode holds suggestions for a person to approve, while full-auto mode can apply qualified actions automatically.",
+      "teamsQuestion": "Can different departments use the same workspace?",
+      "teamsAnswer": "Yes. Projects, marketing, product and engineering, operations, people, and leadership teams can keep their own workflows while sharing the same workspace and project data.",
+      "telegramQuestion": "How does the Telegram integration work?",
+      "telegramAnswer": "Teams can request project status and reports from Telegram. Proposed updates and blocker reports use an approval step before they are committed to the project."
+    },
     "security": {
       "dataResidency": "Data hosted in Vietnam",
       "encryption": "TLS 1.3 & AES-256 encryption",
@@ -2568,8 +2574,8 @@
       "audit": "Full audit logging"
     },
     "cta": {
-      "title": "All your work, all your people, all supported by AI",
-      "lead": "Set up in 5 minutes. Let the team focus on their craft.",
+      "title": "One click. The project keeps moving.",
+      "lead": "Plan work, assign by capacity, catch risks, and send reports with AI agents working inside one shared workflow.",
       "primary": "Start for free",
       "secondary": "Book a demo",
       "note": "No credit card · Cancel any time"
@@ -2660,6 +2666,26 @@
       "lead": "Your familiar workflow, run by VieroClick's AI agents.",
       "tablistLabel": "Choose a team",
       "cta": "Explore the solution",
+      "workspace": "{team} workspace",
+      "mockAiRunning": "AI agents coordinating the plan",
+      "mockOnTrack": "On track",
+      "mockPlan": "Live plan",
+      "mockActivity": "Agent activity",
+      "mockReports": "Reports",
+      "mockWorkstreams": "Workstreams",
+      "mockTimeline": "This week",
+      "mockCalendar": "Campaign calendar",
+      "mockBoard": "Sprint board",
+      "mockPipeline": "Request pipeline",
+      "mockOnboarding": "Onboarding plan",
+      "mockPortfolio": "Portfolio overview",
+      "mockBacklog": "Backlog",
+      "mockInProgress": "In progress",
+      "mockReview": "Review",
+      "mockComplete": "On track",
+      "mockHealth": "Health",
+      "mockOwner": "Owner",
+      "mockStatus": "Status",
       "projectsTab": "Projects",
       "projectsHeadA": "Ship on time,",
       "projectsHeadB": "without the",

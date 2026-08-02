@@ -58,7 +58,7 @@ export function LandingPricing() {
   ];
 
   return (
-    <section id="pricing" aria-labelledby="pricing-title" className="bg-canvas py-20 md:py-28">
+    <section id="pricing" aria-labelledby="pricing-title" className="bg-canvas py-16 md:py-20">
       <Container>
         <Reveal className="text-center">
           <DisplayTitle id="pricing-title" className="mx-auto max-w-[760px]">
