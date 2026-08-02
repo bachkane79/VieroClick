@@ -25,10 +25,20 @@ export default auth((req) => {
   }
 
   const isLoggedIn = !!req.auth?.user?.id;
-  const isAuthPage = pathname.startsWith("/login");
+  // /login and /register are the anonymous auth surfaces; a signed-in visitor
+  // on either is sent to /dashboard, an anonymous one may render them.
+  const isAuthPage = pathname.startsWith("/login") || pathname.startsWith("/register");
 
   if (isAuthPage) {
     if (isLoggedIn) return withRequestId(NextResponse.redirect(new URL("/dashboard", req.url)));
+    return withRequestId(NextResponse.next({ request: { headers: requestHeaders } }));
+  }
+
+  // The marketing root is the product's only public page. Matched exactly —
+  // a `startsWith` here would expose every route under it. `app/page.tsx`
+  // sends signed-in visitors on to /dashboard itself, so this gate stays a
+  // pure "anonymous traffic may render `/`" exception and nothing more.
+  if (pathname === "/") {
     return withRequestId(NextResponse.next({ request: { headers: requestHeaders } }));
   }
 
